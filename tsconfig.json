@@ -22,6 +22,6 @@
     "emitDecoratorMetadata": true,
     "useDefineForClassFields": false
   },
-  "include": ["src/**/*", "test/**/*"],
+  "include": ["src/**/*", "test/**/*", "knex/knex.module.ts", "knex/knexfile.ts", "knex/migrations/**/*.ts"],
   "exclude": ["node_modules", "dist", "__tests__"]
 }
