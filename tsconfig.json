@@ -9,6 +9,8 @@
     "outDir": "dist",
     "sourceMap": true,
     "noImplicitAny": false,
+    "strict": true,
+    "strictNullChecks": true,
     "strictBindCallApply": false,
     "noFallthroughCasesInSwitch": false,
     "esModuleInterop": true,
@@ -20,6 +22,6 @@
     "emitDecoratorMetadata": true,
     "useDefineForClassFields": false
   },
-  "include": ["src/**/*"],
+  "include": ["src/**/*", "test/**/*"],
   "exclude": ["node_modules", "dist", "__tests__"]
 }
