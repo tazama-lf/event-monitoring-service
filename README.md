@@ -1,3 +1,3 @@
-# DEMS Dynnamic Event Monitoring System
+# DEMS Dynamic Event Monitoring Service
 
-Dynnamic Event Monitoring System
+Dynamic Event Monitoring Service
