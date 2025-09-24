@@ -1,5 +1,6 @@
 import { Global, Module } from '@nestjs/common';
 import knex, { Knex } from 'knex';
+import { ConfigNotifyModule } from '../src/config-notify/config-notify.module';
 
 @Global()
 @Module({
@@ -14,5 +15,6 @@ import knex, { Knex } from 'knex';
     },
   ],
   exports: ['KNEX_CONNECTION'],
+  imports: [ConfigNotifyModule],
 })
 export class KnexModule {}

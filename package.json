@@ -27,12 +27,23 @@
   },
   "dependencies": {
     "@nestjs/common": "^11.0.1",
+    "@nestjs/config": "^4.0.2",
     "@nestjs/core": "^11.0.1",
     "@nestjs/platform-express": "^11.0.1",
+    "@nestjs/schedule": "^6.0.1",
+    "@tazama-lf/frms-coe-lib": "^5.1.1",
+    "@tazama-lf/frms-coe-startup-lib": "^3.0.0-rc.1",
+    "axios": "^1.12.2",
+    "class-transformer": "^0.5.1",
+    "class-validator": "^0.14.2",
+    "dotenv": "^17.2.2",
     "knex": "^3.1.0",
+    "nats": "^2.29.3",
+    "node-cache": "^5.1.2",
     "pg": "^8.16.3",
     "reflect-metadata": "^0.2.2",
-    "rxjs": "^7.8.1"
+    "rxjs": "^7.8.1",
+    "uuid": "^13.0.0"
   },
   "devDependencies": {
     "@eslint-community/eslint-plugin-eslint-comments": "^4.5.0",
@@ -47,6 +58,7 @@
     "@types/node": "^22.10.7",
     "@types/pg": "^8.15.5",
     "@types/supertest": "^6.0.2",
+    "@types/uuid": "^10.0.0",
     "eslint": "^9.18.0",
     "eslint-config-love": "^125.0.0",
     "eslint-config-prettier": "^10.1.8",
@@ -80,7 +92,10 @@
       "**/*.(t|j)s"
     ],
     "coverageDirectory": "../coverage",
-    "testEnvironment": "node"
+    "testEnvironment": "node",
+    "setupFiles": [
+      "../jest.setup.js"
+    ]
   },
   "lint-staged": {
     "*.{ts,js}": [
