@@ -53,6 +53,7 @@ export class ConfigNotifyService implements OnModuleInit, OnModuleDestroy {
 
     const configs = (await this.knex('configurations').select('*')) as Config[];
     for (const config of configs) {
+      console.log('Preloading cache for config:', config.id);
       await this.setCache(config);
     }
     this.logger.log(`Cache preloaded: ${configs.length} configurations`);
@@ -131,5 +132,15 @@ export class ConfigNotifyService implements OnModuleInit, OnModuleDestroy {
       artifact_link: config.artifact_link,
     };
     return { configs: [{ key, data }] };
+  }
+
+  async testing(): Promise<string> {
+    const config = await this.knex('configurations').first();
+
+    if (!config) {
+      return 'No configuration found';
+    }
+
+    return `Testing successful: ${JSON.stringify(config)}`;
   }
 }
