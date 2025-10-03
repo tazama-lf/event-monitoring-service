@@ -4,6 +4,7 @@ import { StartupFactory } from '@tazama-lf/frms-coe-startup-lib';
 import { Knex } from 'knex';
 
 interface Config {
+  endpoint: string;
   id: string;
   tenant_id: string;
   msg_fam: string;
@@ -52,9 +53,12 @@ export class ConfigNotifyService implements OnModuleInit, OnModuleDestroy {
     this.logger.log('NATS consumer initialized for config.notification');
 
     const configs = (await this.knex('configurations').select('*')) as Config[];
+    // const schemaRecord = await this.knex('configurations').select('schema');
+
     for (const config of configs) {
-      console.log('Preloading cache for config:', config.id);
-      await this.setCache(config);
+      console.log('Preloading cache for config:', config.endpoint);
+      // await this.setCache(config);
+      await this.redis.setJson(config.endpoint, JSON.stringify(config.schema), CACHE_TTL);
     }
     this.logger.log(`Cache preloaded: ${configs.length} configurations`);
   }
