@@ -39,6 +39,7 @@ export class SchemaService implements OnModuleInit, OnModuleDestroy {
     const schemaRecord = await this.knex('configurations').select('schema').where({ endpoint }).first();
 
     if (schemaRecord) {
+      this.loggerService.log(`Schema found for endpoint: ${endpoint}. Caching result...`);
       await this.redisService.set(cacheKey, schemaRecord, 86400);
       return schemaRecord;
     }
@@ -51,6 +52,7 @@ export class SchemaService implements OnModuleInit, OnModuleDestroy {
     const configuredSchema = await this.findSchemaInDatabase(endpoint);
 
     if (!configuredSchema) {
+      this.loggerService.log(`No schema configured for endpoint: ${endpoint}`);
       return {
         isMatch: false,
         message: 'Schema not found for the specified endpoint',
@@ -61,9 +63,11 @@ export class SchemaService implements OnModuleInit, OnModuleDestroy {
     const isValid = this.ajv.validate(actualSchema, lookupDto);
 
     if (isValid) {
+      this.loggerService.log('Payload structure matches the schema perfectly!');
       return {
         isMatch: true,
         message: 'Payload structure matches the schema perfectly!',
+        schema: actualSchema,
         differences: [],
       };
     }
@@ -86,9 +90,11 @@ export class SchemaService implements OnModuleInit, OnModuleDestroy {
         }
       }) || [];
 
+    this.loggerService.log(`Schema validation errors: ${JSON.stringify(differences)}`);
     return {
       isMatch: false,
       message: 'Payload structure does not match the schema',
+      schema: actualSchema,
       differences,
     };
   }

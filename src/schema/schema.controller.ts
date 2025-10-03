@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, HttpStatus, Param, Post } from '@nestjs/common';
 import { SchemaService } from './schema.service';
 import { LoggerService } from '@tazama-lf/frms-coe-lib';
 import Ajv from 'ajv';
@@ -63,6 +63,22 @@ export class SchemaController {
 
     const result = await this.schemaService.lookupAndCompare(lookupDto, transformedEndpoint);
 
-    return result;
+    if (!result.isMatch) {
+      this.logger.log(`Schema mismatch: ${result.message}`);
+      throw new BadRequestException({
+        message: result.message,
+        differences: result.differences,
+        schema: result.schema,
+        statusCode: HttpStatus.BAD_REQUEST,
+      });
+    }
+
+    this.logger.log(`Schema match: ${result.message}`);
+    return {
+      message: result.message,
+      isMatch: result.isMatch,
+      schema: result.schema,
+      statusCode: HttpStatus.OK,
+    };
   }
 }
