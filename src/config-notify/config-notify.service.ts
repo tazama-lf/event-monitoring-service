@@ -1,10 +1,11 @@
-import { Injectable, Inject, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
+import { Injectable, Inject, OnModuleInit } from '@nestjs/common';
 import { LoggerService, RedisService } from '@tazama-lf/frms-coe-lib';
 import { StartupFactory } from '@tazama-lf/frms-coe-startup-lib';
 import { Knex } from 'knex';
 
 interface Config {
   id: string;
+  endpoint: string;
   tenant_id: string;
   msg_fam: string;
   msg_type: string;
@@ -26,9 +27,8 @@ interface NatsMessage {
 const CACHE_TTL = 86400;
 
 @Injectable()
-export class ConfigNotifyService implements OnModuleInit, OnModuleDestroy {
+export class ConfigNotifyService implements OnModuleInit {
   private readonly natsService = new StartupFactory();
-  private isInitialized = false;
 
   constructor(
     private readonly logger: LoggerService,
@@ -37,31 +37,20 @@ export class ConfigNotifyService implements OnModuleInit, OnModuleDestroy {
   ) {}
 
   async onModuleInit(): Promise<void> {
-    if (this.isInitialized) {
-      this.logger.warn('NATS service already initialized');
-      return;
-    }
-
     await this.natsService.init(
       this.handleNatsMessage.bind(this) as never,
       this.logger,
       ['config.notification'],
       'config.notification.response',
     );
-    this.isInitialized = true;
     this.logger.log('NATS consumer initialized for config.notification');
 
     const configs = (await this.knex('configurations').select('*')) as Config[];
     for (const config of configs) {
       console.log('Preloading cache for config:', config.id);
-      await this.setCache(config);
+      await this.redis.setJson(config.endpoint, JSON.stringify({ schema: config.schema, mapping: config.mapping }), CACHE_TTL);
     }
     this.logger.log(`Cache preloaded: ${configs.length} configurations`);
-  }
-
-  onModuleDestroy(): void {
-    this.isInitialized = false;
-    this.logger.log('ConfigNotifyService destroyed');
   }
 
   private async handleNatsMessage(reqObj: unknown, handleResponse: (response: object) => Promise<void>): Promise<void> {
@@ -72,8 +61,8 @@ export class ConfigNotifyService implements OnModuleInit, OnModuleDestroy {
       const config = (await this.knex('configurations').where('id', message.transactionID).first()) as Config | undefined;
 
       if (config) {
-        await this.setCache(config);
-        this.logger.log(`Updated cache for key: ${config.tenant_id}:${config.msg_fam}:${config.msg_type}:${config.version}`);
+        await this.redis.setJson(config.endpoint, JSON.stringify({ schema: config.schema, mapping: config.mapping }), CACHE_TTL);
+        this.logger.log(`Updated cache for key: ${config.endpoint}`);
       } else {
         this.logger.log(`Config not found for ID: ${message.transactionID}`);
       }
@@ -93,54 +82,5 @@ export class ConfigNotifyService implements OnModuleInit, OnModuleDestroy {
         timestamp: new Date().toISOString(),
       });
     }
-  }
-
-  private async setCache(config: Config): Promise<void> {
-    const key = `${config.tenant_id}:${config.msg_fam}:${config.msg_type}:${config.version}`;
-    const data = {
-      schema: config.schema,
-      mapping: config.mapping,
-      enrichment: config.enrichment,
-      artifact_link: config.artifact_link,
-    };
-    await this.redis.setJson(key, JSON.stringify(data), CACHE_TTL);
-  }
-
-  async getCachedConfig(tenantId: string, msgFam: string, msgType: string, version: string): Promise<object> {
-    const key = `${tenantId}:${msgFam}:${msgType}:${version}`;
-
-    const cached = await this.redis.getJson(key);
-    if (cached) {
-      const data = JSON.parse(cached) as object;
-      return { configs: [{ key, data }] };
-    }
-
-    this.logger.log(`Cache miss for ${key} - lazy loading from database`);
-    const config = (await this.knex('configurations')
-      .where({ tenant_id: tenantId, msg_fam: msgFam, msg_type: msgType, version })
-      .first()) as Config | undefined;
-
-    if (!config) {
-      return { configs: [] };
-    }
-
-    await this.setCache(config);
-    const data = {
-      schema: config.schema,
-      mapping: config.mapping,
-      enrichment: config.enrichment,
-      artifact_link: config.artifact_link,
-    };
-    return { configs: [{ key, data }] };
-  }
-
-  async testing(): Promise<string> {
-    const config = await this.knex('configurations').first();
-
-    if (!config) {
-      return 'No configuration found';
-    }
-
-    return `Testing successful: ${JSON.stringify(config)}`;
   }
 }
