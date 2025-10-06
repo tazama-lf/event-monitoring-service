@@ -1,11 +1,11 @@
-import { Injectable, Inject, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
+import { Injectable, Inject } from '@nestjs/common';
 import { LoggerService, RedisService } from '@tazama-lf/frms-coe-lib';
 import Ajv from 'ajv';
 import addFormats from 'ajv-formats';
 import { Knex } from 'knex';
 
 @Injectable()
-export class SchemaService implements OnModuleInit, OnModuleDestroy {
+export class SchemaService {
   private readonly ajv: Ajv;
   constructor(
     private readonly loggerService: LoggerService,
@@ -14,16 +14,6 @@ export class SchemaService implements OnModuleInit, OnModuleDestroy {
   ) {
     this.ajv = new Ajv({ allErrors: true });
     addFormats(this.ajv);
-  }
-
-  async onModuleInit(): Promise<void> {
-    // Initialize service
-    this.loggerService.log('SchemaService initialized');
-  }
-
-  async onModuleDestroy(): Promise<void> {
-    // Cleanup resources
-    this.loggerService.log('SchemaService destroyed');
   }
 
   async findSchemaInDatabase(endpoint: string): Promise<any> {
