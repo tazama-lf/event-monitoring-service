@@ -4,6 +4,9 @@ import Ajv from 'ajv';
 import addFormats from 'ajv-formats';
 import { Knex } from 'knex';
 
+import { extractTransactionType } from '../utils/extract_message_type';
+import { extractTenantId } from '../utils/extract_tenant_id';
+
 @Injectable()
 export class SchemaService {
   private readonly ajv: Ajv;
@@ -38,7 +41,7 @@ export class SchemaService {
     return null;
   }
 
-  async lookupAndCompare(lookupDto: any, endpoint: string): Promise<any> {
+  async handleMessage(payload: { any }, endpoint: string): Promise<any> {
     const configuredSchema = await this.findSchemaInDatabase(endpoint);
 
     if (!configuredSchema) {
@@ -49,51 +52,55 @@ export class SchemaService {
         differences: ['No schema exists for this endpoint'],
       };
     }
-    const actualSchema = configuredSchema.schema;
-    const isValid = this.ajv.validate(actualSchema, lookupDto);
 
-    if (isValid) {
-      this.loggerService.log('Payload structure matches the schema perfectly!');
+    const actualSchema = configuredSchema.schema;
+    const isValid = this.ajv.validate(actualSchema, payload);
+
+    if (!isValid) {
+      const differences =
+        this.ajv.errors?.map((error) => {
+          const path = error.instancePath || 'root';
+          const message = error.message || 'validation failed';
+
+          // Format the error message to be more human-readable
+          if (error.keyword === 'required') {
+            return `${path}: Missing required property '${error.params?.missingProperty}'`;
+          } else if (error.keyword === 'additionalProperties') {
+            return `${path}: Unexpected property '${error.params?.additionalProperty}' not defined in schema`;
+          } else if (error.keyword === 'type') {
+            this.loggerService.log(`Type error details: ${JSON.stringify(error)}`);
+            return `${path}: Should be a ${error.params?.type}`;
+          } else {
+            return `--> ${path}: ${message}`;
+          }
+        }) || [];
+
+      this.loggerService.log(`Schema validation errors: ${JSON.stringify(differences)}`);
       return {
-        isMatch: true,
-        message: 'Payload structure matches the schema perfectly!',
+        isMatch: false,
+        message: 'Payload structure does not match the schema',
         schema: actualSchema,
-        differences: [],
+        differences,
       };
     }
 
-    const differences =
-      this.ajv.errors?.map((error) => {
-        const path = error.instancePath || 'root';
-        const message = error.message || 'validation failed';
+    this.loggerService.log('Payload structure matches the schema perfectly!');
 
-        // Format the error message to be more human-readable
-        if (error.keyword === 'required') {
-          return `${path}: Missing required property '${error.params?.missingProperty}'`;
-        } else if (error.keyword === 'additionalProperties') {
-          return `${path}: Unexpected property '${error.params?.additionalProperty}' not defined in schema`;
-        } else if (error.keyword === 'type') {
-          this.loggerService.log(`Type error details: ${JSON.stringify(error)}`);
-          return `${path}: Should be a ${error.params?.type}`;
-        } else {
-          return `--> ${path}: ${message}`;
-        }
-      }) || [];
+    const messageType = extractTransactionType(endpoint);
+    const tenantId = extractTenantId(endpoint);
 
-    this.loggerService.log(`Schema validation errors: ${JSON.stringify(differences)}`);
-    return {
-      isMatch: false,
-      message: 'Payload structure does not match the schema',
-      schema: actualSchema,
-      differences,
+    const enhancedTransaction = {
+      ...payload,
+      tenantId,
+      TxTp: messageType,
     };
-  }
-  catch(error: any) {
-    this.loggerService.error('Error during schema validation', error);
+
     return {
-      isMatch: false,
-      message: 'Error occurred during comparison',
-      differences: [`Comparison error: ${error.message}`],
+      isMatch: true,
+      message: 'Payload structure matches the schema perfectly!',
+      schema: actualSchema,
+      payload: enhancedTransaction,
+      differences: [],
     };
   }
 }
