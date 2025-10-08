@@ -38,9 +38,6 @@ export class NatsService implements OnModuleInit, OnModuleDestroy {
     this.logger.log('NATS service destroyed');
   }
 
-  /**
-   * Publish a message to event-director
-   */
   async notifyEventDirector(payload: unknown): Promise<void> {
     if (!this.isInitialized) {
       throw new Error('NATS service not initialized');
@@ -55,9 +52,6 @@ export class NatsService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  /**
-   * Check if NATS is ready
-   */
   isReady(): boolean {
     return this.isInitialized;
   }

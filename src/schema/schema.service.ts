@@ -3,9 +3,9 @@ import { LoggerService, RedisService } from '@tazama-lf/frms-coe-lib';
 import Ajv from 'ajv';
 import addFormats from 'ajv-formats';
 import { Knex } from 'knex';
-
 import { extractTransactionType } from '../utils/extract_message_type';
 import { extractTenantId } from '../utils/extract_tenant_id';
+import { NatsService } from '../nats/nats.service';
 
 @Injectable()
 export class SchemaService {
@@ -13,6 +13,7 @@ export class SchemaService {
   constructor(
     private readonly loggerService: LoggerService,
     private readonly redisService: RedisService,
+    private readonly natsService: NatsService,
     @Inject('KNEX') private readonly knex: Knex,
   ) {
     this.ajv = new Ajv({ allErrors: true });
@@ -86,20 +87,34 @@ export class SchemaService {
 
     this.loggerService.log('Payload structure matches the schema perfectly!');
 
-    const messageType = extractTransactionType(endpoint);
+    // notifying event-director after successful validation
+    const transactionType = extractTransactionType(endpoint);
     const tenantId = extractTenantId(endpoint);
 
-    const enhancedTransaction = {
-      ...payload,
-      tenantId,
-      TxTp: messageType,
+    const notification = {
+      transaction: payload,
+      TxTp: transactionType,
+      TenantId: tenantId,
+      metaData: {
+        prcgTmED: Date.now(),
+      },
     };
+
+    try {
+      await this.knex('transactionshistory').insert({
+        transaction: JSON.stringify(notification),
+      });
+      await this.natsService.notifyEventDirector(notification);
+      this.loggerService.log(`Notification sent to event-director for endpoint: ${endpoint}`);
+    } catch (error) {
+      this.loggerService.error(`Failed to notify event-director: ${String(error)}`);
+    }
 
     return {
       isMatch: true,
       message: 'Payload structure matches the schema perfectly!',
       schema: actualSchema,
-      payload: enhancedTransaction,
+      payload: notification,
       differences: [],
     };
   }
