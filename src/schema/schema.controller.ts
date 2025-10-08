@@ -26,8 +26,6 @@ export class SchemaController {
       });
     }
 
-    this.logger.log(`Schema match: ${result.message}`);
-
     return {
       message: result.message,
       isMatch: result.isMatch,

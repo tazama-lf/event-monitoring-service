@@ -25,17 +25,20 @@ export class SchemaService {
 
     const cacheKey = `${endpoint}`;
     const cachedSchema = await this.redisService.getJson(cacheKey);
+    const parsedSchema = JSON.parse(cachedSchema || 'null');
+    console.log(parsedSchema);
     if (cachedSchema) {
-      return JSON.parse(cachedSchema);
+      this.loggerService.log(`Cache hit for endpoint: ${endpoint}`);
+      return [parsedSchema.schema, parsedSchema.mapping];
     }
 
     this.loggerService.log(`Cache miss for endpoint: ${endpoint}. Querying database...`);
-    const schemaRecord = await this.knex('configurations').select('schema').where({ endpoint }).first();
+    const schemaRecord = await this.knex('configurations').select('schema', 'mapping').where({ endpoint }).first();
 
     if (schemaRecord) {
       this.loggerService.log(`Schema found for endpoint: ${endpoint}. Caching result...`);
       await this.redisService.set(cacheKey, schemaRecord, 86400);
-      return schemaRecord.schema;
+      return [schemaRecord.schema, schemaRecord.mapping];
     }
 
     this.loggerService.log(`No schema found for endpoint: ${endpoint}`);
@@ -43,7 +46,7 @@ export class SchemaService {
   }
 
   async handleMessage(payload: { any }, endpoint: string): Promise<any> {
-    const configuredSchema = await this.findSchemaInDatabase(endpoint);
+    const [configuredSchema, configuredMapping] = await this.findSchemaInDatabase(endpoint);
 
     if (!configuredSchema) {
       this.loggerService.log(`No schema configured for endpoint: ${endpoint}`);
@@ -54,11 +57,13 @@ export class SchemaService {
       };
     }
 
-    const actualSchema = configuredSchema;
+    if (!configuredMapping) {
+      this.loggerService.log(`No mapping configured for endpoint: ${endpoint}`);
+    }
 
     let isValid;
     try {
-      isValid = this.ajv.validate(actualSchema, payload);
+      isValid = this.ajv.validate(configuredSchema, payload);
     } catch (error) {
       this.loggerService.error(`AJV validation error: ${String(error)}`);
       return {
@@ -91,7 +96,7 @@ export class SchemaService {
       return {
         isMatch: false,
         message: 'Payload structure does not match the schema',
-        schema: actualSchema,
+        schema: configuredSchema,
         differences,
       };
     }
@@ -115,6 +120,7 @@ export class SchemaService {
       await this.knex('transactionshistory').insert({
         transaction: JSON.stringify(notification),
       });
+
       await this.natsService.notifyEventDirector(notification);
       this.loggerService.log(`Notification sent to event-director for endpoint: ${endpoint}`);
     } catch (error) {
@@ -124,7 +130,7 @@ export class SchemaService {
     return {
       isMatch: true,
       message: 'Payload structure matches the schema perfectly!',
-      schema: actualSchema,
+      schema: configuredSchema,
       payload: notification,
       differences: [],
     };

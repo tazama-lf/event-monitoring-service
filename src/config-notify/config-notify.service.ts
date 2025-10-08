@@ -58,7 +58,7 @@ export class ConfigNotifyService implements OnModuleInit, OnModuleDestroy {
     for (const config of configs) {
       console.log('Preloading cache for config:', config.endpoint);
       // await this.setCache(config);
-      await this.redis.setJson(config.endpoint, JSON.stringify(config.schema), CACHE_TTL);
+      await this.redis.setJson(config.endpoint, JSON.stringify({ schema: config.schema, mapping: config.mapping }), CACHE_TTL);
     }
     this.logger.log(`Cache preloaded: ${configs.length} configurations`);
   }

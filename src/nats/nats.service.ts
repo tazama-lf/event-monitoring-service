@@ -45,7 +45,6 @@ export class NatsService implements OnModuleInit, OnModuleDestroy {
 
     try {
       await this.natsService.handleResponse(payload as object);
-      this.logger.log('Message sent to event-director');
     } catch (error) {
       this.logger.error(`Failed to send message to event-director: ${String(error)}`);
       throw error;
