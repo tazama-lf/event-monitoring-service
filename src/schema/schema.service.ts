@@ -24,10 +24,10 @@ export class SchemaService {
     this.loggerService.log(`Looking up schema for endpoint: ${endpoint}`);
 
     const cacheKey = `${endpoint}`;
-    // const cachedSchema = await this.redisService.getJson(cacheKey);
-    // if (cachedSchema) {
-    //   return JSON.parse(cachedSchema);
-    // }
+    const cachedSchema = await this.redisService.getJson(cacheKey);
+    if (cachedSchema) {
+      return JSON.parse(cachedSchema);
+    }
 
     this.loggerService.log(`Cache miss for endpoint: ${endpoint}. Querying database...`);
     const schemaRecord = await this.knex('configurations').select('schema').where({ endpoint }).first();
@@ -35,7 +35,7 @@ export class SchemaService {
     if (schemaRecord) {
       this.loggerService.log(`Schema found for endpoint: ${endpoint}. Caching result...`);
       await this.redisService.set(cacheKey, schemaRecord, 86400);
-      return schemaRecord;
+      return schemaRecord.schema;
     }
 
     this.loggerService.log(`No schema found for endpoint: ${endpoint}`);
@@ -54,8 +54,19 @@ export class SchemaService {
       };
     }
 
-    const actualSchema = configuredSchema.schema;
-    const isValid = this.ajv.validate(actualSchema, payload);
+    const actualSchema = configuredSchema;
+
+    let isValid;
+    try {
+      isValid = this.ajv.validate(actualSchema, payload);
+    } catch (error) {
+      this.loggerService.error(`AJV validation error: ${String(error)}`);
+      return {
+        isMatch: false,
+        message: 'Error during schema validation',
+        differences: [String(error)],
+      };
+    }
 
     if (!isValid) {
       const differences =
