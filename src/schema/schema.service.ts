@@ -109,41 +109,25 @@ export class SchemaService {
 
     if (configuredMapping) {
       try {
-        const mappingsJSON = typeof configuredMapping === 'string' ? JSON.parse(configuredMapping) : configuredMapping;
+        dataCache = {};
 
-        dataCache = {
-          [mappingsJSON.mappings[0].destination]:
-            getValueByPath(payload, mappingsJSON.mappings[0].sources[0]) +
-            mappingsJSON.mappings[0].separator +
-            getValueByPath(payload, mappingsJSON.mappings[0].sources[1]) +
-            mappingsJSON.mappings[0].separator +
-            getValueByPath(payload, mappingsJSON.mappings[0].sources[2]),
+        for (const mapping of configuredMapping.mappings) {
+          const destination = mapping.destination;
+          const separator = mapping.separator;
+          const sources = mapping.sources;
 
-          [mappingsJSON.mappings[1].destination]:
-            getValueByPath(payload, mappingsJSON.mappings[1].sources[0]) +
-            mappingsJSON.mappings[1].separator +
-            getValueByPath(payload, mappingsJSON.mappings[1].sources[1]) +
-            mappingsJSON.mappings[1].separator +
-            getValueByPath(payload, mappingsJSON.mappings[1].sources[2]),
+          let value = '';
 
-          [mappingsJSON.mappings[2].destination]:
-            getValueByPath(payload, mappingsJSON.mappings[2].sources[0]) +
-            mappingsJSON.mappings[2].separator +
-            getValueByPath(payload, mappingsJSON.mappings[2].sources[1]) +
-            mappingsJSON.mappings[2].separator +
-            getValueByPath(payload, mappingsJSON.mappings[2].sources[2]) +
-            mappingsJSON.mappings[2].separator +
-            getValueByPath(payload, mappingsJSON.mappings[2].sources[3]),
+          for (let i = 0; i < sources.length; i++) {
+            value += getValueByPath(payload, sources[i]);
 
-          [mappingsJSON.mappings[3].destination]:
-            getValueByPath(payload, mappingsJSON.mappings[3].sources[0]) +
-            mappingsJSON.mappings[3].separator +
-            getValueByPath(payload, mappingsJSON.mappings[3].sources[1]) +
-            mappingsJSON.mappings[3].separator +
-            getValueByPath(payload, mappingsJSON.mappings[3].sources[2]) +
-            mappingsJSON.mappings[3].separator +
-            getValueByPath(payload, mappingsJSON.mappings[3].sources[3]),
-        };
+            if (i < sources.length - 1) {
+              value += separator;
+            }
+          }
+
+          dataCache[destination] = value;
+        }
 
         this.loggerService.log('DataCache:', dataCache);
       } catch (error) {
