@@ -1,27 +1,27 @@
-import { Injectable, Inject, OnModuleInit } from '@nestjs/common';
+import { Injectable, OnModuleInit } from '@nestjs/common';
 import { LoggerService, RedisService } from '@tazama-lf/frms-coe-lib';
 import { StartupFactory } from '@tazama-lf/frms-coe-startup-lib';
 import { Knex } from 'knex';
+import { InjectConnection } from 'nest-knexjs';
 
 interface Config {
-  id: string;
-  endpoint: string;
-  tenant_id: string;
+  id: number;
   msg_fam: string;
-  msg_type: string;
+  transaction_type: string;
+  endpoint_path: string;
   version: string;
+  content_type: string;
   schema: object;
   mapping: object;
-  enrichment: object;
-  artifact_link: string;
+  tenant_id: string;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+  status: string;
 }
 
 interface NatsMessage {
-  transactionID: string;
-  msgfam: string;
-  msgtype: string;
-  tenant_id: string;
-  version: string;
+  transactionID: number;
 }
 
 const CACHE_TTL = 86400;
@@ -33,7 +33,7 @@ export class ConfigNotifyService implements OnModuleInit {
   constructor(
     private readonly logger: LoggerService,
     private readonly redis: RedisService,
-    @Inject('KNEX') private readonly knex: Knex,
+    @InjectConnection() private readonly knex: Knex,
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -45,24 +45,24 @@ export class ConfigNotifyService implements OnModuleInit {
     );
     this.logger.log('NATS consumer initialized for config.notification');
 
-    const configs = (await this.knex('configurations').select('*')) as Config[];
+    const configs = (await this.knex('config').select('*')) as Config[];
     for (const config of configs) {
       console.log('Preloading cache for config:', config.id);
-      await this.redis.setJson(config.endpoint, JSON.stringify({ schema: config.schema, mapping: config.mapping }), CACHE_TTL);
+      await this.redis.setJson(config.endpoint_path, JSON.stringify({ schema: config.schema, mapping: config.mapping }), CACHE_TTL);
     }
     this.logger.log(`Cache preloaded: ${configs.length} configurations`);
   }
 
-  private async handleNatsMessage(reqObj: unknown, handleResponse: (response: object) => Promise<void>): Promise<void> {
-    const message = reqObj as NatsMessage;
+  private async handleNatsMessage(reqObj: NatsMessage, handleResponse: (response: object) => Promise<void>): Promise<void> {
+    const message = reqObj;
     this.logger.log(`Received NATS notification for config ID: ${message.transactionID}`);
 
     try {
-      const config = (await this.knex('configurations').where('id', message.transactionID).first()) as Config | undefined;
+      const config = (await this.knex('config').where('id', message.transactionID).first()) as Config | undefined;
 
       if (config) {
-        await this.redis.setJson(config.endpoint, JSON.stringify({ schema: config.schema, mapping: config.mapping }), CACHE_TTL);
-        this.logger.log(`Updated cache for key: ${config.endpoint}`);
+        await this.redis.setJson(config.endpoint_path, JSON.stringify({ schema: config.schema, mapping: config.mapping }), CACHE_TTL);
+        this.logger.log(`Updated cache for key: ${config.endpoint_path}`);
       } else {
         this.logger.log(`Config not found for ID: ${message.transactionID}`);
       }

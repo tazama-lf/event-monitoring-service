@@ -3,10 +3,10 @@ import { ConfigNotifyService } from './config-notify.service';
 import { LoggerModule } from '../logger-service/logger-service.module';
 import { ConfigModule } from '@nestjs/config';
 import { RedisModule } from '../redis/redis.module';
-import { KNEX_CONNECTION } from '../database/knex.provider';
+import { DatabaseModule } from '../database/database.module';
 
 @Module({
-  imports: [LoggerModule, ConfigModule, RedisModule],
-  providers: [ConfigNotifyService, KNEX_CONNECTION],
+  imports: [LoggerModule, ConfigModule, RedisModule, DatabaseModule],
+  providers: [ConfigNotifyService],
 })
 export class ConfigNotifyModule {}
