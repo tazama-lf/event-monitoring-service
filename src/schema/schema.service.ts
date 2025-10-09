@@ -34,16 +34,62 @@ export class SchemaService {
     }
 
     this.loggerService.log(`Cache miss for endpoint: ${endpoint}. Querying database...`);
-    const schemaRecord = await this.knex('configurations').select('schema', 'mapping').where({ endpoint }).first();
+    // const schemaRecord = await this.knex('configurations').select('schema', 'mapping').where({ endpoint }).first();
 
-    if (schemaRecord) {
-      this.loggerService.log(`Schema found for endpoint: ${endpoint}. Caching result...`);
-      await this.redisService.set(cacheKey, schemaRecord, 86400);
-      return [schemaRecord.schema, schemaRecord.mapping];
-    }
+    // if (schemaRecord) {
+    //   this.loggerService.log(`Schema found for endpoint: ${endpoint}. Caching result...`);
+    //   await this.redisService.set(cacheKey, schemaRecord, 86400);
+    //   return [schemaRecord.schema, schemaRecord.mapping];
+    // }
 
     this.loggerService.log(`No schema found for endpoint: ${endpoint}`);
     return null;
+  }
+
+  /**
+   * Saves transaction history to the database
+   * @param transaction The transaction object
+   * @param key The key to use for the transaction
+   */
+  private async saveTransactionHistory(transaction: any, key: string): Promise<void> {
+    try {
+      await this.knex('transactionshistory').insert({
+        _key: key,
+        transaction: JSON.stringify(transaction),
+        created: new Date().toISOString(),
+      });
+      this.loggerService.log(`Saved transaction history with key: ${key}`);
+    } catch (error) {
+      this.loggerService.error(`Failed to save transaction history: ${String(error)}`);
+      throw error;
+    }
+  }
+
+  /**
+   * Saves transaction relationship to the database
+   * @param relationship The transaction relationship object
+   */
+  private async saveTransactionRelationship(relationship: any): Promise<void> {
+    try {
+      await this.knex('transactionrelationships').insert({
+        _from: relationship.from,
+        _to: relationship.to,
+        Amt: relationship.Amt,
+        Ccy: relationship.Ccy,
+        CreDtTm: relationship.CreDtTm,
+        EndToEndId: relationship.EndToEndId,
+        MsgId: relationship.MsgId,
+        PmtInfId: relationship.PmtInfId,
+        TxTp: relationship.TxTp,
+        TenantId: relationship.TenantId,
+        created: new Date().toISOString(),
+      });
+
+      this.loggerService.log(`Saved transaction relationship: ${relationship.from} -> ${relationship.to}`);
+    } catch (error) {
+      this.loggerService.error(`Failed to save transaction relationship: ${String(error)}`);
+      throw error;
+    }
   }
 
   async handleMessage(payload: { any }, endpoint: string): Promise<any> {
@@ -105,31 +151,62 @@ export class SchemaService {
     const tenantId = extractTenantId(endpoint);
 
     // let dataCache: DataCache | undefined;
-    let dataCache: any;
+    const dataCache: any = {};
+    const transactionRelationship: any = {};
+    let endToEndId: string = ''; // needed for saving transaction history
 
     if (configuredMapping) {
       try {
-        dataCache = {};
-
         for (const mapping of configuredMapping.mappings) {
-          const destination = mapping.destination;
+          // 4 cases:
+          // 1. DataCache
+          // 2. TransactionRelationship test util test
+
+          // 3. addAccount
+          // 4. addEntity
+          // 5. addAccountHolder
+
+          // example: "destination": "redis.cdtrId"
+          const destination = mapping.destination.split('.')[1];
+          const type = mapping.destination.split('.')[0];
           const separator = mapping.separator;
           const sources = mapping.sources;
 
-          let value = '';
+          let DataCachevalue = mapping.prefix ? mapping.prefix : '';
+          let transactionRelationshipValue = '';
 
           for (let i = 0; i < sources.length; i++) {
-            value += getValueByPath(payload, sources[i]);
+            if (type === 'redis') {
+              DataCachevalue += getValueByPath(payload, sources[i]);
+              if (i < sources.length - 1) {
+                DataCachevalue += separator;
+              }
+            }
+            if (type === 'transaction') {
+              const value = getValueByPath(payload, sources[i]);
+              transactionRelationshipValue += value;
 
-            if (i < sources.length - 1) {
-              value += separator;
+              if (i < sources.length - 1) {
+                transactionRelationshipValue += separator;
+              }
             }
           }
 
-          dataCache[destination] = value;
-        }
+          if (type === 'redis') {
+            DataCachevalue += mapping.suffix ? mapping.suffix : '';
+            dataCache[destination] = DataCachevalue;
+          }
+          if (type === 'transaction') {
+            transactionRelationshipValue += mapping.suffix ? mapping.suffix : '';
+            transactionRelationship[destination] = transactionRelationshipValue;
 
+            if (destination === 'endToEndId') {
+              endToEndId = transactionRelationshipValue;
+            }
+          }
+        }
         this.loggerService.log('DataCache:', dataCache);
+        this.loggerService.log('TransactionRelationship:', transactionRelationship);
       } catch (error) {
         this.loggerService.error(`Failed to process mapping data: ${String(error)}`);
       }
@@ -145,12 +222,13 @@ export class SchemaService {
     };
 
     try {
-      await this.knex('transactionshistory').insert({
-        transaction: JSON.stringify(tazamaPayload),
-      });
+      console.log('end to end id for tHistory:', endToEndId);
+      // await this.saveTransactionHistory(tazamaPayload, `${transactionType}_${endToEndId}`);
+
+      // await this.saveTransactionRelationship(transactionRelationship);
 
       await this.natsService.notifyEventDirector(tazamaPayload);
-      this.loggerService.log(`Notification sent to event-director for endpoint: ${endpoint}`);
+      this.loggerService.log('Notification sent to event-director');
     } catch (error) {
       this.loggerService.error(`Failed to notify event-director: ${String(error)}`);
     }
@@ -159,7 +237,7 @@ export class SchemaService {
       isMatch: true,
       message: 'Payload structure matches the schema perfectly!',
       schema: configuredSchema,
-      payload: notification,
+      payload: tazamaPayload,
       dataCache: dataCache,
       differences: [],
     };
