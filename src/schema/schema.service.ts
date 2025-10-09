@@ -6,6 +6,7 @@ import { Knex } from 'knex';
 import { extractTransactionType } from '../utils/extract_message_type';
 import { extractTenantId } from '../utils/extract_tenant_id';
 import { NatsService } from '../nats/nats.service';
+import { getValueByPath } from '../utils/has_nested_property';
 
 @Injectable()
 export class SchemaService {
@@ -20,13 +21,13 @@ export class SchemaService {
     addFormats(this.ajv);
   }
 
-  async findSchemaInDatabase(endpoint: string): Promise<any> {
+  async findSchemaAndMapping(endpoint: string): Promise<any> {
     this.loggerService.log(`Looking up schema for endpoint: ${endpoint}`);
 
     const cacheKey = `${endpoint}`;
     const cachedSchema = await this.redisService.getJson(cacheKey);
     const parsedSchema = JSON.parse(cachedSchema || 'null');
-    console.log(parsedSchema);
+
     if (cachedSchema) {
       this.loggerService.log(`Cache hit for endpoint: ${endpoint}`);
       return [parsedSchema.schema, parsedSchema.mapping];
@@ -46,7 +47,7 @@ export class SchemaService {
   }
 
   async handleMessage(payload: { any }, endpoint: string): Promise<any> {
-    const [configuredSchema, configuredMapping] = await this.findSchemaInDatabase(endpoint);
+    const [configuredSchema, configuredMapping] = await this.findSchemaAndMapping(endpoint);
 
     if (!configuredSchema) {
       this.loggerService.log(`No schema configured for endpoint: ${endpoint}`);
@@ -55,10 +56,6 @@ export class SchemaService {
         message: 'Schema not found for the specified endpoint',
         differences: ['No schema exists for this endpoint'],
       };
-    }
-
-    if (!configuredMapping) {
-      this.loggerService.log(`No mapping configured for endpoint: ${endpoint}`);
     }
 
     let isValid;
@@ -107,10 +104,60 @@ export class SchemaService {
     const transactionType = extractTransactionType(endpoint);
     const tenantId = extractTenantId(endpoint);
 
+    // let dataCache: DataCache | undefined;
+    let dataCache: any;
+
+    if (configuredMapping) {
+      try {
+        const mappingsJSON = typeof configuredMapping === 'string' ? JSON.parse(configuredMapping) : configuredMapping;
+
+        dataCache = {
+          [mappingsJSON.mappings[0].destination]:
+            getValueByPath(payload, mappingsJSON.mappings[0].sources[0]) +
+            mappingsJSON.mappings[0].separator +
+            getValueByPath(payload, mappingsJSON.mappings[0].sources[1]) +
+            mappingsJSON.mappings[0].separator +
+            getValueByPath(payload, mappingsJSON.mappings[0].sources[2]),
+
+          [mappingsJSON.mappings[1].destination]:
+            getValueByPath(payload, mappingsJSON.mappings[1].sources[0]) +
+            mappingsJSON.mappings[1].separator +
+            getValueByPath(payload, mappingsJSON.mappings[1].sources[1]) +
+            mappingsJSON.mappings[1].separator +
+            getValueByPath(payload, mappingsJSON.mappings[1].sources[2]),
+
+          [mappingsJSON.mappings[2].destination]:
+            getValueByPath(payload, mappingsJSON.mappings[2].sources[0]) +
+            mappingsJSON.mappings[2].separator +
+            getValueByPath(payload, mappingsJSON.mappings[2].sources[1]) +
+            mappingsJSON.mappings[2].separator +
+            getValueByPath(payload, mappingsJSON.mappings[2].sources[2]) +
+            mappingsJSON.mappings[2].separator +
+            getValueByPath(payload, mappingsJSON.mappings[2].sources[3]),
+
+          [mappingsJSON.mappings[3].destination]:
+            getValueByPath(payload, mappingsJSON.mappings[3].sources[0]) +
+            mappingsJSON.mappings[3].separator +
+            getValueByPath(payload, mappingsJSON.mappings[3].sources[1]) +
+            mappingsJSON.mappings[3].separator +
+            getValueByPath(payload, mappingsJSON.mappings[3].sources[2]) +
+            mappingsJSON.mappings[3].separator +
+            getValueByPath(payload, mappingsJSON.mappings[3].sources[3]),
+        };
+
+        this.loggerService.log('DataCache:', dataCache);
+      } catch (error) {
+        this.loggerService.error(`Failed to process mapping data: ${String(error)}`);
+      }
+    } else {
+      this.loggerService.log(`No mapping configured for endpoint: ${endpoint}`);
+    }
+
     const notification = {
       transaction: payload,
       TxTp: transactionType,
       TenantId: tenantId,
+      // ...(dataCache ? { dataCache } : {}),
       metaData: {
         prcgTmED: Date.now(),
       },
@@ -132,6 +179,7 @@ export class SchemaService {
       message: 'Payload structure matches the schema perfectly!',
       schema: configuredSchema,
       payload: notification,
+      dataCache: dataCache,
       differences: [],
     };
   }
