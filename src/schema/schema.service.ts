@@ -137,22 +137,19 @@ export class SchemaService {
       this.loggerService.log(`No mapping configured for endpoint: ${endpoint}`);
     }
 
-    const notification = {
+    const tazamaPayload = {
       transaction: payload,
       TxTp: transactionType,
       TenantId: tenantId,
-      // ...(dataCache ? { dataCache } : {}),
-      metaData: {
-        prcgTmED: Date.now(),
-      },
+      dataCache,
     };
 
     try {
       await this.knex('transactionshistory').insert({
-        transaction: JSON.stringify(notification),
+        transaction: JSON.stringify(tazamaPayload),
       });
 
-      await this.natsService.notifyEventDirector(notification);
+      await this.natsService.notifyEventDirector(tazamaPayload);
       this.loggerService.log(`Notification sent to event-director for endpoint: ${endpoint}`);
     } catch (error) {
       this.loggerService.error(`Failed to notify event-director: ${String(error)}`);
