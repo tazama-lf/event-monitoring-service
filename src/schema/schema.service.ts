@@ -156,7 +156,7 @@ export class SchemaService {
       this.loggerService.error(`AJV validation error: ${String(error)}`);
       return {
         isMatch: false,
-        message: 'Error during schema validation',
+        message: 'Error during schemaa validation',
         differences: [String(error)],
       };
     }
