@@ -5,7 +5,10 @@
  */
 export const extractTenantId = (url: string): string => {
   const parts = url.split('/');
-  const tenantId = parts[0];
+  console.log('URL parts:', parts);
+  const tenantId = parts[1];
 
   return tenantId || 'unknown';
+  // index is 1 because the URL starts with a leading slash (/)
+  // URL parts: [ '', 'ABL101', 'v1', 'iso20022', 'pain.001' ]
 };

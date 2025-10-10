@@ -92,6 +92,51 @@ export class SchemaService {
     }
   }
 
+  private async addAccount(accountId: string, tenantId: string): Promise<void> {
+    try {
+      await this.knex('accounts').insert({
+        accountId,
+        tenantId,
+        created: new Date().toISOString(),
+      });
+      this.loggerService.log(`Added account: ${accountId} for tenant: ${tenantId}`);
+    } catch (error) {
+      this.loggerService.error(`Failed to add account: ${String(error)}`);
+      throw error;
+    }
+  }
+
+  private async addEntity(entityId: string, tenantId: string, CreDtTm: string): Promise<void> {
+    try {
+      await this.knex('entities').insert({
+        entityId,
+        tenantId,
+        CreDtTm,
+        created: new Date().toISOString(),
+      });
+      this.loggerService.log(`Added entity: ${entityId} for tenant: ${tenantId}`);
+    } catch (error) {
+      this.loggerService.error(`Failed to add entity: ${String(error)}`);
+      throw error;
+    }
+  }
+
+  private async addAccountHolder(entityId: string, accountId: string, CreDtTm: string, tenantId: string): Promise<void> {
+    try {
+      await this.knex('accountholders').insert({
+        entityId,
+        accountId,
+        CreDtTm,
+        tenantId,
+        created: new Date().toISOString(),
+      });
+      this.loggerService.log(`Added account holder: ${entityId} for account: ${accountId} and tenant: ${tenantId}`);
+    } catch (error) {
+      this.loggerService.error(`Failed to add account holder: ${String(error)}`);
+      throw error;
+    }
+  }
+
   async handleMessage(payload: { any }, endpoint: string): Promise<any> {
     const [configuredSchema, configuredMapping] = await this.findSchemaAndMapping(endpoint);
 
@@ -153,20 +198,33 @@ export class SchemaService {
     // let dataCache: DataCache | undefined;
     const dataCache: any = {};
     const transactionRelationship: any = {};
-    let endToEndId: string = ''; // needed for saving transaction history
+    console.log('mapping ', configuredMapping?.mappings);
+
+    // boolean variables for deciding whether to make function calls or not (on runtime)
+    const boolAddAccount = configuredMapping?.mappings.some((row) => row.destination.startsWith('account.'));
+    const boolAddEntity = configuredMapping?.mappings.some((row) => row.destination.startsWith('entity.'));
+    const boolAddAccountHolder = configuredMapping?.mappings.some((row) => row.destination.startsWith('accountHolder.'));
+
+    let debtorAcctId = '';
+    let creditorAcctId = '';
+    let debtorId = '';
+    let creditorId = '';
+    let CreDtTm = '';
+    let endToEndId = '';
+
+    // 4 cases:
+    // 1. DataCache
+    // 2. TransactionRelationship test util test
+
+    // 3. addAccount
+    // 4. addEntity
+    // 5. addAccountHolder
+
+    // example: "destination": "redis.cdtrId" / "destination": "transaction.endToEndId" / "destination": "accountHolder.addAccountHolder"
 
     if (configuredMapping) {
       try {
         for (const mapping of configuredMapping.mappings) {
-          // 4 cases:
-          // 1. DataCache
-          // 2. TransactionRelationship test util test
-
-          // 3. addAccount
-          // 4. addEntity
-          // 5. addAccountHolder
-
-          // example: "destination": "redis.cdtrId"
           const destination = mapping.destination.split('.')[1];
           const type = mapping.destination.split('.')[0];
           const separator = mapping.separator;
@@ -195,16 +253,27 @@ export class SchemaService {
           if (type === 'redis') {
             DataCachevalue += mapping.suffix ? mapping.suffix : '';
             dataCache[destination] = DataCachevalue;
+
+            if (destination === 'dbtrAcctId') {
+              debtorAcctId = DataCachevalue;
+            } else if (destination === 'cdtrAcctId') {
+              creditorAcctId = DataCachevalue;
+            } else if (destination === 'dbtrId') {
+              debtorId = DataCachevalue;
+            } else if (destination === 'cdtrId') {
+              creditorId = DataCachevalue;
+            }
           }
+
           if (type === 'transaction') {
             transactionRelationshipValue += mapping.suffix ? mapping.suffix : '';
             transactionRelationship[destination] = transactionRelationshipValue;
 
-            if (destination === 'endToEndId') {
-              endToEndId = transactionRelationshipValue;
-            }
+            if (destination === 'endToEndId') endToEndId = transactionRelationshipValue;
+            else if (destination === 'CreDtTm') CreDtTm = transactionRelationshipValue;
           }
         }
+
         this.loggerService.log('DataCache:', dataCache);
         this.loggerService.log('TransactionRelationship:', transactionRelationship);
       } catch (error) {
@@ -213,6 +282,9 @@ export class SchemaService {
     } else {
       this.loggerService.log(`No mapping configured for endpoint: ${endpoint}`);
     }
+
+    const obj = { endToEndId, debtorAcctId, creditorAcctId, debtorId, creditorId, CreDtTm, tenantId, transactionType };
+    console.log('Extracted mapping values:', obj);
 
     const tazamaPayload = {
       transaction: payload,
@@ -223,9 +295,24 @@ export class SchemaService {
 
     try {
       console.log('end to end id for tHistory:', endToEndId);
-      // await this.saveTransactionHistory(tazamaPayload, `${transactionType}_${endToEndId}`);
+      await this.saveTransactionHistory(tazamaPayload, `${transactionType}_${endToEndId}`);
 
-      // await this.saveTransactionRelationship(transactionRelationship);
+      if (boolAddAccount) {
+        await this.addAccount(debtorAcctId, tenantId);
+        await this.addAccount(creditorAcctId, tenantId);
+      }
+
+      if (boolAddEntity) {
+        await this.addEntity(debtorId, tenantId, CreDtTm);
+        await this.addEntity(creditorId, tenantId, CreDtTm);
+      }
+
+      if (boolAddAccountHolder) {
+        await this.addAccountHolder(debtorId, debtorAcctId, CreDtTm, tenantId);
+        await this.addAccountHolder(creditorId, creditorAcctId, CreDtTm, tenantId);
+      }
+
+      await this.saveTransactionRelationship(transactionRelationship);
 
       await this.natsService.notifyEventDirector(tazamaPayload);
       this.loggerService.log('Notification sent to event-director');
