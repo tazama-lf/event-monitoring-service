@@ -5,7 +5,6 @@
  */
 export const extractTenantId = (url: string): string => {
   const parts = url.split('/');
-  console.log('URL parts:', parts);
   const tenantId = parts[1];
 
   return tenantId || 'unknown';

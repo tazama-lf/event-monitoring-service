@@ -94,11 +94,11 @@ export class SchemaService {
 
   private async addAccount(accountId: string, tenantId: string): Promise<void> {
     try {
-      await this.knex('accounts').insert({
-        accountId,
-        tenantId,
-        created: new Date().toISOString(),
-      });
+      // await this.knex('accounts').insert({
+      //   accountId,
+      //   tenantId,
+      //   created: new Date().toISOString(),
+      // });
       this.loggerService.log(`Added account: ${accountId} for tenant: ${tenantId}`);
     } catch (error) {
       this.loggerService.error(`Failed to add account: ${String(error)}`);
@@ -108,13 +108,13 @@ export class SchemaService {
 
   private async addEntity(entityId: string, tenantId: string, CreDtTm: string): Promise<void> {
     try {
-      await this.knex('entities').insert({
-        entityId,
-        tenantId,
-        CreDtTm,
-        created: new Date().toISOString(),
-      });
-      this.loggerService.log(`Added entity: ${entityId} for tenant: ${tenantId}`);
+      // await this.knex('entities').insert({
+      //   entityId,
+      //   tenantId,
+      //   CreDtTm,
+      //   created: new Date().toISOString(),
+      // });
+      this.loggerService.log(`Added entity: ${entityId} for tenant: ${tenantId} and CreDtTm: ${CreDtTm}`);
     } catch (error) {
       this.loggerService.error(`Failed to add entity: ${String(error)}`);
       throw error;
@@ -123,13 +123,13 @@ export class SchemaService {
 
   private async addAccountHolder(entityId: string, accountId: string, CreDtTm: string, tenantId: string): Promise<void> {
     try {
-      await this.knex('accountholders').insert({
-        entityId,
-        accountId,
-        CreDtTm,
-        tenantId,
-        created: new Date().toISOString(),
-      });
+      // await this.knex('accountholders').insert({
+      //   entityId,
+      //   accountId,
+      //   CreDtTm,
+      //   tenantId,
+      //   created: new Date().toISOString(),
+      // });
       this.loggerService.log(`Added account holder: ${entityId} for account: ${accountId} and tenant: ${tenantId}`);
     } catch (error) {
       this.loggerService.error(`Failed to add account holder: ${String(error)}`);
@@ -137,7 +137,7 @@ export class SchemaService {
     }
   }
 
-  async handleMessage(payload: { any }, endpoint: string): Promise<any> {
+  async handleMessagke(payload: { any }, endpoint: string): Promise<any> {
     const [configuredSchema, configuredMapping] = await this.findSchemaAndMapping(endpoint);
 
     if (!configuredSchema) {
@@ -194,23 +194,11 @@ export class SchemaService {
     // notifying event-director after successful validation
     const transactionType = extractTransactionType(endpoint);
     const tenantId = extractTenantId(endpoint);
+    // let endToEndId = 'unknown';
 
     // let dataCache: DataCache | undefined;
     const dataCache: any = {};
     const transactionRelationship: any = {};
-    console.log('mapping ', configuredMapping?.mappings);
-
-    // boolean variables for deciding whether to make function calls or not (on runtime)
-    const boolAddAccount = configuredMapping?.mappings.some((row) => row.destination.startsWith('account.'));
-    const boolAddEntity = configuredMapping?.mappings.some((row) => row.destination.startsWith('entity.'));
-    const boolAddAccountHolder = configuredMapping?.mappings.some((row) => row.destination.startsWith('accountHolder.'));
-
-    let debtorAcctId = '';
-    let creditorAcctId = '';
-    let debtorId = '';
-    let creditorId = '';
-    let CreDtTm = '';
-    let endToEndId = '';
 
     // 4 cases:
     // 1. DataCache
@@ -222,7 +210,7 @@ export class SchemaService {
 
     // example: "destination": "redis.cdtrId" / "destination": "transaction.endToEndId" / "destination": "accountHolder.addAccountHolder"
 
-    if (configuredMapping) {
+    if (configuredMapping?.mappings) {
       try {
         for (const mapping of configuredMapping.mappings) {
           const destination = mapping.destination.split('.')[1];
@@ -231,7 +219,7 @@ export class SchemaService {
           const sources = mapping.sources;
 
           let DataCachevalue = mapping.prefix ? mapping.prefix : '';
-          let transactionRelationshipValue = '';
+          let transactionRelationshipValue = mapping.prefix ? mapping.prefix : '';
 
           for (let i = 0; i < sources.length; i++) {
             if (type === 'redis') {
@@ -253,29 +241,16 @@ export class SchemaService {
           if (type === 'redis') {
             DataCachevalue += mapping.suffix ? mapping.suffix : '';
             dataCache[destination] = DataCachevalue;
-
-            if (destination === 'dbtrAcctId') {
-              debtorAcctId = DataCachevalue;
-            } else if (destination === 'cdtrAcctId') {
-              creditorAcctId = DataCachevalue;
-            } else if (destination === 'dbtrId') {
-              debtorId = DataCachevalue;
-            } else if (destination === 'cdtrId') {
-              creditorId = DataCachevalue;
-            }
           }
 
           if (type === 'transaction') {
             transactionRelationshipValue += mapping.suffix ? mapping.suffix : '';
             transactionRelationship[destination] = transactionRelationshipValue;
-
-            if (destination === 'endToEndId') endToEndId = transactionRelationshipValue;
-            else if (destination === 'CreDtTm') CreDtTm = transactionRelationshipValue;
           }
         }
 
-        this.loggerService.log('DataCache:', dataCache);
-        this.loggerService.log('TransactionRelationship:', transactionRelationship);
+        // this.loggerService.log('DataCache:', dataCache);
+        // this.loggerService.log('TransactionRelationship:', transactionRelationship);
       } catch (error) {
         this.loggerService.error(`Failed to process mapping data: ${String(error)}`);
       }
@@ -283,8 +258,27 @@ export class SchemaService {
       this.loggerService.log(`No mapping configured for endpoint: ${endpoint}`);
     }
 
-    const obj = { endToEndId, debtorAcctId, creditorAcctId, debtorId, creditorId, CreDtTm, tenantId, transactionType };
-    console.log('Extracted mapping values:', obj);
+    if (configuredMapping?.functions) {
+      try {
+        for (const row of configuredMapping.functions) {
+          // prepare params (getPayloadByPath) --> and call each function one by one
+          const functionToCall = row.functionName;
+          let sources = row.sources || [];
+
+          sources = sources.map((source: Array<string>) =>
+            source
+              .map((s: string) => {
+                return getValueByPath(payload, s);
+              })
+              .reduce((a: string, b: string) => a + b, ''),
+          );
+
+          await this[functionToCall](...Object.values(sources));
+        }
+      } catch (error) {
+        this.loggerService.error(`Failed to execute configured functions: ${String(error)}`);
+      }
+    }
 
     const tazamaPayload = {
       transaction: payload,
@@ -294,25 +288,9 @@ export class SchemaService {
     };
 
     try {
-      console.log('end to end id for tHistory:', endToEndId);
-      await this.saveTransactionHistory(tazamaPayload, `${transactionType}_${endToEndId}`);
+      // await this.saveTransactionHistory(tazamaPayload, `${transactionType}_${endToEndId}`);
 
-      if (boolAddAccount) {
-        await this.addAccount(debtorAcctId, tenantId);
-        await this.addAccount(creditorAcctId, tenantId);
-      }
-
-      if (boolAddEntity) {
-        await this.addEntity(debtorId, tenantId, CreDtTm);
-        await this.addEntity(creditorId, tenantId, CreDtTm);
-      }
-
-      if (boolAddAccountHolder) {
-        await this.addAccountHolder(debtorId, debtorAcctId, CreDtTm, tenantId);
-        await this.addAccountHolder(creditorId, creditorAcctId, CreDtTm, tenantId);
-      }
-
-      await this.saveTransactionRelationship(transactionRelationship);
+      // await this.saveTransactionRelationship(transactionRelationship);
 
       await this.natsService.notifyEventDirector(tazamaPayload);
       this.loggerService.log('Notification sent to event-director');
