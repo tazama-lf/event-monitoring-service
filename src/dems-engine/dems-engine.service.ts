@@ -1,4 +1,4 @@
-import { Injectable, Inject } from '@nestjs/common';
+import { Injectable, Inject, OnModuleInit } from '@nestjs/common';
 import { LoggerService, RedisService } from '@tazama-lf/frms-coe-lib';
 import Ajv from 'ajv';
 import addFormats from 'ajv-formats';
@@ -9,7 +9,7 @@ import { NatsService } from '../nats/nats.service';
 import { getValueByPath } from '../utils/has_nested_property';
 
 @Injectable()
-export class SchemaService {
+export class DemsEngineService implements OnModuleInit {
   private readonly ajv: Ajv;
   constructor(
     private readonly loggerService: LoggerService,
@@ -19,6 +19,10 @@ export class SchemaService {
   ) {
     this.ajv = new Ajv({ allErrors: true });
     addFormats(this.ajv);
+  }
+
+  onModuleInit() {
+    this.loggerService.log('DemsEngineService initialized', DemsEngineService.name);
   }
 
   async findSchemaAndMapping(endpoint: string): Promise<any> {
