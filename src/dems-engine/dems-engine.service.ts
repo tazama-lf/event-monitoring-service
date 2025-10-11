@@ -38,6 +38,7 @@ export class DemsEngineService implements OnModuleInit {
     }
 
     this.loggerService.log(`Cache miss for endpoint: ${endpoint}. Querying database...`);
+    // db hit ni hogi at dems.
     // const schemaRecord = await this.knex('configurations').select('schema', 'mapping').where({ endpoint }).first();
 
     // if (schemaRecord) {
@@ -57,11 +58,11 @@ export class DemsEngineService implements OnModuleInit {
    */
   private async saveTransactionHistory(transaction: any, key: string): Promise<void> {
     try {
-      // await this.knex('transactionshistory').insert({
-      //   _key: key,
-      //   transaction: JSON.stringify(transaction),
-      //   created: new Date().toISOString(),
-      // });
+      await this.knex(`transactionshistory_${transaction.TxTp}`).insert({
+        _key: key,
+        transaction: JSON.stringify(transaction),
+        created: new Date().toISOString(),
+      });
       this.loggerService.log(`Saved transaction history with key: ${key}`);
     } catch (error) {
       this.loggerService.error(`Failed to save transaction history: ${String(error)}`);
@@ -75,19 +76,19 @@ export class DemsEngineService implements OnModuleInit {
    */
   private async saveTransactionRelationship(relationship: any): Promise<void> {
     try {
-      // await this.knex('transactionrelationships').insert({
-      //   _from: relationship.from,
-      //   _to: relationship.to,
-      //   Amt: relationship.Amt,
-      //   Ccy: relationship.Ccy,
-      //   CreDtTm: relationship.CreDtTm,
-      //   EndToEndId: relationship.EndToEndId,
-      //   MsgId: relationship.MsgId,
-      //   PmtInfId: relationship.PmtInfId,
-      //   TxTp: relationship.TxTp,
-      //   TenantId: relationship.TenantId,
-      //   created: new Date().toISOString(),
-      // });
+      await this.knex('transactionrelationship').insert({
+        _from: relationship.from,
+        _to: relationship.to,
+        Amt: relationship.Amt,
+        Ccy: relationship.Ccy,
+        CreDtTm: relationship.CreDtTm,
+        EndToEndId: relationship.EndToEndId,
+        MsgId: relationship.MsgId,
+        PmtInfId: relationship.PmtInfId,
+        TxTp: relationship.TxTp,
+        TenantId: relationship.TenantId,
+        created: new Date().toISOString(),
+      });
 
       this.loggerService.log(`Saved transaction relationship: ${relationship.from} -> ${relationship.to}`);
     } catch (error) {
@@ -98,11 +99,11 @@ export class DemsEngineService implements OnModuleInit {
 
   private async addAccount(accountId: string, tenantId: string): Promise<void> {
     try {
-      // await this.knex('accounts').insert({
-      //   accountId,
-      //   tenantId,
-      //   created: new Date().toISOString(),
-      // });
+      await this.knex('accounts').insert({
+        accountId,
+        tenantId,
+        created: new Date().toISOString(),
+      });
       this.loggerService.log(`Added account: ${accountId} for tenant: ${tenantId}`);
     } catch (error) {
       this.loggerService.error(`Failed to add account: ${String(error)}`);
@@ -112,12 +113,12 @@ export class DemsEngineService implements OnModuleInit {
 
   private async addEntity(entityId: string, tenantId: string, CreDtTm: string): Promise<void> {
     try {
-      // await this.knex('entities').insert({
-      //   entityId,
-      //   tenantId,
-      //   CreDtTm,
-      //   created: new Date().toISOString(),
-      // });
+      await this.knex('entities').insert({
+        entityId,
+        tenantId,
+        CreDtTm,
+        created: new Date().toISOString(),
+      });
       this.loggerService.log(`Added entity: ${entityId} for tenant: ${tenantId} and CreDtTm: ${CreDtTm}`);
     } catch (error) {
       this.loggerService.error(`Failed to add entity: ${String(error)}`);
@@ -127,13 +128,13 @@ export class DemsEngineService implements OnModuleInit {
 
   private async addAccountHolder(entityId: string, accountId: string, CreDtTm: string, tenantId: string): Promise<void> {
     try {
-      // await this.knex('accountholders').insert({
-      //   entityId,
-      //   accountId,
-      //   CreDtTm,
-      //   tenantId,
-      //   created: new Date().toISOString(),
-      // });
+      await this.knex('accountholders').insert({
+        entityId,
+        accountId,
+        CreDtTm,
+        tenantId,
+        created: new Date().toISOString(),
+      });
       this.loggerService.log(`Added account holder: ${entityId} for account: ${accountId} and tenant: ${tenantId} and CreDtTm: ${CreDtTm}`);
     } catch (error) {
       this.loggerService.error(`Failed to add account holder: ${String(error)}`);
