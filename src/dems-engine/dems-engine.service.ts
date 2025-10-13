@@ -142,6 +142,41 @@ export class DemsEngineService implements OnModuleInit {
     }
   }
 
+  /**
+   * Saves failed transaction to quarantine table
+   * @param payload The original payload that failed
+   * @param endpoint The endpoint path
+   * @param differences The AJV validation errors
+   * @param correlationId Optional correlation ID for tracking
+   */
+  private async saveToQuarantine(payload: any, endpoint: string, differences: string[], correlationId?: string): Promise<void> {
+    try {
+      const tenantId = extractTenantId(endpoint);
+      const quarantineRecord = {
+        id: `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`, // Simple ID generation
+        correlation_id: correlationId || null,
+        tenant_id: tenantId,
+        endpoint_path: endpoint,
+        config_id: null, // Add if you have config versioning
+        version: null, // Add if you have schema versioning
+        error: JSON.stringify({
+          code: 'VALIDATION_ERROR',
+          message: 'Payload validation failed',
+          differences: differences,
+          timestamp: new Date().toISOString(),
+        }),
+        raw_payload: JSON.stringify(payload),
+        status: 'failed',
+      };
+
+      await this.knex('dems_quarantine').insert(quarantineRecord);
+      this.loggerService.log(`Saved failed record to quarantine with ID: ${quarantineRecord.id}`);
+    } catch (error) {
+      this.loggerService.error(`Failed to save to quarantine: ${String(error)}`);
+      // Don't throw here to avoid masking the original validation error
+    }
+  }
+
   async handleMessage(payload: { any }, endpoint: string): Promise<any> {
     const [configuredSchema, configuredMapping] = await this.findSchemaAndMapping(endpoint);
 
@@ -186,6 +221,13 @@ export class DemsEngineService implements OnModuleInit {
         }) || [];
 
       this.loggerService.log(`Schema validation errors: ${JSON.stringify(differences)}`);
+      const correlationId = crypto.randomUUID();
+      try {
+        await this.saveToQuarantine(payload, endpoint, differences, correlationId);
+      } catch (error) {
+        this.loggerService.error(`Failed to save to quarantine: ${String(error)}`);
+      }
+
       return {
         isMatch: false,
         message: 'Payload structure does not match the schema',
