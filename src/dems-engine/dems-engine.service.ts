@@ -57,8 +57,10 @@ export class DemsEngineService implements OnModuleInit {
    * @param key The key to use for the transaction
    */
   private async saveTransactionHistory(transaction: any, key: string): Promise<void> {
+    const txtp = transaction.TxTp.replace('.', '_').toLowerCase();
+    const destination = `transactionshistory_${txtp}`;
     try {
-      await this.knex(`transactionshistory_${transaction.TxTp}`).insert({
+      await this.knex(destination).insert({
         _key: key,
         transaction: JSON.stringify(transaction),
         created: new Date().toISOString(),
