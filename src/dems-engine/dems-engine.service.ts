@@ -7,6 +7,7 @@ import { extractTransactionType } from '../utils/extract_message_type';
 import { extractTenantId } from '../utils/extract_tenant_id';
 import { NatsService } from '../nats/nats.service';
 import { getValueByPath } from '../utils/has_nested_property';
+import { DatabaseOperationsService } from '../commons';
 
 @Injectable()
 export class DemsEngineService {
@@ -15,6 +16,7 @@ export class DemsEngineService {
     private readonly loggerService: LoggerService,
     private readonly redisService: RedisService,
     private readonly natsService: NatsService,
+    private readonly databaseOperationsService: DatabaseOperationsService,
     @Inject('KNEX') private readonly knex: Knex,
   ) {
     this.ajv = new Ajv({ allErrors: true });
@@ -91,51 +93,6 @@ export class DemsEngineService {
       this.loggerService.log(`Saved transaction relationship: ${relationship.from} -> ${relationship.to}`);
     } catch (error) {
       this.loggerService.error(`Failed to save transaction relationship: ${String(error)}`);
-      throw error;
-    }
-  }
-
-  private async addAccount(accountId: string, tenantId: string): Promise<void> {
-    try {
-      // await this.knex('accounts').insert({
-      //   accountId,
-      //   tenantId,
-      //   created: new Date().toISOString(),
-      // });
-      this.loggerService.log(`Added account: ${accountId} for tenant: ${tenantId}`);
-    } catch (error) {
-      this.loggerService.error(`Failed to add account: ${String(error)}`);
-      throw error;
-    }
-  }
-
-  private async addEntity(entityId: string, tenantId: string, CreDtTm: string): Promise<void> {
-    try {
-      // await this.knex('entities').insert({
-      //   entityId,
-      //   tenantId,
-      //   CreDtTm,
-      //   created: new Date().toISOString(),
-      // });
-      this.loggerService.log(`Added entity: ${entityId} for tenant: ${tenantId} and CreDtTm: ${CreDtTm}`);
-    } catch (error) {
-      this.loggerService.error(`Failed to add entity: ${String(error)}`);
-      throw error;
-    }
-  }
-
-  private async addAccountHolder(entityId: string, accountId: string, CreDtTm: string, tenantId: string): Promise<void> {
-    try {
-      // await this.knex('accountholders').insert({
-      //   entityId,
-      //   accountId,
-      //   CreDtTm,
-      //   tenantId,
-      //   created: new Date().toISOString(),
-      // });
-      this.loggerService.log(`Added account holder: ${entityId} for account: ${accountId} and tenant: ${tenantId} and CreDtTm: ${CreDtTm}`);
-    } catch (error) {
-      this.loggerService.error(`Failed to add account holder: ${String(error)}`);
       throw error;
     }
   }
@@ -342,7 +299,7 @@ export class DemsEngineService {
             return combinedValue;
           });
 
-          await this[functionToCall](...Object.values(sources));
+          await this.databaseOperationsService[functionToCall](...Object.values(sources));
         }
       } catch (error) {
         this.loggerService.error(`Failed to execute configured functions: ${String(error)}`);
@@ -452,6 +409,8 @@ export class DemsEngineService {
 
     // Step 5: Build final payload and save/notify
     const tazamaPayload = this.buildTazamaPayload(payload, transactionType, tenantId, dataCache);
+
+    // Step 5: Build final payload and save/notify
     await this.saveTransactionDataAndNotify(tazamaPayload, transactionType, endToEndId, transactionRelationship);
 
     // Step 6: Return success response

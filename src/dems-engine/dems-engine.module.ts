@@ -6,10 +6,11 @@ import { ConfigModule } from '@nestjs/config';
 import { RedisModule } from '../redis/redis.module';
 import { KNEX_CONNECTION } from '../database/knex.provider';
 import { NatsModule } from '../nats/nats.module';
+import { DatabaseOperationsService } from '../commons';
 
 @Module({
   imports: [LoggerModule, ConfigModule, RedisModule, NatsModule],
   controllers: [DemsEngineController],
-  providers: [DemsEngineService, KNEX_CONNECTION],
+  providers: [DemsEngineService, DatabaseOperationsService, KNEX_CONNECTION],
 })
 export class DemsEngineModule {}
