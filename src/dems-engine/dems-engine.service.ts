@@ -384,13 +384,11 @@ export class DemsEngineService {
   }
 
   async handleMessage(payload: { any }, endpoint: string): Promise<any> {
-    // Step 1: Find and validate schema configuration
     const [configuredSchema, configuredMapping] = await this.findSchemaAndMapping(endpoint);
     if (!configuredSchema) {
       return this.buildErrorResponse('Schema not found for the specified endpoint', ['No schema exists for this endpoint']);
     }
 
-    // Step 2: Validate payload against schema
     const validationResult = await this.validatePayload(payload, configuredSchema, endpoint);
     if (!validationResult.isValid) {
       const errorMessage = validationResult.differences?.[0]?.includes('AJV validation error')
@@ -399,21 +397,16 @@ export class DemsEngineService {
       return this.buildErrorResponse(errorMessage, validationResult.differences || [], configuredSchema);
     }
 
-    // Step 3: Extract transaction metadata
     const transactionType = extractTransactionType(endpoint);
     const tenantId = extractTenantId(endpoint);
 
-    // Step 4: Process mappings and execute functions
     const { dataCache, transactionRelationship, endToEndId } = this.processMappings(payload, configuredMapping, endpoint);
     await this.executeConfiguredFunctions(payload, configuredMapping);
 
-    // Step 5: Build final payload and save/notify
     const tazamaPayload = this.buildTazamaPayload(payload, transactionType, tenantId, dataCache);
 
-    // Step 5: Build final payload and save/notify
     await this.saveTransactionDataAndNotify(tazamaPayload, transactionType, endToEndId, transactionRelationship);
 
-    // Step 6: Return success response
     return this.buildSuccessResponse(configuredSchema, tazamaPayload, dataCache);
   }
 }
