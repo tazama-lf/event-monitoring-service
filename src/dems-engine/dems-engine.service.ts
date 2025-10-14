@@ -1,4 +1,4 @@
-import { Injectable, Inject, OnModuleInit } from '@nestjs/common';
+import { Injectable, Inject } from '@nestjs/common';
 import { LoggerService, RedisService } from '@tazama-lf/frms-coe-lib';
 import Ajv from 'ajv';
 import addFormats from 'ajv-formats';
@@ -9,7 +9,7 @@ import { NatsService } from '../nats/nats.service';
 import { getValueByPath } from '../utils/has_nested_property';
 
 @Injectable()
-export class DemsEngineService implements OnModuleInit {
+export class DemsEngineService {
   private readonly ajv: Ajv;
   constructor(
     private readonly loggerService: LoggerService,
@@ -19,10 +19,6 @@ export class DemsEngineService implements OnModuleInit {
   ) {
     this.ajv = new Ajv({ allErrors: true });
     addFormats(this.ajv);
-  }
-
-  onModuleInit() {
-    this.loggerService.log('DemsEngineService initialized', DemsEngineService.name);
   }
 
   async findSchemaAndMapping(endpoint: string): Promise<any> {
@@ -179,50 +175,33 @@ export class DemsEngineService implements OnModuleInit {
     }
   }
 
-  async handleMessage(payload: { any }, endpoint: string): Promise<any> {
-    const [configuredSchema, configuredMapping] = await this.findSchemaAndMapping(endpoint);
-
-    if (!configuredSchema) {
-      this.loggerService.log(`No schema configured for endpoint: ${endpoint}`);
-      return {
-        isMatch: false,
-        message: 'Schema not found for the specified endpoint',
-        differences: ['No schema exists for this endpoint'],
-      };
-    }
-
+  /**
+   * Validates payload against the configured schema
+   * @param payload The payload to validate
+   * @param configuredSchema The schema to validate against
+   * @param endpoint The endpoint path for error tracking
+   * @returns Validation result with isValid flag and formatted errors
+   */
+  private async validatePayload(
+    payload: any,
+    configuredSchema: any,
+    endpoint: string,
+  ): Promise<{ isValid: boolean; differences?: string[] }> {
     let isValid;
     try {
       isValid = this.ajv.validate(configuredSchema, payload);
     } catch (error) {
       this.loggerService.error(`AJV validation error: ${String(error)}`);
       return {
-        isMatch: false,
-        message: 'Error during schemaa validation',
+        isValid: false,
         differences: [String(error)],
       };
     }
 
     if (!isValid) {
-      const differences =
-        this.ajv.errors?.map((error) => {
-          const path = error.instancePath || 'root';
-          const message = error.message || 'validation failed';
-
-          // Format the error message to be more human-readable
-          if (error.keyword === 'required') {
-            return `${path}: Missing required property '${error.params?.missingProperty}'`;
-          } else if (error.keyword === 'additionalProperties') {
-            return `${path}: Unexpected property '${error.params?.additionalProperty}' not defined in schema`;
-          } else if (error.keyword === 'type') {
-            this.loggerService.log(`Type error details: ${JSON.stringify(error)}`);
-            return `${path}: Should be a ${error.params?.type}`;
-          } else {
-            return `--> ${path}: ${message}`;
-          }
-        }) || [];
-
+      const differences = this.formatValidationErrors();
       this.loggerService.log(`Schema validation errors: ${JSON.stringify(differences)}`);
+
       const correlationId = crypto.randomUUID();
       try {
         await this.saveToQuarantine(payload, endpoint, differences, correlationId);
@@ -230,34 +209,53 @@ export class DemsEngineService implements OnModuleInit {
         this.loggerService.error(`Failed to save to quarantine: ${String(error)}`);
       }
 
-      return {
-        isMatch: false,
-        message: 'Payload structure does not match the schema',
-        schema: configuredSchema,
-        differences,
-      };
+      return { isValid: false, differences };
     }
 
     this.loggerService.log('Payload structure matches the schema perfectly!');
+    return { isValid: true };
+  }
 
-    // notifying event-director after successful validation
-    const transactionType = extractTransactionType(endpoint);
-    const tenantId = extractTenantId(endpoint);
-    let endToEndId = '';
+  /**
+   * Formats AJV validation errors into human-readable messages
+   * @returns Array of formatted error messages
+   */
+  private formatValidationErrors(): string[] {
+    return (
+      this.ajv.errors?.map((error) => {
+        const path = error.instancePath || 'root';
+        const message = error.message || 'validation failed';
 
-    // let dataCache: DataCache | undefined;
+        // Format the error message to be more human-readable
+        if (error.keyword === 'required') {
+          return `${path}: Missing required property '${error.params?.missingProperty}'`;
+        } else if (error.keyword === 'additionalProperties') {
+          return `${path}: Unexpected property '${error.params?.additionalProperty}' not defined in schema`;
+        } else if (error.keyword === 'type') {
+          this.loggerService.log(`Type error details: ${JSON.stringify(error)}`);
+          return `${path}: Should be a ${error.params?.type}`;
+        } else {
+          return `--> ${path}: ${message}`;
+        }
+      }) || []
+    );
+  }
+
+  /**
+   * Processes configured mappings to extract data cache and transaction relationship data
+   * @param payload The payload to extract data from
+   * @param configuredMapping The mapping configuration
+   * @param endpoint The endpoint path for logging
+   * @returns Object containing dataCache, transactionRelationship, and endToEndId
+   */
+  private processMappings(
+    payload: any,
+    configuredMapping: any,
+    endpoint: string,
+  ): { dataCache: any; transactionRelationship: any; endToEndId: string } {
     const dataCache: any = {};
     const transactionRelationship: any = {};
-
-    // 4 cases:
-    // 1. DataCache
-    // 2. TransactionRelationship test util test
-
-    // 3. addAccount
-    // 4. addEntity
-    // 5. addAccountHolder
-
-    // example: "destination": "redis.cdtrId" / "destination": "transaction.endToEndId" / "destination": "accountHolder.addAccountHolder"
+    let endToEndId = '';
 
     if (configuredMapping?.mappings) {
       try {
@@ -311,6 +309,15 @@ export class DemsEngineService implements OnModuleInit {
       this.loggerService.log(`No mapping configured for endpoint: ${endpoint}`);
     }
 
+    return { dataCache, transactionRelationship, endToEndId };
+  }
+
+  /**
+   * Executes configured functions based on the mapping configuration
+   * @param payload The payload to extract data from
+   * @param configuredMapping The mapping configuration containing functions to execute
+   */
+  private async executeConfiguredFunctions(payload: any, configuredMapping: any): Promise<void> {
     if (configuredMapping?.functions) {
       try {
         for (const row of configuredMapping.functions) {
@@ -341,14 +348,38 @@ export class DemsEngineService implements OnModuleInit {
         this.loggerService.error(`Failed to execute configured functions: ${String(error)}`);
       }
     }
+  }
 
-    const tazamaPayload = {
+  /**
+   * Builds the Tazama payload object
+   * @param payload The original payload
+   * @param transactionType The extracted transaction type
+   * @param tenantId The extracted tenant ID
+   * @param dataCache The processed data cache
+   * @returns The formatted Tazama payload
+   */
+  private buildTazamaPayload(payload: any, transactionType: string, tenantId: string, dataCache: any): any {
+    return {
       transaction: payload,
       TxTp: transactionType,
       TenantId: tenantId,
       dataCache,
     };
+  }
 
+  /**
+   * Saves transaction data and sends notification to event director
+   * @param tazamaPayload The Tazama payload to process
+   * @param transactionType The transaction type
+   * @param endToEndId The end-to-end ID for the transaction
+   * @param transactionRelationship The transaction relationship data
+   */
+  private async saveTransactionDataAndNotify(
+    tazamaPayload: any,
+    transactionType: string,
+    endToEndId: string,
+    transactionRelationship: any,
+  ): Promise<void> {
     try {
       await this.saveTransactionHistory(tazamaPayload, `${transactionType}_${endToEndId}`);
 
@@ -359,14 +390,71 @@ export class DemsEngineService implements OnModuleInit {
     } catch (error) {
       this.loggerService.error(`Failed to notify event-director: ${String(error)}`);
     }
+  }
 
+  /**
+   * Builds an error response object
+   * @param message The error message
+   * @param differences Array of validation differences
+   * @param schema Optional schema object
+   * @returns Formatted error response
+   */
+  private buildErrorResponse(message: string, differences: string[], schema?: any): any {
+    return {
+      isMatch: false,
+      message,
+      differences,
+      ...(schema && { schema }),
+    };
+  }
+
+  /**
+   * Builds a success response object
+   * @param schema The validated schema
+   * @param payload The processed payload
+   * @param dataCache The processed data cache
+   * @returns Formatted success response
+   */
+  private buildSuccessResponse(schema: any, payload: any, dataCache: any): any {
     return {
       isMatch: true,
       message: 'Payload structure matches the schema perfectly!',
-      schema: configuredSchema,
-      payload: tazamaPayload,
-      dataCache: dataCache,
+      schema,
+      payload,
+      dataCache,
       differences: [],
     };
+  }
+
+  async handleMessage(payload: { any }, endpoint: string): Promise<any> {
+    // Step 1: Find and validate schema configuration
+    const [configuredSchema, configuredMapping] = await this.findSchemaAndMapping(endpoint);
+    if (!configuredSchema) {
+      return this.buildErrorResponse('Schema not found for the specified endpoint', ['No schema exists for this endpoint']);
+    }
+
+    // Step 2: Validate payload against schema
+    const validationResult = await this.validatePayload(payload, configuredSchema, endpoint);
+    if (!validationResult.isValid) {
+      const errorMessage = validationResult.differences?.[0]?.includes('AJV validation error')
+        ? 'Error during schemaa validation'
+        : 'Payload structure does not match the schema';
+      return this.buildErrorResponse(errorMessage, validationResult.differences || [], configuredSchema);
+    }
+
+    // Step 3: Extract transaction metadata
+    const transactionType = extractTransactionType(endpoint);
+    const tenantId = extractTenantId(endpoint);
+
+    // Step 4: Process mappings and execute functions
+    const { dataCache, transactionRelationship, endToEndId } = this.processMappings(payload, configuredMapping, endpoint);
+    await this.executeConfiguredFunctions(payload, configuredMapping);
+
+    // Step 5: Build final payload and save/notify
+    const tazamaPayload = this.buildTazamaPayload(payload, transactionType, tenantId, dataCache);
+    await this.saveTransactionDataAndNotify(tazamaPayload, transactionType, endToEndId, transactionRelationship);
+
+    // Step 6: Return success response
+    return this.buildSuccessResponse(configuredSchema, tazamaPayload, dataCache);
   }
 }
