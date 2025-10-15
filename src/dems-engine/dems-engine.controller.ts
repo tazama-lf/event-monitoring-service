@@ -1,9 +1,11 @@
-import { BadRequestException, Body, Controller, HttpStatus, Param, Post } from '@nestjs/common';
+import { BadRequestException, Body, Controller, HttpStatus, Param, Post, UseGuards } from '@nestjs/common';
 import { DemsEngineService } from './dems-engine.service';
 import { LoggerService } from '@tazama-lf/frms-coe-lib';
 import { transformEndpoint } from '../utils/transform_endpoint';
+import { AuthGuard } from '../auth/auth.guard';
 
 @Controller('/dems-engine')
+@UseGuards(AuthGuard)
 export class DemsEngineController {
   constructor(
     private readonly demsEngineService: DemsEngineService,

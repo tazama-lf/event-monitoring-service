@@ -7,9 +7,10 @@ import { RedisModule } from '../redis/redis.module';
 import { KNEX_CONNECTION } from '../database/knex.provider';
 import { NatsModule } from '../nats/nats.module';
 import { DatabaseOperationsService } from '../commons';
+import { AuthModule } from '../auth/auth.module';
 
 @Module({
-  imports: [LoggerModule, ConfigModule, RedisModule, NatsModule],
+  imports: [LoggerModule, ConfigModule, RedisModule, NatsModule, AuthModule],
   controllers: [DemsEngineController],
   providers: [DemsEngineService, DatabaseOperationsService, KNEX_CONNECTION],
 })
