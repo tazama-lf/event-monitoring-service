@@ -1,13 +1,12 @@
 import { CanActivate, ExecutionContext, Injectable, UnauthorizedException, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Reflector } from '@nestjs/core';
+import { validateTokenAndClaims } from '@tazama-lf/auth-lib';
 import type { Request } from 'express';
 
-// Custom decorator for public endpoints
 export const IS_PUBLIC_KEY = 'isPublic';
 export const Public = () => Reflector.createDecorator<boolean>({ key: IS_PUBLIC_KEY });
 
-// Auth service interface
 export interface IAuthService {
   validateTokenAndClaims(token: string, claims: string[]): Record<string, boolean>;
 }
@@ -16,27 +15,35 @@ export interface IAuthService {
 export class AuthService implements IAuthService {
   private readonly logger = new Logger(AuthService.name);
 
+  constructor(private readonly configService: ConfigService) {}
+
   validateTokenAndClaims(token: string, claims: string[]): Record<string, boolean> {
     try {
-      // This would integrate with @tazama-lf/auth-lib for real JWT validation
-      // For now, implementing basic validation structure
       if (!token) {
         throw new UnauthorizedException('No token provided');
       }
 
-      // TODO: Replace with actual JWT validation using @tazama-lf/auth-lib
-      // const validated = validateTokenAndClaims(token, claims);
+      const validated = validateTokenAndClaims(token, claims);
+
+      if (!validated) {
+        this.logger.warn('Token validation failed - validateTokenAndClaims returned false');
+        throw new UnauthorizedException('Invalid token or insufficient claims');
+      }
 
       const result: Record<string, boolean> = {};
       claims.forEach((claim) => {
-        // Mock validation - replace with actual validation logic
         result[claim] = true;
       });
 
+      this.logger.debug(`Token validation successful for claims: ${claims.join(', ')}`);
       return result;
     } catch (error) {
-      this.logger.error('Token validation failed:', error);
-      throw new UnauthorizedException('Invalid token');
+      if (error instanceof UnauthorizedException) {
+        throw error;
+      }
+
+      this.logger.error('Token validation error:', error);
+      throw new UnauthorizedException('Token validation failed');
     }
   }
 }
@@ -52,22 +59,24 @@ export class AuthGuard implements CanActivate {
   ) {}
 
   canActivate(context: ExecutionContext): boolean {
-    // Check if endpoint is marked as public
     const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [context.getHandler(), context.getClass()]);
 
     if (isPublic) {
+      this.logger.debug('Public endpoint accessed, skipping authentication');
       return true;
     }
 
-    // Check if authentication is enabled
     const isAuthenticated = this.configService.get<boolean>('AUTHENTICATED', true);
     if (!isAuthenticated) {
-      this.logger.debug('Authentication disabled');
+      this.logger.debug('Authentication disabled via configuration');
       return true;
     }
 
     const request = context.switchToHttp().getRequest<Request>();
-    const claims = ['dems:write']; // Default claim for DEMS operations
+
+    const defaultClaims = ['dems:write'];
+    const configuredClaims = this.configService.get<string>('REQUIRED_CLAIMS');
+    const claims = configuredClaims ? configuredClaims.split(',').map((c) => c.trim()) : defaultClaims;
 
     return this.validateRequest(request, claims);
   }
@@ -89,10 +98,8 @@ export class AuthGuard implements CanActivate {
         throw new UnauthorizedException('Missing token');
       }
 
-      // Validate token and claims
       const validationResult = this.authService.validateTokenAndClaims(token, claims);
 
-      // Check if all required claims are valid
       const allClaimsValid = claims.every((claim) => validationResult[claim] === true);
 
       if (!allClaimsValid) {
@@ -101,6 +108,7 @@ export class AuthGuard implements CanActivate {
       }
 
       this.logger.debug('Authentication successful', logContext);
+
       return true;
     } catch (error) {
       if (error instanceof UnauthorizedException) {
