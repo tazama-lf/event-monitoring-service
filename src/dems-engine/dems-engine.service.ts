@@ -36,14 +36,6 @@ export class DemsEngineService {
     }
 
     this.loggerService.log(`Cache miss for endpoint: ${endpoint}. Querying database...`);
-    // db hit ni hogi at dems.
-    // const schemaRecord = await this.knex('configurations').select('schema', 'mapping').where({ endpoint }).first();
-
-    // if (schemaRecord) {
-    //   this.loggerService.log(`Schema found for endpoint: ${endpoint}. Caching result...`);
-    //   await this.redisService.set(cacheKey, schemaRecord, 86400);
-    //   return [schemaRecord.schema, schemaRecord.mapping];
-    // }
 
     this.loggerService.log(`No schema found for endpoint: ${endpoint}`);
     return null;
@@ -256,9 +248,6 @@ export class DemsEngineService {
             }
           }
         }
-
-        // this.loggerService.log('DataCache:', dataCache);
-        // this.loggerService.log('TransactionRelationship:', transactionRelationship);
       } catch (error) {
         this.loggerService.error(`Failed to process mapping data: ${String(error)}`);
       }
@@ -281,14 +270,6 @@ export class DemsEngineService {
           // prepare params (getPayloadByPath) --> and call each function one by one
           const functionToCall = row.functionName;
           let sources = row.sources || [];
-
-          // sources = sources.map((source: Array<string>) =>
-          //   source
-          //     .map((s: string) => {
-          //       return getValueByPath(payload, s);
-          //     })
-          //     .reduce((a: string, b: string) => a + b, ''),
-          // );
 
           sources = sources.map((source: string) => {
             const mapping = configuredMapping.mappings.find((sch: any) => sch.destination === source);
