@@ -23,6 +23,8 @@ export class DemsEngineService {
     addFormats(this.ajv);
   }
 
+  TIME_TO_LIVE = 3600; // 1 hour in seconds
+
   async findSchemaAndMapping(endpoint: string): Promise<any> {
     this.loggerService.log(`Looking up schema for endpoint: ${endpoint}`);
 
@@ -35,7 +37,16 @@ export class DemsEngineService {
       return [parsedSchema.schema, parsedSchema.mapping];
     }
 
+    // not found in cache, query the database
+
     this.loggerService.log(`Cache miss for endpoint: ${endpoint}. Querying database...`);
+    const record: any = await this.knex('configurations').select('schema', 'mapping').where({ endpoint_path: endpoint });
+
+    if (record) {
+      this.loggerService.log(`Found schema for endpoint: ${endpoint}`);
+      await this.redisService.setJson(cacheKey, JSON.stringify(record), this.TIME_TO_LIVE);
+      return [record.schema, record.mapping];
+    }
 
     this.loggerService.log(`No schema found for endpoint: ${endpoint}`);
     return null;
