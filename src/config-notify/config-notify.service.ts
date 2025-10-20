@@ -3,19 +3,6 @@ import { LoggerService, RedisService } from '@tazama-lf/frms-coe-lib';
 import { StartupFactory } from '@tazama-lf/frms-coe-startup-lib';
 import { Knex } from 'knex';
 
-interface Config {
-  endpoint: string;
-  id: string;
-  tenant_id: string;
-  msg_fam: string;
-  msg_type: string;
-  version: string;
-  schema: object;
-  mapping: object;
-  enrichment: object;
-  artifact_link: string;
-}
-
 interface NatsMessage {
   transactionID: string;
   msgfam: string;
@@ -52,13 +39,11 @@ export class ConfigNotifyService implements OnModuleInit, OnModuleDestroy {
     this.isInitialized = true;
     this.logger.log('NATS consumer initialized for config.notification');
 
-    const configs = (await this.knex('configurations').select('*')) as Config[];
-    // const schemaRecord = await this.knex('configurations').select('schema');
+    const configs = await this.knex('config').select('endpoint_path', 'schema', 'mapping', 'functions').where('msg_fam', 'ForDEMS');
 
     for (const config of configs) {
-      console.log('Preloading cache for config:', config.endpoint);
-      // await this.setCache(config);
-      await this.redis.setJson(config.endpoint, JSON.stringify({ schema: config.schema, mapping: config.mapping }), CACHE_TTL);
+      console.log('Preloading cache for config:', config.endpoint_path);
+      await this.setCache(config);
     }
     this.logger.log(`Cache preloaded: ${configs.length} configurations`);
   }
@@ -73,7 +58,7 @@ export class ConfigNotifyService implements OnModuleInit, OnModuleDestroy {
     this.logger.log(`Received NATS notification for config ID: ${message.transactionID}`);
 
     try {
-      const config = (await this.knex('configurations').where('id', message.transactionID).first()) as Config | undefined;
+      const config = await this.knex('configurations').where('id', message.transactionID).first();
 
       if (config) {
         await this.setCache(config);
@@ -99,13 +84,12 @@ export class ConfigNotifyService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  private async setCache(config: Config): Promise<void> {
-    const key = `${config.tenant_id}:${config.msg_fam}:${config.msg_type}:${config.version}`;
+  private async setCache(config: any): Promise<void> {
+    const key = config.endpoint_paths;
     const data = {
       schema: config.schema,
       mapping: config.mapping,
-      enrichment: config.enrichment,
-      artifact_link: config.artifact_link,
+      functions: config.functions,
     };
     await this.redis.setJson(key, JSON.stringify(data), CACHE_TTL);
   }
@@ -120,9 +104,7 @@ export class ConfigNotifyService implements OnModuleInit, OnModuleDestroy {
     }
 
     this.logger.log(`Cache miss for ${key} - lazy loading from database`);
-    const config = (await this.knex('configurations')
-      .where({ tenant_id: tenantId, msg_fam: msgFam, msg_type: msgType, version })
-      .first()) as Config | undefined;
+    const config = await this.knex('configurations').where({ tenant_id: tenantId, msg_fam: msgFam, msg_type: msgType, version }).first();
 
     if (!config) {
       return { configs: [] };
@@ -136,15 +118,5 @@ export class ConfigNotifyService implements OnModuleInit, OnModuleDestroy {
       artifact_link: config.artifact_link,
     };
     return { configs: [{ key, data }] };
-  }
-
-  async testing(): Promise<string> {
-    const config = await this.knex('configurations').first();
-
-    if (!config) {
-      return 'No configuration found';
-    }
-
-    return `Testing successful: ${JSON.stringify(config)}`;
   }
 }
