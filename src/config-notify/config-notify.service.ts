@@ -85,7 +85,7 @@ export class ConfigNotifyService implements OnModuleInit, OnModuleDestroy {
   }
 
   private async setCache(config: any): Promise<void> {
-    const key = config.endpoint_paths;
+    const key = config.endpoint_path;
     const data = {
       schema: config.schema,
       mapping: config.mapping,

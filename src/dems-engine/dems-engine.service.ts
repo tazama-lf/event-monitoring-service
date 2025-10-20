@@ -34,18 +34,18 @@ export class DemsEngineService {
 
     if (cachedSchema) {
       this.loggerService.log(`Cache hit for endpoint: ${endpoint}`);
-      return [parsedSchema.schema, parsedSchema.mapping];
+      return [parsedSchema.schema, parsedSchema.mapping, parsedSchema.functions];
     }
 
     // not found in cache, query the database
 
     this.loggerService.log(`Cache miss for endpoint: ${endpoint}. Querying database...`);
-    const record: any = await this.knex('configurations').select('schema', 'mapping').where({ endpoint_path: endpoint });
+    const record: any = await this.knex('config').select('schema', 'mapping', 'functions').where({ endpoint_path: endpoint });
 
     if (record) {
       this.loggerService.log(`Found schema for endpoint: ${endpoint}`);
       await this.redisService.setJson(cacheKey, JSON.stringify(record), this.TIME_TO_LIVE);
-      return [record.schema, record.mapping];
+      return [record.schema, record.mapping, record.functions];
     }
 
     this.loggerService.log(`No schema found for endpoint: ${endpoint}`);
@@ -274,16 +274,16 @@ export class DemsEngineService {
    * @param payload The payload to extract data from
    * @param configuredMapping The mapping configuration containing functions to execute
    */
-  private async executeConfiguredFunctions(payload: any, configuredMapping: any): Promise<void> {
-    if (configuredMapping?.functions) {
+  private async executeConfiguredFunctions(payload: any, configuredFunctions: any): Promise<void> {
+    if (configuredFunctions) {
       try {
-        for (const row of configuredMapping.functions) {
+        for (const row of configuredFunctions) {
           // prepare params (getPayloadByPath) --> and call each function one by one
           const functionToCall = row.functionName;
           let sources = row.sources || [];
 
           sources = sources.map((source: string) => {
-            const mapping = configuredMapping.mappings.find((sch: any) => sch.destination === source);
+            const mapping = configuredFunctions.find((sch: any) => sch.destination === source);
 
             const extractedValues = mapping.sources.map((s: string) => getValueByPath(payload, s));
 
@@ -376,7 +376,7 @@ export class DemsEngineService {
   }
 
   async handleMessage(payload: { any }, endpoint: string): Promise<any> {
-    const [configuredSchema, configuredMapping] = await this.findSchemaAndMapping(endpoint);
+    const [configuredSchema, configuredMapping, configuredFunctions] = await this.findSchemaAndMapping(endpoint);
     if (!configuredSchema) {
       return this.buildErrorResponse('Schema not found for the specified endpoint', ['No schema exists for this endpoint']);
     }
@@ -393,7 +393,7 @@ export class DemsEngineService {
     const tenantId = extractTenantId(endpoint);
 
     const { dataCache, transactionRelationship, endToEndId } = this.processMappings(payload, configuredMapping, endpoint);
-    await this.executeConfiguredFunctions(payload, configuredMapping);
+    await this.executeConfiguredFunctions(payload, configuredFunctions);
 
     const tazamaPayload = this.buildTazamaPayload(payload, transactionType, tenantId, dataCache);
 
