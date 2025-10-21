@@ -21,4 +21,3 @@ export function getValueByPath(obj: any, path: string): any {
 // const keyPath = 'glossary.GlossDiv.GlossList.GlossEntry.SortAs';
 // const keyPath_withArray = 'glossary.GlossDiv.GlossList.GlossEntry.0.SortAs';
 // const value = getValueByPath(payload, keyPath); // "SGML"
-// console.log(value);

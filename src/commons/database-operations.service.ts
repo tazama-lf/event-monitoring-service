@@ -47,6 +47,8 @@ export class DatabaseOperationsService {
 
   async addAccountHolder(entityId: string, accountId: string, CreDtTm: string, tenantId: string): Promise<void> {
     try {
+      // betha hai ya nahi
+
       await this.knex('account_holder').insert({
         source: entityId,
         destination: accountId,

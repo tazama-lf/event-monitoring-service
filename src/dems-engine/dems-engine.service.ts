@@ -82,7 +82,6 @@ export class DemsEngineService {
    */
   private async saveTransactionRelationship(relationship: any): Promise<void> {
     try {
-      console.log('Saving transaction relationship:', relationship);
       await this.knex('transaction').insert({
         source: relationship.from,
         destination: relationship.to,
@@ -277,35 +276,20 @@ export class DemsEngineService {
           // prepare params (getPayloadByPath) --> and call each function one by one
           const functionToCall = row.functionName;
           let sources = row.params || [];
-          console.log(
-            ' ------------------------------------------------------------------------------------------------------------------',
-          );
-
-          console.log('Original sources:', sources, 'for function:', functionToCall);
 
           sources = sources.map((source: string) => {
             const mapping = configuredMapping.find((sch: any) => sch.destination === source);
 
-            console.log('Processing source:', source, 'with mapping:', mapping);
-
             const extractedValues = mapping.source.map((s: string) => {
               const value = getValueByPath(payload, s);
-              console.log('Extracted value for', s, ':', value);
               return value;
             });
 
-            console.log('Extracted values:', extractedValues);
-
             const combinedValue = extractedValues.join('');
 
-            console.log('Combined value for', source, ':', combinedValue);
             return combinedValue;
           });
 
-          console.log('Executing function:', functionToCall, 'with sources:', sources);
-          console.log(
-            ' ------------------------------------------------------------------------------------------------------------------',
-          );
           await this.databaseOperationsService[functionToCall](...Object.values(sources));
         }
       } catch (error) {
@@ -345,8 +329,6 @@ export class DemsEngineService {
   ): Promise<void> {
     try {
       await this.saveTransactionHistory(tazamaPayload, `${transactionType}_${endToEndId}`);
-
-      this.loggerService.log('saved transaction History');
     } catch (error) {
       this.loggerService.error(`Failed to notify event-director: ${String(error)}`);
     }
