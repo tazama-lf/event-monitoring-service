@@ -5,7 +5,7 @@ import { AppModule } from './app.module';
 import { ValidationPipe } from '@nestjs/common';
 config();
 
-const DEFAULT_PORT = 3000;
+const DEFAULT_PORT = 3002;
 const ERROR_EXIT_CODE = 1;
 
 async function bootstrap(): Promise<void> {
