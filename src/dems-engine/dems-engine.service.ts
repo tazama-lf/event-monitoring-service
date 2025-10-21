@@ -44,7 +44,12 @@ export class DemsEngineService {
 
     if (record) {
       this.loggerService.log(`Found schema for endpoint: ${endpoint}`);
-      await this.redisService.setJson(cacheKey, JSON.stringify(record), this.TIME_TO_LIVE);
+      const data = {
+        schema: record.schema,
+        mapping: record.mapping,
+        functions: record.functions,
+      };
+      await this.redisService.setJson(cacheKey, JSON.stringify(data), this.TIME_TO_LIVE);
       return [record.schema, record.mapping, record.functions];
     }
 

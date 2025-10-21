@@ -39,7 +39,7 @@ export class ConfigNotifyService implements OnModuleInit, OnModuleDestroy {
     this.isInitialized = true;
     this.logger.log('NATS consumer initialized for config.notification');
 
-    const configs = await this.knex('config').select('endpoint_path', 'schema', 'mapping', 'functions').where('msg_fam', 'ForDEMS');
+    const configs = await this.knex('config').select('endpoint_path', 'schema', 'mapping', 'functions');
 
     for (const config of configs) {
       console.log('Preloading cache for config:', config.endpoint_path);
@@ -84,7 +84,7 @@ export class ConfigNotifyService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  private async setCache(config: any): Promise<void> {
+  public async setCache(config: any): Promise<void> {
     const key = config.endpoint_path;
     const data = {
       schema: config.schema,
