@@ -346,10 +346,21 @@ export class DemsEngineService {
     try {
       await this.saveTransactionHistory(tazamaPayload, `${transactionType}_${endToEndId}`);
 
-      await this.saveTransactionRelationship(transactionRelationship);
+      this.loggerService.log('saved transaction History');
+    } catch (error) {
+      this.loggerService.error(`Failed to notify event-director: ${String(error)}`);
+    }
 
+    try {
+      await this.saveTransactionRelationship(transactionRelationship);
+      this.loggerService.log('saved transaction Relationship');
+    } catch (error) {
+      this.loggerService.error(`Failed to save transaction relationship: ${String(error)}`);
+    }
+
+    try {
       await this.natsService.notifyEventDirector(tazamaPayload);
-      this.loggerService.log('Notification sent to event-director');
+      this.loggerService.log('Notified event-director successfully');
     } catch (error) {
       this.loggerService.error(`Failed to notify event-director: ${String(error)}`);
     }
