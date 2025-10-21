@@ -63,13 +63,11 @@ export class DemsEngineService {
    * @param key The key to use for the transaction
    */
   private async saveTransactionHistory(transaction: any, key: string): Promise<void> {
-    const txtp = transaction.TxTp.replace('.', '_').toLowerCase();
-    const destination = `transactionshistory_${txtp}`;
+    const txtp = transaction.TxTp.replace('.', '').toLowerCase();
+    const destination = `${txtp}`;
     try {
       await this.knex(destination).insert({
-        _key: key,
-        transaction: JSON.stringify(transaction),
-        created: new Date().toISOString(),
+        document: transaction.transaction,
       });
       this.loggerService.log(`Saved transaction history with key: ${key}`);
     } catch (error) {
@@ -335,7 +333,6 @@ export class DemsEngineService {
     return {
       transaction: payload,
       TxTp: transactionType,
-      TenantId: tenantId,
       dataCache,
     };
   }
