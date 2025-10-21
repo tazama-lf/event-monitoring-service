@@ -1,25 +1,24 @@
-
 services:
-  postgres:
-    image: postgres:15
-    container_name: event-monitoring-postgres
-    environment:
-      POSTGRES_DB: event_monitoring_dev
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: password
-      POSTGRES_HOST_AUTH_METHOD: trust
-    ports:
-      - "5432:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-      - ./init-scripts:/docker-entrypoint-initdb.d
+  # postgres:
+  #   image: postgres:15
+  #   container_name: event-monitoring-postgres
+  #   environment:
+  #     POSTGRES_DB: tcs
+  #     POSTGRES_USER: postgres
+  #     POSTGRES_PASSWORD: postgres
+  #     POSTGRES_HOST_AUTH_METHOD: trust
+  #   ports:
+  #     - '5432:5432'
+  #   volumes:
+  #     - postgres_data:/var/lib/postgresql/data
+  #     - ./init-scripts:/docker-entrypoint-initdb.d
 
   redis:
     image: redis:7-alpine
     container_name: event-monitoring-redis
     command: redis-server --requirepass redis-password
     ports:
-      - "6379:6379"
+      - '6379:6379'
     volumes:
       - redis_data:/data
 
@@ -27,10 +26,10 @@ services:
     image: nats:2.10-alpine
     container_name: event-monitoring-nats
     ports:
-      - "4222:4222"
-      - "8222:8222"
-    command: ["nats-server", "--jetstream", "--http_port", "8222"]
+      - '4222:4222'
+      - '8222:8222'
+    command: ['nats-server', '--jetstream', '--http_port', '8222']
 
 volumes:
-  postgres_data:  
+  postgres_data:
   redis_data:

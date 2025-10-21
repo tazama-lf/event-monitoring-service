@@ -1,11 +1,11 @@
-import { BadRequestException, Body, Controller, HttpStatus, Param, Post, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Headers, HttpStatus, Param, Post } from '@nestjs/common';
 import { DemsEngineService } from './dems-engine.service';
 import { LoggerService } from '@tazama-lf/frms-coe-lib';
 import { transformEndpoint } from '../utils/transform_endpoint';
-import { AuthGuard } from '../auth/auth.guard';
+// import { AuthGuard } from '../auth/auth.guard';
 
 @Controller('/dems-engine')
-@UseGuards(AuthGuard)
+// @UseGuards(AuthGuard)
 export class DemsEngineController {
   constructor(
     private readonly demsEngineService: DemsEngineService,
@@ -13,10 +13,14 @@ export class DemsEngineController {
   ) {}
 
   @Post('*endpoint')
-  async MessageHandler(@Param('endpoint') endpoint: string, @Body() payload: any): Promise<any> {
+  async MessageHandler(
+    @Param('endpoint') endpoint: string,
+    @Body() payload: any,
+    @Headers('tenantId') tenantId: string,
+  ): Promise<{ message: string; isMatch: boolean; schema: any; payload: any; statusCode: number }> {
     const transformedEndpoint = transformEndpoint(endpoint);
 
-    const result = await this.demsEngineService.handleMessage(payload, transformedEndpoint);
+    const result = await this.demsEngineService.handleMessage(payload, transformedEndpoint, tenantId);
 
     if (!result.isMatch) {
       this.logger.log(`Schema mismatch: ${result.message}`);

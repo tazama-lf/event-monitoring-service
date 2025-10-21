@@ -375,7 +375,7 @@ export class DemsEngineService {
     };
   }
 
-  async handleMessage(payload: { any }, endpoint: string): Promise<any> {
+  async handleMessage(payload: { any }, endpoint: string, tenantId: string): Promise<any> {
     const [configuredSchema, configuredMapping, configuredFunctions] = await this.findSchemaAndMapping(endpoint);
     if (!configuredSchema) {
       return this.buildErrorResponse('Schema not found for the specified endpoint', ['No schema exists for this endpoint']);
@@ -389,13 +389,14 @@ export class DemsEngineService {
       return this.buildErrorResponse(errorMessage, validationResult.differences || [], configuredSchema);
     }
 
+    const enhancedRequest = { ...payload, TenantId: tenantId };
+
     const transactionType = extractTransactionType(endpoint);
-    const tenantId = extractTenantId(endpoint);
 
-    const { dataCache, transactionRelationship, endToEndId } = this.processMappings(payload, configuredMapping, endpoint);
-    await this.executeConfiguredFunctions(payload, configuredFunctions);
+    const { dataCache, transactionRelationship, endToEndId } = this.processMappings(enhancedRequest, configuredMapping, endpoint);
+    await this.executeConfiguredFunctions(enhancedRequest, configuredFunctions);
 
-    const tazamaPayload = this.buildTazamaPayload(payload, transactionType, tenantId, dataCache);
+    const tazamaPayload = this.buildTazamaPayload(enhancedRequest, transactionType, tenantId, dataCache);
 
     await this.saveTransactionDataAndNotify(tazamaPayload, transactionType, endToEndId, transactionRelationship);
 
