@@ -82,18 +82,11 @@ export class DemsEngineService {
    */
   private async saveTransactionRelationship(relationship: any): Promise<void> {
     try {
-      await this.knex('transactionrelationship').insert({
-        _from: relationship.from,
-        _to: relationship.to,
-        Amt: relationship.Amt,
-        Ccy: relationship.Ccy,
-        CreDtTm: relationship.CreDtTm,
-        EndToEndId: relationship.EndToEndId,
-        MsgId: relationship.MsgId,
-        PmtInfId: relationship.PmtInfId,
-        TxTp: relationship.TxTp,
-        TenantId: relationship.TenantId,
-        created: new Date().toISOString(),
+      console.log('Saving transaction relationship:', relationship);
+      await this.knex('transaction').insert({
+        source: relationship.from,
+        destination: relationship.to,
+        transaction: relationship,
       });
 
       this.loggerService.log(`Saved transaction relationship: ${relationship.from} -> ${relationship.to}`);
@@ -225,7 +218,7 @@ export class DemsEngineService {
         for (const mapping of configuredMapping) {
           const destination = mapping.destination.split('.')[1];
           const type = mapping.destination.split('.')[0];
-          const separator = mapping.separator;
+          const separator = mapping.delimiter;
           const sources = mapping.source;
 
           let DataCachevalue = mapping.prefix ? mapping.prefix : '';
@@ -410,9 +403,8 @@ export class DemsEngineService {
       return this.buildErrorResponse(errorMessage, validationResult.differences || [], configuredSchema);
     }
 
-    const enhancedRequest = { ...payload, TenantId: tenantId };
-
     const transactionType = extractTransactionType(endpoint);
+    const enhancedRequest = { ...payload, TenantId: tenantId, TxTp: transactionType };
 
     const { dataCache, transactionRelationship, endToEndId } = this.processMappings(enhancedRequest, configuredMapping, endpoint);
 
