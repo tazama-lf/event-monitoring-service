@@ -19,7 +19,7 @@ export class DemsEngineService {
     private readonly databaseOperationsService: DatabaseOperationsService,
     @Inject('KNEX') private readonly knex: Knex,
   ) {
-    this.ajv = new Ajv({ allErrors: true });
+    this.ajv = new Ajv({ allErrors: true, logger: false });
     addFormats(this.ajv);
   }
 
@@ -217,13 +217,13 @@ export class DemsEngineService {
     const transactionRelationship: any = {};
     let endToEndId = '';
 
-    if (configuredMapping?.mappings) {
+    if (configuredMapping) {
       try {
-        for (const mapping of configuredMapping.mappings) {
+        for (const mapping of configuredMapping) {
           const destination = mapping.destination.split('.')[1];
           const type = mapping.destination.split('.')[0];
           const separator = mapping.separator;
-          const sources = mapping.sources;
+          const sources = mapping.source;
 
           let DataCachevalue = mapping.prefix ? mapping.prefix : '';
           let transactionRelationshipValue = mapping.prefix ? mapping.prefix : '';
@@ -274,23 +274,42 @@ export class DemsEngineService {
    * @param payload The payload to extract data from
    * @param configuredMapping The mapping configuration containing functions to execute
    */
-  private async executeConfiguredFunctions(payload: any, configuredFunctions: any): Promise<void> {
+  private async executeConfiguredFunctions(payload: any, configuredMapping: any, configuredFunctions: any): Promise<void> {
     if (configuredFunctions) {
       try {
         for (const row of configuredFunctions) {
           // prepare params (getPayloadByPath) --> and call each function one by one
           const functionToCall = row.functionName;
-          let sources = row.sources || [];
+          let sources = row.params || [];
+          console.log(
+            ' ------------------------------------------------------------------------------------------------------------------',
+          );
+
+          console.log('Original sources:', sources, 'for function:', functionToCall);
 
           sources = sources.map((source: string) => {
-            const mapping = configuredFunctions.find((sch: any) => sch.destination === source);
+            const mapping = configuredMapping.find((sch: any) => sch.destination === source);
 
-            const extractedValues = mapping.sources.map((s: string) => getValueByPath(payload, s));
+            console.log('Processing source:', source, 'with mapping:', mapping);
+
+            const extractedValues = mapping.source.map((s: string) => {
+              const value = getValueByPath(payload, s);
+              console.log('Extracted value for', s, ':', value);
+              return value;
+            });
+
+            console.log('Extracted values:', extractedValues);
 
             const combinedValue = extractedValues.join('');
+
+            console.log('Combined value for', source, ':', combinedValue);
             return combinedValue;
           });
 
+          console.log('Executing function:', functionToCall, 'with sources:', sources);
+          console.log(
+            ' ------------------------------------------------------------------------------------------------------------------',
+          );
           await this.databaseOperationsService[functionToCall](...Object.values(sources));
         }
       } catch (error) {
@@ -394,7 +413,8 @@ export class DemsEngineService {
     const transactionType = extractTransactionType(endpoint);
 
     const { dataCache, transactionRelationship, endToEndId } = this.processMappings(enhancedRequest, configuredMapping, endpoint);
-    await this.executeConfiguredFunctions(enhancedRequest, configuredFunctions);
+
+    await this.executeConfiguredFunctions(enhancedRequest, configuredMapping, configuredFunctions);
 
     const tazamaPayload = this.buildTazamaPayload(enhancedRequest, transactionType, tenantId, dataCache);
 
