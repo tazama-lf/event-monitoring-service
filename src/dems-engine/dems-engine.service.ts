@@ -331,10 +331,11 @@ export class DemsEngineService {
    * @param dataCache The processed data cache
    * @returns Formatted success response
    */
-  private buildSuccessResponse(schema: any, payload: any, dataCache: any): any {
+  private buildSuccessResponse(schema: any, payload: any, transactionRelationship: any, dataCache: any): any {
     return {
       isMatch: true,
       message: 'Payload structure matches the schema perfectly!',
+      transactionRelationship,
       schema,
       payload,
       dataCache,
@@ -380,7 +381,7 @@ export class DemsEngineService {
         ]);
       }
 
-      return this.buildSuccessResponse(configuredSchema, tazamaPayload, dataCache);
+      return this.buildSuccessResponse(configuredSchema, tazamaPayload, transactionRelationship, dataCache);
     } catch (error) {
       this.loggerService.error(`Unexpected error in handleMessage: ${String(error)}`);
       return this.buildErrorResponse('Unexpected error occurred while processing message', [`Internal error: ${String(error)}`]);

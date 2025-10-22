@@ -87,6 +87,7 @@ export class DatabaseOperationsService {
    * @param relationship The transaction relationship object
    */
   async saveTransactionRelationship(relationship: any): Promise<void> {
+    console.log(' transaction relationship', relationship);
     try {
       await this.knex('transaction').insert({
         source: relationship.from,
