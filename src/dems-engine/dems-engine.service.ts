@@ -139,6 +139,8 @@ export class DemsEngineService {
     const transactionRelationship: any = {};
     let endToEndId = '';
 
+    // new case: sum and split
+
     if (configuredMapping) {
       try {
         for (const mapping of configuredMapping) {
@@ -146,20 +148,39 @@ export class DemsEngineService {
           const type = mapping.destination.split('.')[0];
           const separator = mapping.delimiter;
           const sources = mapping.source;
+          const transformation = mapping.transformation;
+
+          if (transformation == 'SUM') console.log('transformation', transformation);
 
           let DataCachevalue = mapping.prefix ? mapping.prefix : '';
+          let sum = 0;
           let transactionRelationshipValue = mapping.prefix ? mapping.prefix : '';
 
           for (let i = 0; i < sources.length; i++) {
             if (type === 'redis') {
-              DataCachevalue += getValueByPath(payload, sources[i]);
+              const value = getValueByPath(payload, sources[i]);
+
+              if (transformation == 'SUM') {
+                const value = getValueByPath(payload, sources[i]);
+                console.log('value', value);
+                sum += value;
+              } else {
+                transactionRelationshipValue += value;
+              }
+
               if (i < sources.length - 1) {
                 DataCachevalue += separator;
               }
             }
             if (type === 'transaction') {
               const value = getValueByPath(payload, sources[i]);
-              transactionRelationshipValue += value;
+              if (transformation == 'SUM') {
+                const value = getValueByPath(payload, sources[i]);
+                console.log('value', value);
+                sum += value;
+              } else {
+                transactionRelationshipValue += value;
+              }
 
               if (i < sources.length - 1) {
                 transactionRelationshipValue += separator;
@@ -169,12 +190,20 @@ export class DemsEngineService {
 
           if (type === 'redis') {
             DataCachevalue += mapping.suffix ? mapping.suffix : '';
-            dataCache[destination] = DataCachevalue;
+            if (transformation == 'SUM') {
+              transactionRelationship[destination] = sum.toString();
+            } else {
+              transactionRelationship[destination] = DataCachevalue;
+            }
           }
 
           if (type === 'transaction') {
             transactionRelationshipValue += mapping.suffix ? mapping.suffix : '';
-            transactionRelationship[destination] = transactionRelationshipValue;
+            if (transformation == 'SUM') {
+              transactionRelationship[destination] = sum.toString();
+            } else {
+              transactionRelationship[destination] = transactionRelationshipValue;
+            }
 
             if (destination === 'endToEndId') {
               endToEndId = transactionRelationshipValue;
