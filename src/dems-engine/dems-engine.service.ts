@@ -150,8 +150,6 @@ export class DemsEngineService {
           const sources = mapping.source;
           const transformation = mapping.transformation;
 
-          if (transformation == 'SUM') console.log('transformation', transformation);
-
           let DataCachevalue = mapping.prefix ? mapping.prefix : '';
           let sum = 0;
           let transactionRelationshipValue = mapping.prefix ? mapping.prefix : '';
@@ -165,7 +163,7 @@ export class DemsEngineService {
                 console.log('value', value);
                 sum += value;
               } else {
-                transactionRelationshipValue += value;
+                DataCachevalue += value;
               }
 
               if (i < sources.length - 1) {
@@ -191,9 +189,9 @@ export class DemsEngineService {
           if (type === 'redis') {
             DataCachevalue += mapping.suffix ? mapping.suffix : '';
             if (transformation == 'SUM') {
-              transactionRelationship[destination] = sum.toString();
+              dataCache[destination] = sum.toString();
             } else {
-              transactionRelationship[destination] = DataCachevalue;
+              dataCache[destination] = DataCachevalue;
             }
           }
 
@@ -332,14 +330,14 @@ export class DemsEngineService {
    * @returns Formatted success response
    */
   private buildSuccessResponse(schema: any, payload: any, transactionRelationship: any, dataCache: any): any {
+    this.loggerService.log('THE END');
     return {
       isMatch: true,
-      message: 'Payload structure matches the schema perfectly!',
-      transactionRelationship,
+      message: 'Everything is OK!',
+      TransactionRelationship: transactionRelationship,
       schema,
       payload,
       dataCache,
-      differences: [],
     };
   }
 
@@ -380,6 +378,8 @@ export class DemsEngineService {
           `Transaction processing failed: ${String(error)}`,
         ]);
       }
+      this.loggerService.log(' transaction relationship', transactionRelationship);
+      this.loggerService.log('data cache', dataCache);
 
       return this.buildSuccessResponse(configuredSchema, tazamaPayload, transactionRelationship, dataCache);
     } catch (error) {
