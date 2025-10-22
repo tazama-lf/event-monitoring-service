@@ -23,7 +23,7 @@ export class DemsEngineController {
     const result = await this.demsEngineService.handleMessage(payload, transformedEndpoint, tenantId);
 
     if (!result.isMatch) {
-      this.logger.log(`Schema mismatch: ${result.message}`);
+      this.logger.log(`Problem is: ${result.message}`);
       throw new BadRequestException({
         message: result.message,
         differences: result.differences,

@@ -88,6 +88,7 @@ export class DemsEngineService {
         await this.databaseOperationsService.saveToQuarantine(payload, endpoint, differences, correlationId);
       } catch (error) {
         this.loggerService.error(`Failed to save to quarantine: ${String(error)}`);
+        // Continue with validation result even if quarantine save fails
       }
 
       return { isValid: false, differences };
@@ -220,6 +221,7 @@ export class DemsEngineService {
         }
       } catch (error) {
         this.loggerService.error(`Failed to execute configured functions: ${String(error)}`);
+        throw error;
       }
     }
   }
@@ -256,7 +258,8 @@ export class DemsEngineService {
     try {
       await this.databaseOperationsService.saveTransactionHistory(tazamaPayload, `${transactionType}_${endToEndId}`);
     } catch (error) {
-      this.loggerService.error(`Failed to notify event-director: ${String(error)}`);
+      this.loggerService.error(`Failed to save transaction history: ${String(error)}`);
+      throw error;
     }
 
     try {
@@ -264,6 +267,7 @@ export class DemsEngineService {
       this.loggerService.log('saved transaction Relationship');
     } catch (error) {
       this.loggerService.error(`Failed to save transaction relationship: ${String(error)}`);
+      throw error;
     }
 
     try {
@@ -271,6 +275,7 @@ export class DemsEngineService {
       this.loggerService.log('Notified event-director successfully');
     } catch (error) {
       this.loggerService.error(`Failed to notify event-director: ${String(error)}`);
+      throw error;
     }
   }
 
@@ -309,30 +314,47 @@ export class DemsEngineService {
   }
 
   async handleMessage(payload: { any }, endpoint: string, tenantId: string): Promise<any> {
-    const [configuredSchema, configuredMapping, configuredFunctions] = await this.findSchemaAndMapping(endpoint);
-    if (!configuredSchema) {
-      return this.buildErrorResponse('Schema not found for the specified endpoint', ['No schema exists for this endpoint']);
+    try {
+      const [configuredSchema, configuredMapping, configuredFunctions] = await this.findSchemaAndMapping(endpoint);
+      if (!configuredSchema) {
+        return this.buildErrorResponse('Schema not found for the specified endpoint', ['No schema exists for this endpoint']);
+      }
+
+      const validationResult = await this.validatePayload(payload, configuredSchema, endpoint);
+      if (!validationResult.isValid) {
+        const errorMessage = validationResult.differences?.[0]?.includes('AJV validation error')
+          ? 'Error during schemaa validation'
+          : 'Payload structure does not match the schema';
+        return this.buildErrorResponse(errorMessage, validationResult.differences || [], configuredSchema);
+      }
+
+      const transactionType = extractTransactionType(endpoint);
+      const enhancedRequest = { ...payload, TenantId: tenantId, TxTp: transactionType };
+
+      const { dataCache, transactionRelationship, endToEndId } = this.processMappings(enhancedRequest, configuredMapping, endpoint);
+
+      try {
+        await this.executeConfiguredFunctions(enhancedRequest, configuredMapping, configuredFunctions);
+      } catch (error) {
+        this.loggerService.error(`Failed to execute configured functions: ${String(error)}`);
+        return this.buildErrorResponse('Error executing configured functions', [`Function execution failed: ${String(error)}`]);
+      }
+
+      const tazamaPayload = this.buildTazamaPayload(enhancedRequest, transactionType, tenantId, dataCache);
+
+      try {
+        await this.saveTransactionDataAndNotify(tazamaPayload, transactionType, endToEndId, transactionRelationship);
+      } catch (error) {
+        this.loggerService.error(`Failed to save transaction data or notify: ${String(error)}`);
+        return this.buildErrorResponse('Error saving transaction data or sending notification', [
+          `Transaction processing failed: ${String(error)}`,
+        ]);
+      }
+
+      return this.buildSuccessResponse(configuredSchema, tazamaPayload, dataCache);
+    } catch (error) {
+      this.loggerService.error(`Unexpected error in handleMessage: ${String(error)}`);
+      return this.buildErrorResponse('Unexpected error occurred while processing message', [`Internal error: ${String(error)}`]);
     }
-
-    const validationResult = await this.validatePayload(payload, configuredSchema, endpoint);
-    if (!validationResult.isValid) {
-      const errorMessage = validationResult.differences?.[0]?.includes('AJV validation error')
-        ? 'Error during schemaa validation'
-        : 'Payload structure does not match the schema';
-      return this.buildErrorResponse(errorMessage, validationResult.differences || [], configuredSchema);
-    }
-
-    const transactionType = extractTransactionType(endpoint);
-    const enhancedRequest = { ...payload, TenantId: tenantId, TxTp: transactionType };
-
-    const { dataCache, transactionRelationship, endToEndId } = this.processMappings(enhancedRequest, configuredMapping, endpoint);
-
-    await this.executeConfiguredFunctions(enhancedRequest, configuredMapping, configuredFunctions);
-
-    const tazamaPayload = this.buildTazamaPayload(enhancedRequest, transactionType, tenantId, dataCache);
-
-    await this.saveTransactionDataAndNotify(tazamaPayload, transactionType, endToEndId, transactionRelationship);
-
-    return this.buildSuccessResponse(configuredSchema, tazamaPayload, dataCache);
   }
 }
