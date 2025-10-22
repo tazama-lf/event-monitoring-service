@@ -7,12 +7,15 @@ import { LoggerModule } from './logger-service/logger-service.module';
 import { NatsModule } from './nats/nats.module';
 import { DemsEngineModule } from './dems-engine/dems-engine.module';
 import { AuthModule } from './auth/auth.module';
+import { validateEnvironment } from './config/env.validation';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: ['.env'],
+      cache: true,
+      validate: validateEnvironment,
     }),
     ConfigNotifyModule,
     LoggerModule,

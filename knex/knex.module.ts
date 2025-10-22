@@ -1,4 +1,5 @@
 import { Global, Module } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import knex, { Knex } from 'knex';
 import { ConfigNotifyModule } from '../src/config-notify/config-notify.module';
 
@@ -7,11 +8,12 @@ import { ConfigNotifyModule } from '../src/config-notify/config-notify.module';
   providers: [
     {
       provide: 'KNEX_CONNECTION',
-      useFactory: (): Knex =>
+      useFactory: (configService: ConfigService): Knex =>
         knex({
           client: 'pg',
-          connection: process.env.CONFIGURATION_DATABASE_URL,
+          connection: configService.get<string>('configurationDatabaseUrl'),
         }),
+      inject: [ConfigService],
     },
   ],
   exports: ['KNEX_CONNECTION'],

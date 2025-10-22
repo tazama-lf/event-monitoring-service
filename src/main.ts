@@ -1,15 +1,16 @@
 import { config } from 'dotenv';
 
 import { NestFactory } from '@nestjs/core';
+import { ConfigService } from '@nestjs/config';
 import { AppModule } from './app.module';
 import { ValidationPipe } from '@nestjs/common';
 config();
 
-const DEFAULT_PORT = 3002;
 const ERROR_EXIT_CODE = 1;
 
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule);
+  const configService = app.get(ConfigService);
 
   app.useGlobalPipes(
     new ValidationPipe({
@@ -19,7 +20,8 @@ async function bootstrap(): Promise<void> {
     }),
   );
 
-  await app.listen(DEFAULT_PORT);
+  const port = configService.get<number>('port', 3002);
+  await app.listen(port);
 }
 bootstrap().catch((error: unknown) => {
   const errorMessage = error instanceof Error ? error.message : String(error);

@@ -1,18 +1,20 @@
 import type { Provider } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import Knex from 'knex';
 
 export const KNEX_CONNECTION: Provider = {
   provide: 'KNEX',
-  useFactory: () =>
+  useFactory: (configService: ConfigService) =>
     Knex({
       client: 'pg',
       connection: {
-        host: process.env.DB_HOST,
-        user: process.env.DB_USER,
-        password: process.env.DB_PASSWORD,
-        database: process.env.DB_NAME,
-        port: parseInt(process.env.DB_PORT ?? '5432'),
+        host: configService.get<string>('database.host'),
+        user: configService.get<string>('database.user'),
+        password: configService.get<string>('database.password'),
+        database: configService.get<string>('database.name'),
+        port: configService.get<number>('database.port'),
       },
       pool: { min: 2, max: 10 },
     }),
+  inject: [ConfigService],
 };
