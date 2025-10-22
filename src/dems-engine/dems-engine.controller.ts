@@ -17,7 +17,7 @@ export class DemsEngineController {
     @Param('endpoint') endpoint: string,
     @Body() payload: any,
     @Headers('tenantId') tenantId: string,
-  ): Promise<{ message: string; isMatch: boolean; schema: any; payload: any; statusCode: number }> {
+  ): Promise<{ message: string; isMatch: boolean; transactionRelationship: any; schema: any; payload: any; statusCode: number }> {
     const transformedEndpoint = transformEndpoint(endpoint);
 
     const result = await this.demsEngineService.handleMessage(payload, transformedEndpoint, tenantId);
@@ -35,6 +35,7 @@ export class DemsEngineController {
     return {
       message: result.message,
       isMatch: result.isMatch,
+      transactionRelationship: result.transactionRelationship,
       schema: result.schema,
       payload: result.payload,
       statusCode: HttpStatus.OK,

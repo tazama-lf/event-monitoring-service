@@ -334,7 +334,7 @@ export class DemsEngineService {
     return {
       isMatch: true,
       message: 'Everything is OK!',
-      TransactionRelationship: transactionRelationship,
+      transactionRelationship,
       schema,
       payload,
       dataCache,
