@@ -136,7 +136,6 @@ export class DemsEngineService {
         } else if (error.keyword === 'additionalProperties') {
           return `${path}: Unexpected property '${error.params?.additionalProperty}' not defined in schema`;
         } else if (error.keyword === 'type') {
-          this.loggerService.log(`Type error details: ${JSON.stringify(error)}`);
           return `${path}: Should be a ${error.params?.type}`;
         } else {
           return `--> ${path}: ${message}`;
@@ -172,7 +171,7 @@ export class DemsEngineService {
           const sources = mapping.source;
           const transformation = mapping.transformation;
 
-          let DataCachevalue = mapping.prefix ? mapping.prefix : '';
+          let dataCacheValue = mapping.prefix ? mapping.prefix : '';
           let sum = 0;
           let transactionRelationshipValue = mapping.prefix ? mapping.prefix : '';
 
@@ -185,11 +184,11 @@ export class DemsEngineService {
                 console.log('value', value);
                 sum += value;
               } else {
-                DataCachevalue += value;
+                dataCacheValue += value;
               }
 
               if (i < sources.length - 1) {
-                DataCachevalue += separator;
+                dataCacheValue += separator;
               }
             }
             if (type === 'transaction') {
@@ -209,11 +208,11 @@ export class DemsEngineService {
           }
 
           if (type === 'redis') {
-            DataCachevalue += mapping.suffix ? mapping.suffix : '';
+            dataCacheValue += mapping.suffix ? mapping.suffix : '';
             if (transformation == 'SUM') {
               dataCache[destination] = sum.toString();
             } else {
-              dataCache[destination] = DataCachevalue;
+              dataCache[destination] = dataCacheValue;
             }
           }
 

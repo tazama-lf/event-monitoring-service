@@ -1,4 +1,4 @@
-import { BadRequestException, Body, Controller, Headers, HttpStatus, Param, Post } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Headers, HttpStatus, NotFoundException, Param, Post } from '@nestjs/common';
 import { DemsEngineService } from './dems-engine.service';
 import { LoggerService } from '@tazama-lf/frms-coe-lib';
 import { transformEndpoint } from '../utils/transform_endpoint';
@@ -24,11 +24,19 @@ export class DemsEngineController {
 
     if (!result.isMatch) {
       this.logger.log(`Problem is: ${result.message}`);
+
+      if (result.message === 'Schema not found for the specified endpoint') {
+        throw new NotFoundException({
+          message: result.message,
+          differences: result.differences,
+          schema: result.schema,
+        });
+      }
+
       throw new BadRequestException({
         message: result.message,
         differences: result.differences,
         schema: result.schema,
-        statusCode: result.message === 'Schema not found for the specified endpoint' ? HttpStatus.NOT_FOUND : HttpStatus.BAD_REQUEST,
       });
     }
 
