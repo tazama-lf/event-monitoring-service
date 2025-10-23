@@ -56,11 +56,24 @@ export class DemsEngineService {
 
     const cacheKey = `${endpoint}`;
     const cachedSchema = await this.redisService.getJson(cacheKey);
-    const parsedSchema = JSON.parse(cachedSchema || 'null');
 
     if (cachedSchema) {
       this.loggerService.log(`Cache hit for endpoint: ${endpoint}`);
-      return [parsedSchema.schema, parsedSchema.mapping, parsedSchema.functions] as [any, any, any];
+
+      // Only parse if cachedSchema is a string
+      if (typeof cachedSchema === 'string') {
+        try {
+          const parsedSchema = JSON.parse(cachedSchema);
+          return [parsedSchema.schema, parsedSchema.mapping, parsedSchema.functions] as [any, any, any];
+        } catch (error) {
+          this.loggerService.error(`Failed to parse cached schema for endpoint ${endpoint}: ${String(error)}`);
+          // Continue to database query if parsing fails
+        }
+      } else if (typeof cachedSchema === 'object' && cachedSchema !== null) {
+        // If cachedSchema is already an object, use it directly
+        const schemaObj = cachedSchema as any;
+        return [schemaObj.schema, schemaObj.mapping, schemaObj.functions] as [any, any, any];
+      }
     }
 
     // not found in cache, query the database
