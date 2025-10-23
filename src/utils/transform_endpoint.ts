@@ -3,4 +3,4 @@
  * @param endpoint The URL path (e.g., 'ABL101,v1,iso20022,pain.001')
  * @returns The transformed URL path (e.g., '/ABL101/v1/iso20022/pain.001')
  */
-export const transformEndpoint = (endpoint: string) => '/' + endpoint.toString().replaceAll(',', '/');
+export const transformEndpoint = (endpoint: string) => '/' + endpoint.toString().trim().replaceAll(',', '/');
