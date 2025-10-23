@@ -29,6 +29,9 @@ export interface AppConfiguration {
     readonly consumerStream: string;
     readonly streamSubject: string;
   };
+  readonly cache: {
+    readonly timeToLive: number;
+  };
 }
 
 /**
@@ -61,6 +64,12 @@ export function validateEnvironment(config: Record<string, unknown>): AppConfigu
     throw new Error('Environment variable STARTUP_TYPE is required');
   }
 
+  // Validate cache TTL if provided
+  const cacheTtl = config.CACHE_TTL as string;
+  if (cacheTtl && (isNaN(parseInt(cacheTtl, 10)) || parseInt(cacheTtl, 10) <= 0)) {
+    throw new Error('Environment variable CACHE_TTL must be a positive number');
+  }
+
   return {
     functionName: (config.FUNCTION_NAME as string) || 'event-monitoring-service',
     nodeEnv: (config.NODE_ENV as string) || 'development',
@@ -86,6 +95,9 @@ export function validateEnvironment(config: Record<string, unknown>): AppConfigu
       producerStream: (config.PRODUCER_STREAM as string) || 'config.notification',
       consumerStream: (config.CONSUMER_STREAM as string) || 'config.notification',
       streamSubject: (config.STREAM_SUBJECT as string) || 'config.notification',
+    },
+    cache: {
+      timeToLive: parseInt(config.CACHE_TTL as string, 10) || 3600, // Default to 1 hour if not specified
     },
   };
 }

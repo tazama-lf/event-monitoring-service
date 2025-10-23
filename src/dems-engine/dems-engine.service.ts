@@ -1,4 +1,5 @@
 import { Injectable, Inject } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { LoggerService, RedisService } from '@tazama-lf/frms-coe-lib';
 import Ajv from 'ajv';
 import addFormats from 'ajv-formats';
@@ -30,23 +31,27 @@ interface TazamaPayload {
   dataCache: any;
 }
 
+type FindSchemaAndMappingResult = [any, any, any] | null;
+
 @Injectable()
 export class DemsEngineService {
   private readonly ajv: Ajv;
+  private readonly timeToLive: number;
+
   constructor(
     private readonly loggerService: LoggerService,
     private readonly redisService: RedisService,
     private readonly natsService: NatsService,
     private readonly databaseOperationsService: DatabaseOperationsService,
+    private readonly configService: ConfigService,
     @Inject('KNEX') private readonly knex: Knex,
   ) {
     this.ajv = new Ajv({ allErrors: true, logger: false });
     addFormats(this.ajv);
+    this.timeToLive = this.configService.get<number>('cache.timeToLive', 3600);
   }
 
-  TIME_TO_LIVE = 3600; // 1 hour in seconds
-
-  async findSchemaAndMapping(endpoint: string): Promise<any> {
+  async findSchemaAndMapping(endpoint: string): Promise<FindSchemaAndMappingResult> {
     this.loggerService.log(`Looking up schema for endpoint: ${endpoint}`);
 
     const cacheKey = `${endpoint}`;
@@ -55,7 +60,7 @@ export class DemsEngineService {
 
     if (cachedSchema) {
       this.loggerService.log(`Cache hit for endpoint: ${endpoint}`);
-      return [parsedSchema.schema, parsedSchema.mapping, parsedSchema.functions];
+      return [parsedSchema.schema, parsedSchema.mapping, parsedSchema.functions] as [any, any, any];
     }
 
     // not found in cache, query the database
@@ -70,8 +75,8 @@ export class DemsEngineService {
         mapping: record.mapping,
         functions: record.functions,
       };
-      await this.redisService.setJson(cacheKey, JSON.stringify(data), this.TIME_TO_LIVE);
-      return [record.schema, record.mapping, record.functions];
+      await this.redisService.setJson(cacheKey, JSON.stringify(data), this.timeToLive);
+      return [record.schema, record.mapping, record.functions] as [any, any, any];
     }
 
     this.loggerService.log(`No schema found for endpoint: ${endpoint}`);
@@ -367,10 +372,12 @@ export class DemsEngineService {
 
   async handleMessage(payload: { any }, endpoint: string, tenantId: string): Promise<any> {
     try {
-      const [configuredSchema, configuredMapping, configuredFunctions] = await this.findSchemaAndMapping(endpoint);
-      if (!configuredSchema) {
+      const result = await this.findSchemaAndMapping(endpoint);
+      if (!result) {
         return this.buildErrorResponse('Schema not found for the specified endpoint', ['No schema exists for this endpoint']);
       }
+
+      const [configuredSchema, configuredMapping, configuredFunctions] = result;
 
       const validationResult = await this.validatePayload(payload, configuredSchema, endpoint);
       if (!validationResult.isValid) {
