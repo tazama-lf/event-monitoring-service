@@ -120,16 +120,15 @@ export class DemsEngineService {
     }
 
     if (!isValid) {
-      const differences = this.formatValidationErrors();
-      this.loggerService.log(`Schema validation errors: ${JSON.stringify(differences)}`);
+      const differences: string[] = this.formatValidationErrors();
+      this.loggerService.warn('Schema validation errors:');
+      differences.forEach((difference, index) => {
+        this.loggerService.warn(`  ${index + 1}. ${difference}`);
+      });
 
       const correlationId = crypto.randomUUID();
-      try {
-        await this.databaseOperationsService.saveToQuarantine(payload, endpoint, differences, correlationId);
-      } catch (error) {
-        this.loggerService.error(`Failed to save to quarantine: ${String(error)}`);
-        // Continue with validation result even if quarantine save fails
-      }
+
+      await this.databaseOperationsService.saveToQuarantine(payload, endpoint, differences, correlationId);
 
       return { isValid: false, differences };
     }
