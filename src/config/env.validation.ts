@@ -4,9 +4,11 @@
  * Configuration validation schema for the Event Monitoring Service
  */
 export interface AppConfiguration {
-  readonly port: number;
+  readonly functionName: string;
   readonly nodeEnv: string;
-  readonly configurationDatabaseUrl: string;
+  readonly maxCpu: number;
+  readonly port: number;
+  readonly databaseUrl: string;
   readonly database: {
     readonly host: string;
     readonly port: number;
@@ -20,6 +22,13 @@ export interface AppConfiguration {
     readonly password: string;
     readonly db: number;
   };
+  readonly nats: {
+    readonly serverUrl: string;
+    readonly startupType: string;
+    readonly producerStream: string;
+    readonly consumerStream: string;
+    readonly streamSubject: string;
+  };
 }
 
 /**
@@ -29,8 +38,8 @@ export interface AppConfiguration {
  */
 export function validateEnvironment(config: Record<string, unknown>): AppConfiguration {
   // Validate required environment variables
-  if (!config.CONFIGURATION_DATABASE_URL) {
-    throw new Error('Environment variable CONFIGURATION_DATABASE_URL is required');
+  if (!config.DATABASE_URL) {
+    throw new Error('Environment variable DATABASE_URL is required');
   }
 
   // Validate required Redis environment variables
@@ -44,10 +53,20 @@ export function validateEnvironment(config: Record<string, unknown>): AppConfigu
     throw new Error('Environment variable REDIS_PASSWORD is required');
   }
 
+  // Validate required NATS environment variables
+  if (!config.SERVER_URL) {
+    throw new Error('Environment variable SERVER_URL is required');
+  }
+  if (!config.STARTUP_TYPE) {
+    throw new Error('Environment variable STARTUP_TYPE is required');
+  }
+
   return {
-    port: parseInt(config.APP_PORT as string, 10) || 3002,
+    functionName: (config.FUNCTION_NAME as string) || 'event-monitoring-service',
     nodeEnv: (config.NODE_ENV as string) || 'development',
-    configurationDatabaseUrl: config.CONFIGURATION_DATABASE_URL as string,
+    maxCpu: parseInt(config.MAX_CPU as string, 10) || 1,
+    port: parseInt(config.APP_PORT as string, 10) || 3002,
+    databaseUrl: config.DATABASE_URL as string,
     database: {
       host: (config.DB_HOST as string) || 'localhost',
       port: parseInt(config.DB_PORT as string, 10) || 5432,
@@ -60,6 +79,13 @@ export function validateEnvironment(config: Record<string, unknown>): AppConfigu
       port: parseInt(config.REDIS_PORT as string, 10),
       password: config.REDIS_PASSWORD as string,
       db: parseInt(config.REDIS_DB as string, 10) || 0,
+    },
+    nats: {
+      serverUrl: config.SERVER_URL as string,
+      startupType: config.STARTUP_TYPE as string,
+      producerStream: (config.PRODUCER_STREAM as string) || 'config.notification',
+      consumerStream: (config.CONSUMER_STREAM as string) || 'config.notification',
+      streamSubject: (config.STREAM_SUBJECT as string) || 'config.notification',
     },
   };
 }
