@@ -4,3 +4,7 @@
  * @returns The transformed URL path (e.g., '/ABL101/v1/iso20022/pain.001')
  */
 export const transformEndpoint = (endpoint: string) => '/' + endpoint.toString().trim().replaceAll(',', '/');
+
+export const isValidEndpointFormat = (endpoint: unknown): endpoint is string => {
+  return typeof endpoint === 'string' && endpoint.length > 0 && endpoint.includes(',');
+};

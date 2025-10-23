@@ -1,7 +1,7 @@
 import { BadRequestException, Body, Controller, Headers, HttpStatus, NotFoundException, Param, Post } from '@nestjs/common';
 import { DemsEngineService } from './dems-engine.service';
 import { LoggerService } from '@tazama-lf/frms-coe-lib';
-import { transformEndpoint } from '../utils/transform_endpoint';
+import { isValidEndpointFormat, transformEndpoint } from '../utils/transform_endpoint';
 // import { AuthGuard } from '../auth/auth.guard';
 
 @Controller('/dems-engine')
@@ -18,6 +18,11 @@ export class DemsEngineController {
     @Body() payload: any,
     @Headers('tenantId') tenantId: string,
   ): Promise<{ message: string; isMatch: boolean; transactionRelationship: any; schema: any; payload: any; statusCode: number }> {
+    if (isValidEndpointFormat(endpoint) === false) {
+      throw new BadRequestException({
+        message: 'Invalid endpoint format. Endpoint must be a non-empty string containing commas.',
+      });
+    }
     const transformedEndpoint = transformEndpoint(endpoint);
 
     const result = await this.demsEngineService.handleMessage(payload, transformedEndpoint, tenantId);
