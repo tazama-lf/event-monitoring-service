@@ -1,9 +1,9 @@
-export function getValueByPath(obj: any, path: string): any {
+export function getValueByPath<T>(obj: any, path: string): T | undefined {
   const properties = path.split('.');
   let current: any = obj;
 
   for (const prop of properties) {
-    if (prop.match(/^\d+$/)) {
+    if (/^\d+$/.test(prop)) {
       current = current[parseInt(prop)];
     } else {
       current = current?.[prop];
