@@ -24,6 +24,12 @@ interface SuccessResponse {
   dataCache: any;
 }
 
+interface TazamaPayload {
+  transaction: any;
+  TxTp: string;
+  dataCache: any;
+}
+
 @Injectable()
 export class DemsEngineService {
   private readonly ajv: Ajv;
@@ -277,7 +283,7 @@ export class DemsEngineService {
    * @param dataCache The processed data cache
    * @returns The formatted Tazama payload
    */
-  private buildTazamaPayload(payload: any, transactionType: string, tenantId: string, dataCache: any): any {
+  private buildTazamaPayload(payload: any, transactionType: string, tenantId: string, dataCache: any): TazamaPayload {
     return {
       transaction: payload,
       TxTp: transactionType,
@@ -293,31 +299,34 @@ export class DemsEngineService {
    * @param transactionRelationship The transaction relationship data
    */
   private async saveTransactionDataAndNotify(
-    tazamaPayload: any,
+    tazamaPayload: TazamaPayload,
     transactionType: string,
     endToEndId: string,
     transactionRelationship: any,
   ): Promise<void> {
     try {
-      await this.databaseOperationsService.saveTransactionHistory(tazamaPayload, `${transactionType}_${endToEndId}`);
-    } catch (error) {
-      this.loggerService.error(`Failed to save transaction history: ${String(error)}`);
-      throw error;
-    }
+      await Promise.all([
+        this.databaseOperationsService.saveTransactionHistory(tazamaPayload, `${transactionType}_${endToEndId}`),
+        this.databaseOperationsService.saveTransactionRelationship(transactionRelationship),
+        this.natsService.notifyEventDirector(tazamaPayload),
+      ]);
 
-    try {
-      await this.databaseOperationsService.saveTransactionRelationship(transactionRelationship);
-      this.loggerService.log('saved transaction Relationship');
+      this.loggerService.log('Successfully saved transaction history, transaction relationship, and notified event-director');
     } catch (error) {
-      this.loggerService.error(`Failed to save transaction relationship: ${String(error)}`);
-      throw error;
-    }
+      // Determine which operation failed for better error reporting
+      let errorMessage = 'Failed to complete transaction operations';
 
-    try {
-      await this.natsService.notifyEventDirector(tazamaPayload);
-      this.loggerService.log('Notified event-director successfully');
-    } catch (error) {
-      this.loggerService.error(`Failed to notify event-director: ${String(error)}`);
+      if (String(error).includes('saveTransactionHistory') || String(error).includes('transaction history')) {
+        errorMessage = `Failed to save transaction history: ${String(error)}`;
+      } else if (String(error).includes('saveTransactionRelationship') || String(error).includes('transaction relationship')) {
+        errorMessage = `Failed to save transaction relationship: ${String(error)}`;
+      } else if (String(error).includes('notifyEventDirector') || String(error).includes('event-director')) {
+        errorMessage = `Failed to notify event-director: ${String(error)}`;
+      } else {
+        errorMessage = `Failed to complete transaction operations: ${String(error)}`;
+      }
+
+      this.loggerService.error(errorMessage);
       throw error;
     }
   }
