@@ -38,8 +38,8 @@ export interface AppConfiguration {
  */
 export function validateEnvironment(config: Record<string, unknown>): AppConfiguration {
   // Validate required environment variables
-  if (!config.DATABASE_URL) {
-    throw new Error('Environment variable DATABASE_URL is required');
+  if (!config.CONFIGURATION_DATABASE_URL) {
+    throw new Error('Environment variable CONFIGURATION_DATABASE_URL is required');
   }
 
   // Validate required Redis environment variables

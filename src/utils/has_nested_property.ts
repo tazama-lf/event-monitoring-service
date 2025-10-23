@@ -1,4 +1,4 @@
-export function getValueByPath<T>(obj: any, path: string): T | undefined {
+export function getValueByPath<T>(obj: any, path: string): T {
   const properties = path.split('.');
   let current: any = obj;
 
@@ -10,7 +10,7 @@ export function getValueByPath<T>(obj: any, path: string): T | undefined {
     }
 
     if (current === undefined || current === null) {
-      return undefined;
+      throw new Error(`Property '${path}' not found`);
     }
   }
 

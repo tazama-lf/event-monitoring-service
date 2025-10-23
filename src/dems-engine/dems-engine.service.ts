@@ -156,10 +156,10 @@ export class DemsEngineService {
 
           for (let i = 0; i < sources.length; i++) {
             if (type === 'redis') {
-              const value = getValueByPath(payload, sources[i]);
+              const value = getValueByPath<string>(payload, sources[i]);
 
               if (transformation == 'SUM') {
-                const value = getValueByPath(payload, sources[i]);
+                const value: number = getValueByPath<number>(payload, sources[i]);
                 console.log('value', value);
                 sum += value;
               } else {
@@ -171,9 +171,9 @@ export class DemsEngineService {
               }
             }
             if (type === 'transaction') {
-              const value = getValueByPath(payload, sources[i]);
+              const value = getValueByPath<string>(payload, sources[i]);
               if (transformation == 'SUM') {
-                const value = getValueByPath(payload, sources[i]);
+                const value = getValueByPath<number>(payload, sources[i]);
                 console.log('value', value);
                 sum += value;
               } else {
