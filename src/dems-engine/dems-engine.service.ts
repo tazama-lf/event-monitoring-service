@@ -8,6 +8,22 @@ import { NatsService } from '../nats/nats.service';
 import { getValueByPath } from '../utils/has_nested_property';
 import { DatabaseOperationsService } from '../commons';
 
+interface ErrorResponse {
+  isMatch: false;
+  message: string;
+  differences: string[];
+  schema?: any;
+}
+
+interface SuccessResponse {
+  isMatch: true;
+  message: string;
+  transactionRelationship: any;
+  schema: any;
+  payload: any;
+  dataCache: any;
+}
+
 @Injectable()
 export class DemsEngineService {
   private readonly ajv: Ajv;
@@ -313,7 +329,7 @@ export class DemsEngineService {
    * @param schema Optional schema object
    * @returns Formatted error response
    */
-  private buildErrorResponse(message: string, differences: string[], schema?: any): any {
+  private buildErrorResponse(message: string, differences: string[], schema?: any): ErrorResponse {
     return {
       isMatch: false,
       message,
@@ -329,7 +345,7 @@ export class DemsEngineService {
    * @param dataCache The processed data cache
    * @returns Formatted success response
    */
-  private buildSuccessResponse(schema: any, payload: any, transactionRelationship: any, dataCache: any): any {
+  private buildSuccessResponse(schema: any, payload: any, transactionRelationship: any, dataCache: any): SuccessResponse {
     this.loggerService.log('THE END');
     return {
       isMatch: true,
