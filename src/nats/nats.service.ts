@@ -18,21 +18,39 @@ export class NatsService implements OnModuleInit, OnModuleDestroy {
       return;
     }
 
-    try {
-      const connected = await this.natsService.initProducer(this.logger);
+    const maxRetries = 3;
+    const retryDelayMs = 2000; // 2 seconds
 
-      if (!connected) {
-        throw new Error('Failed to initialize NATS producer');
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        this.logger.log(`Initializing NATS producer - Attempt ${attempt}/${maxRetries}`);
+
+        const connected = await this.natsService.initProducer(this.logger);
+
+        if (!connected) {
+          throw new Error('Failed to initialize NATS producer - connection returned false');
+        }
+
+        this.isInitialized = true;
+        this.logger.log('NATS producer initialized successfully');
+        return;
+      } catch (error) {
+        const errorMessage = `Failed to initialize NATS (attempt ${attempt}/${maxRetries}): ${String(error)}`;
+
+        if (attempt === maxRetries) {
+          this.logger.error(`${errorMessage} - Max retries reached, giving up`);
+          throw new Error(`NATS initialization failed after ${maxRetries} attempts: ${String(error)}`);
+        }
+
+        this.logger.warn(`${errorMessage} - Retrying in ${retryDelayMs}ms`);
+        await this.delay(retryDelayMs);
       }
-
-      this.isInitialized = true;
-      this.logger.log('NATS producer initialized successfully');
-    } catch (error) {
-      this.logger.error(`Failed to initialize NATS: ${String(error)}`);
-      throw error;
     }
   }
 
+  private delay(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
   onModuleDestroy(): void {
     this.isInitialized = false;
     this.logger.log('NATS service destroyed');
