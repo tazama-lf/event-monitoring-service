@@ -30,12 +30,18 @@ export class AuthService implements IAuthService {
         throw new UnauthorizedException('Invalid token or insufficient claims');
       }
 
-      const result: Record<string, boolean> = {};
-      claims.forEach((claim) => {
-        result[claim] = true;
-      });
+      // Use the actual validation results instead of blindly setting all to true
+      const result = validated as Record<string, boolean>;
 
-      this.logger.debug(`Token validation successful for claims: ${claims.join(', ')}`);
+      // Verify that all requested claims are actually valid
+      const invalidClaims = claims.filter((claim) => !result[claim]);
+      if (invalidClaims.length > 0) {
+        this.logger.warn(`Token missing required claims: ${invalidClaims.join(', ')}`);
+        throw new UnauthorizedException(`Missing required claims: ${invalidClaims.join(', ')}`);
+      }
+
+      const validClaims = claims.filter((claim) => result[claim]);
+      this.logger.debug(`Token validation successful for claims: ${validClaims.join(', ')}`);
       return result;
     } catch (error) {
       if (error instanceof UnauthorizedException) {
@@ -74,7 +80,7 @@ export class AuthGuard implements CanActivate {
 
     const request = context.switchToHttp().getRequest<Request>();
 
-    const defaultClaims = ['dems:write'];
+    const defaultClaims = ['dems:read'];
     const configuredClaims = this.configService.get<string>('REQUIRED_CLAIMS');
     const claims = configuredClaims ? configuredClaims.split(',').map((c) => c.trim()) : defaultClaims;
 
