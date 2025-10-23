@@ -16,8 +16,10 @@ export class AppController {
 
   @Get('/health/nats')
   getNatsHealth(): { status: string } {
+    const connected = 'connected';
+    const disconnected = 'disconnected';
     return {
-      status: this.natsService.isReady() ? 'connected' : 'disconnected',
+      status: this.natsService.isReady() ? connected : disconnected,
     };
   }
 }
