@@ -16,9 +16,9 @@ WORKDIR /app
 
 COPY package*.json ./
 COPY .npmrc ./
-RUN npm install
 
 COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/node_modules ./node_modules
 
 # --- Environment Variables for CI/CD ---
 ENV FUNCTION_NAME="event-monitoring-service"
@@ -47,4 +47,4 @@ ENV STREAM_SUBJECT=config.notification
 # --- Environment Variables for CI/CD Ends Here ---
 
 EXPOSE 3002
-CMD ["npm", "run", "start:dev"]
+CMD ["node", "dist/main.js"]
