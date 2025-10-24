@@ -7,6 +7,7 @@ import { LoggerModule } from './logger-service/logger-service.module';
 import { NatsModule } from './nats/nats.module';
 import { DemsEngineModule } from './dems-engine/dems-engine.module';
 import { AuthModule } from './auth/auth.module';
+import { DatabaseModule } from './database/database.module';
 import { validateEnvironment } from './config/env.validation';
 
 @Module({
@@ -17,6 +18,7 @@ import { validateEnvironment } from './config/env.validation';
       cache: true,
       validate: validateEnvironment,
     }),
+    DatabaseModule,
     ConfigNotifyModule,
     LoggerModule,
     DemsEngineModule,

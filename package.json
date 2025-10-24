@@ -10,8 +10,6 @@
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "format:check": "prettier --check \"src/**/*.ts\" \"test/**/*.ts\"",
     "start": "nest start",
-    "db:reset": "npx knex migrate:rollback --all && npx knex migrate:latest && npx knex seed:run",
-    "db:fresh": "npx knex migrate:rollback --all && npx knex migrate:latest",
     "start:dev": "nest start --watch",
     "start:debug": "nest start --debug --watch",
     "start:prod": "node dist/main",
@@ -22,10 +20,7 @@
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
-    "prepare": "husky",
-    "migrate:make": "knex --knexfile knex/knexfile.ts migrate:make",
-    "migrate:latest": "knex --knexfile knex/knexfile.ts migrate:latest",
-    "migrate:rollback": "knex --knexfile knex/knexfile.ts migrate:rollback"
+    "prepare": "husky"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.1",
@@ -44,7 +39,6 @@
     "class-validator": "^0.14.2",
     "dotenv": "^17.2.2",
     "jsonwebtoken": "^9.0.2",
-    "knex": "^3.1.0",
     "nats": "^2.29.3",
     "node-cache": "^5.1.2",
     "pg": "^8.16.3",

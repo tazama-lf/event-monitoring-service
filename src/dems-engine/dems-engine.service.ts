@@ -1,13 +1,13 @@
-import { Injectable, Inject } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { LoggerService, RedisService } from '@tazama-lf/frms-coe-lib';
 import Ajv from 'ajv';
 import addFormats from 'ajv-formats';
-import { Knex } from 'knex';
 import { extractTransactionType } from '../utils/extract_message_type';
 import { NatsService } from '../nats/nats.service';
 import { getValueByPath } from '../utils/has_nested_property';
 import { DatabaseOperationsService } from '../commons';
+import { DatabaseService } from '../database/database.service';
 
 interface ErrorResponse {
   isMatch: false;
@@ -44,7 +44,7 @@ export class DemsEngineService {
     private readonly natsService: NatsService,
     private readonly databaseOperationsService: DatabaseOperationsService,
     private readonly configService: ConfigService,
-    @Inject('KNEX') private readonly knex: Knex,
+    private readonly databaseService: DatabaseService,
   ) {
     this.ajv = new Ajv({ allErrors: true, logger: false });
     addFormats(this.ajv);
@@ -79,7 +79,8 @@ export class DemsEngineService {
     // not found in cache, query the database
 
     this.loggerService.log(`Cache miss for endpoint: ${endpoint}. Querying database...`);
-    const record: any = await this.knex('config').select('schema', 'mapping', 'functions').where({ endpoint_path: endpoint });
+    const result = await this.databaseService.query('SELECT schema, mapping, functions FROM config WHERE endpoint_path = $1', [endpoint]);
+    const record = result.rows[0];
 
     if (record) {
       this.loggerService.log(`Found schema for endpoint: ${endpoint}`);

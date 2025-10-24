@@ -1,7 +1,7 @@
-import { Injectable, Inject, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
+import { Injectable, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
 import { LoggerService, RedisService } from '@tazama-lf/frms-coe-lib';
 import { StartupFactory } from '@tazama-lf/frms-coe-startup-lib';
-import { Knex } from 'knex';
+import { DatabaseService } from '../database/database.service';
 
 interface NatsMessage {
   transactionID: string;
@@ -21,7 +21,7 @@ export class ConfigNotifyService implements OnModuleInit, OnModuleDestroy {
   constructor(
     private readonly logger: LoggerService,
     private readonly redis: RedisService,
-    @Inject('KNEX') private readonly knex: Knex,
+    private readonly databaseService: DatabaseService,
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -39,7 +39,8 @@ export class ConfigNotifyService implements OnModuleInit, OnModuleDestroy {
     this.isInitialized = true;
     this.logger.log('NATS consumer initialized for config.notification');
 
-    const configs = await this.knex('config').select('endpoint_path', 'schema', 'mapping', 'functions');
+    const configsResult = await this.databaseService.query('SELECT endpoint_path, schema, mapping, functions FROM config');
+    const configs = configsResult.rows;
 
     for (const config of configs) {
       console.log('Preloading cache for config:', config.endpoint_path);
@@ -58,7 +59,8 @@ export class ConfigNotifyService implements OnModuleInit, OnModuleDestroy {
     this.logger.log(`Received NATS notification for config ID: ${message.transactionID}`);
 
     try {
-      const config = await this.knex('configurations').where('id', message.transactionID).first();
+      const configResult = await this.databaseService.query('SELECT * FROM configurations WHERE id = $1', [message.transactionID]);
+      const config = configResult.rows[0];
 
       if (config) {
         await this.setCache(config);
@@ -104,7 +106,11 @@ export class ConfigNotifyService implements OnModuleInit, OnModuleDestroy {
     }
 
     this.logger.log(`Cache miss for ${key} - lazy loading from database`);
-    const config = await this.knex('configurations').where({ tenant_id: tenantId, msg_fam: msgFam, msg_type: msgType, version }).first();
+    const configResult = await this.databaseService.query(
+      'SELECT * FROM configurations WHERE tenant_id = $1 AND msg_fam = $2 AND msg_type = $3 AND version = $4',
+      [tenantId, msgFam, msgType, version],
+    );
+    const config = configResult.rows[0];
 
     if (!config) {
       return { configs: [] };
