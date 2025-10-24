@@ -26,7 +26,7 @@ ENV NODE_ENV="dev"
 ENV MAX_CPU=1
 
 # Database Configuration
-ENV DATABASE_URL="postgresql://postgres:postgres@10.10.80.37:5432/tcs?schema=public"
+ENV CONFIGURATION_DATABASE_URL="postgresql://postgres:postgres@10.10.80.37:5432/tcs?schema=public"
 ENV DB_HOST=10.10.80.37
 ENV DB_PORT=5432
 ENV DB_USER=postgres
