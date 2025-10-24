@@ -47,4 +47,4 @@ ENV STREAM_SUBJECT=config.notification
 # --- Environment Variables for CI/CD Ends Here ---
 
 EXPOSE 3002
-CMD ["node", "dist/src/main.js"]
+CMD ["npm", "run", "start:dev"]
