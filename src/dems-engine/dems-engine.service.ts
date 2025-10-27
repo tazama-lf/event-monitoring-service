@@ -330,16 +330,11 @@ export class DemsEngineService {
    * @param endToEndId The end-to-end ID for the transaction
    * @param transactionRelationship The transaction relationship data
    */
-  private async saveTransactionDataAndNotify(
-    tazamaPayload: TazamaPayload,
-    transactionType: string,
-    endToEndId: string,
-    transactionRelationship: any,
-  ): Promise<void> {
+  private async saveTransactionDataAndNotify(tazamaPayload: TazamaPayload, transactionType: string, endToEndId: string): Promise<void> {
     try {
       await Promise.all([
         this.databaseOperationsService.saveTransactionHistory(tazamaPayload, `${transactionType}_${endToEndId}`),
-        this.databaseOperationsService.saveTransactionRelationship(transactionRelationship),
+        // this.databaseOperationsService.saveTransactionRelationship(transactionRelationship),
         this.natsService.notifyEventDirector(tazamaPayload),
       ]);
 
@@ -430,7 +425,7 @@ export class DemsEngineService {
       const tazamaPayload = this.buildTazamaPayload(enhancedRequest, transactionType, tenantId, dataCache);
 
       try {
-        await this.saveTransactionDataAndNotify(tazamaPayload, transactionType, endToEndId, transactionRelationship);
+        await this.saveTransactionDataAndNotify(tazamaPayload, transactionType, endToEndId);
       } catch (error) {
         this.loggerService.error(`Failed to save transaction data or notify: ${String(error)}`);
         return this.buildErrorResponse('Error saving transaction data or sending notification', [
