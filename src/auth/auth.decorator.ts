@@ -43,5 +43,5 @@ export const EventMonitoringClaims = {
  * Convenience decorators for common Event Monitoring Service roles
  */
 export const RequireDemsWriteRole = () => RequireClaims(EventMonitoringClaims.DEMS_WRITE);
-export const RequireDemsReadRole = () => RequireClaims(EventMonitoringClaims.DEMS_READ);
+export const RequireDemsReadRole = () => RequireAnyClaims(EventMonitoringClaims.DEMS_READ);
 export const RequireDemsAdminRole = () => RequireClaims(EventMonitoringClaims.DEMS_ADMIN);

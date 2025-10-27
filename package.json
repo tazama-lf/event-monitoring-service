@@ -28,7 +28,7 @@
     "@nestjs/core": "^11.0.1",
     "@nestjs/platform-express": "^11.0.1",
     "@nestjs/schedule": "^6.0.1",
-    "@tazama-lf/auth-lib": "^2.2.0-rc.1",
+    "@tazama-lf/auth-lib": "file:/home/rahim/Downloads/tazama/auth-lib",
     "@tazama-lf/frms-coe-lib": "6.0.0-rc.9",
     "@tazama-lf/frms-coe-startup-lib": "3.0.0-rc.1",
     "@types/jsonwebtoken": "^9.0.10",

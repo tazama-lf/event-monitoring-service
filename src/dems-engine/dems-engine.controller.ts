@@ -3,7 +3,7 @@ import { DemsEngineService } from './dems-engine.service';
 import { LoggerService } from '@tazama-lf/frms-coe-lib';
 import { isValidEndpointFormat, transformEndpoint } from '../utils/transform_endpoint';
 import { TazamaAuthGuard } from '../auth/tazama-auth.guard';
-import { RequireDemsWriteRole } from '../auth/auth.decorator';
+import { RequireDemsReadRole, RequireDemsWriteRole } from '../auth/auth.decorator';
 import { User } from '../auth/user.decorator';
 import { AuthenticatedUser } from '../auth/auth.types';
 
@@ -17,6 +17,7 @@ export class DemsEngineController {
 
   @Post('*endpoint')
   @RequireDemsWriteRole()
+  @RequireDemsReadRole()
   async MessageHandler(
     @Param('endpoint') endpoint: string,
     @Body() payload: any,
