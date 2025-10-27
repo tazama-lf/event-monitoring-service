@@ -189,6 +189,17 @@ export class DemsEngineService {
           const sources = mapping.source;
           const transformation = mapping.transformation;
 
+          // dealing with the constant value injection first
+          if (mapping.constantValue) {
+            if (type === 'redis') {
+              dataCache[destination] = mapping.constantValue;
+            }
+            if (type === 'transaction') {
+              transactionRelationship[destination] = mapping.constantValue;
+            }
+            continue; // skip to next mapping
+          }
+
           let dataCacheValue = mapping.prefix ? mapping.prefix : '';
           let sum = 0;
           let transactionRelationshipValue = mapping.prefix ? mapping.prefix : '';
@@ -272,6 +283,10 @@ export class DemsEngineService {
 
           sources = sources.map((source: string) => {
             const mapping = configuredMapping.find((sch: any) => sch.destination === source);
+
+            if (mapping.constantValue) {
+              return mapping.constantValue;
+            }
 
             const extractedValues = mapping.source.map((s: string) => {
               const value = getValueByPath(payload, s);
