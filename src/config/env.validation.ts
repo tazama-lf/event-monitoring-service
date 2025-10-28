@@ -22,6 +22,7 @@ export interface AppConfiguration {
     readonly host: string;
     readonly port: number;
     readonly password: string;
+    readonly db: number;
   };
   readonly nats: {
     readonly serverUrl: string;
@@ -108,6 +109,7 @@ export function validateEnvironment(config: Record<string, unknown>): AppConfigu
       host: config.REDIS_HOST as string,
       port: redisPort,
       password: config.REDIS_PASSWORD as string,
+      db: parseInt(config.REDIS_DB as string, 10) || 0,
     },
     nats: {
       serverUrl: config.SERVER_URL as string,
