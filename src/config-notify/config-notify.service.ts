@@ -4,11 +4,6 @@ import { LoggerService, RedisService } from '@tazama-lf/frms-coe-lib';
 import { StartupFactory } from '@tazama-lf/frms-coe-startup-lib';
 import { DatabaseService } from '../database/database.service';
 
-const NATS_SUBJECTS = {
-  CONFIG_NOTIFICATION: 'config.notification',
-  CONFIG_NOTIFICATION_RESPONSE: 'config.notification.response',
-} as const;
-
 enum Status {
   ACK = 'ACK',
   NACK = 'NACK',
@@ -30,6 +25,8 @@ export class ConfigNotifyService implements OnModuleInit, OnModuleDestroy {
   private readonly natsService = new StartupFactory();
   private isInitialized = false;
   private readonly cacheTtl: number;
+  private readonly consumerStream: string;
+  private readonly producerStream: string;
 
   constructor(
     private readonly logger: LoggerService,
@@ -38,6 +35,8 @@ export class ConfigNotifyService implements OnModuleInit, OnModuleDestroy {
     private readonly databaseService: DatabaseService,
   ) {
     this.cacheTtl = this.configService.get<number>('CACHE_TTL', 86400);
+    this.consumerStream = this.configService.get<string>('CONSUMER_STREAM', 'config.notification');
+    this.producerStream = this.configService.get<string>('PRODUCER_STREAM', 'config.notification.response');
   }
 
   async onModuleInit(): Promise<void> {
@@ -47,17 +46,14 @@ export class ConfigNotifyService implements OnModuleInit, OnModuleDestroy {
     }
 
     try {
-      await this.natsService.init(
-        this.handleNatsMessage.bind(this) as never,
-        this.logger,
-        [NATS_SUBJECTS.CONFIG_NOTIFICATION],
-        NATS_SUBJECTS.CONFIG_NOTIFICATION_RESPONSE,
-      );
+      await this.natsService.init(this.handleNatsMessage.bind(this) as never, this.logger, [this.consumerStream], this.producerStream);
       this.isInitialized = true;
-      this.logger.log('NATS consumer initialized for config.notification');
+      this.logger.log(`NATS consumer initialized for ${this.consumerStream}`);
 
-      const result = await this.databaseService.query('SELECT endpoint_path as "endpointPath", schema, mapping, functions FROM config');
-      const configs = result.rows as CacheData[];
+      const result = await this.databaseService.query<CacheData>(
+        'SELECT endpoint_path AS "endpointPath", schema, mapping, functions FROM config',
+      );
+      const configs = result.rows;
 
       for (const config of configs) {
         this.logger.log('Preloading cache for config:', config.endpointPath);
@@ -81,11 +77,11 @@ export class ConfigNotifyService implements OnModuleInit, OnModuleDestroy {
     this.logger.log(`Received NATS notification for config ID: ${message.transactionId}`);
 
     try {
-      const result = await this.databaseService.query(
-        'SELECT endpoint_path as "endpointPath", schema, mapping, functions FROM config WHERE id = $1',
+      const result = await this.databaseService.query<CacheData>(
+        'SELECT endpoint_path AS "endpointPath", schema, mapping, functions FROM config WHERE id = $1',
         [message.transactionId],
       );
-      const config = result.rows[0] as CacheData | undefined;
+      const config = result.rows[0];
 
       if (config) {
         await this.setCache(config);
