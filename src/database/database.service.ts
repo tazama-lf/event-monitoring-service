@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
-import { Injectable, LoggerService, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Pool, PoolClient, QueryResult, QueryResultRow } from 'pg';
 import { DatabaseConfig } from '../config/database.config';
+import { LoggerService } from '@tazama-lf/frms-coe-lib';
 
 @Injectable()
 export class DatabaseService implements OnModuleInit, OnModuleDestroy {
@@ -58,16 +59,20 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
    * @param params Query parameters
    * @returns Query result
    */
-  async query<T extends QueryResultRow = any>(text: string, params?: any[]): Promise<QueryResult<T>> {
+  async query<T extends QueryResultRow = QueryResultRow>(text: string, params?: unknown[]): Promise<QueryResult<T>> {
     const start = Date.now();
     try {
       const result = await this.pool.query<T>(text, params);
       const duration = Date.now() - start;
-      this.logger.log('Executed query', { text, duration, rows: result.rowCount });
+      this.logger.log('Executed query', JSON.stringify({ text, duration, rows: result.rowCount }));
       return result;
     } catch (error) {
       const duration = Date.now() - start;
-      this.logger.error('Query error', { text, duration, error: (error as Error).message });
+      this.logger.error('Query error', {
+        text,
+        duration,
+        error: error instanceof Error ? error.message : String(error),
+      });
       throw error;
     }
   }

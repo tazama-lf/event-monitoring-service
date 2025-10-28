@@ -4,10 +4,11 @@ import { Global, Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { DatabaseService } from './database.service';
 import databaseConfig from '../config/database.config';
+import { LoggerModule } from '../logger-service/logger-service.module';
 
 @Global()
 @Module({
-  imports: [ConfigModule.forFeature(databaseConfig)],
+  imports: [LoggerModule, ConfigModule.forFeature(databaseConfig)],
   providers: [DatabaseService],
   exports: [DatabaseService],
 })
