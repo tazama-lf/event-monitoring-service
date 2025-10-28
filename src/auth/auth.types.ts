@@ -6,8 +6,4 @@ export interface AuthenticatedUser {
   validClaims: string[];
 }
 
-export interface AuthenticatedRequest extends Request {
-  user: AuthenticatedUser;
-}
-
 export type { ClaimValidationResult, TazamaToken };
