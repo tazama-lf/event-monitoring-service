@@ -2,6 +2,7 @@ import { Injectable, BadRequestException, InternalServerErrorException, Conflict
 import { LoggerService } from '@tazama-lf/frms-coe-lib';
 import { DatabaseService } from '../database/database.service';
 import { extractTenantId } from '../utils/extract_tenant_id';
+import { TazamaPayload, TransactionRelationship } from '../dems-engine/dems-engine.service';
 
 @Injectable()
 export class DatabaseOperationsService {
@@ -111,7 +112,7 @@ export class DatabaseOperationsService {
     }
   }
 
-  async saveTransactionHistory(transaction: any, key: string): Promise<void> {
+  async saveTransactionHistory(transaction: TazamaPayload, key: string): Promise<void> {
     const txtp = transaction.TxTp.replace('.', '').toLowerCase();
     const destination = `${txtp}`;
     try {
@@ -124,7 +125,7 @@ export class DatabaseOperationsService {
     }
   }
 
-  async saveTransactionRelationship(relationship: any): Promise<void> {
+  async saveTransactionRelationship(relationship: TransactionRelationship): Promise<void> {
     try {
       await this.databaseService.query('INSERT INTO transaction (source, destination, transaction) VALUES ($1, $2, $3)', [
         relationship.from,

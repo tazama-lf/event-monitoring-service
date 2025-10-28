@@ -25,10 +25,26 @@ interface SuccessResponse {
   dataCache: any;
 }
 
-interface TazamaPayload {
+export interface TazamaPayload {
   transaction: any;
   TxTp: string;
   dataCache: any;
+}
+
+export interface TransactionRelationship {
+  from: string;
+  to: string;
+  TxTp: string;
+  MsgId: string;
+  CreDtTm: string;
+  Amt?: string;
+  Ccy?: string;
+  PmtInfId: string;
+  EndToEndId: string;
+  lat?: string;
+  long?: string;
+  TxSts?: string;
+  TenantId: string;
 }
 
 type FindSchemaAndMappingResult = [any, any, any] | null;
@@ -173,9 +189,23 @@ export class DemsEngineService {
     payload: any,
     configuredMapping: any,
     endpoint: string,
-  ): { dataCache: any; transactionRelationship: any; endToEndId: string } {
+  ): { dataCache: any; transactionRelationship: TransactionRelationship; endToEndId: string } {
     const dataCache: any = {};
-    const transactionRelationship: any = {};
+    const transactionRelationship: TransactionRelationship = {
+      from: '',
+      to: '',
+      TxTp: '',
+      MsgId: '',
+      CreDtTm: '',
+      Amt: '',
+      Ccy: '',
+      PmtInfId: '',
+      EndToEndId: '',
+      lat: '',
+      long: '',
+      TxSts: '',
+      TenantId: '',
+    };
     let endToEndId = '';
 
     // new case: sum and split
@@ -471,7 +501,7 @@ export class DemsEngineService {
           `Transaction processing failed: ${String(error)}`,
         ]);
       }
-      this.loggerService.log(' transaction relationship', transactionRelationship);
+      this.loggerService.log(' transaction relationship', JSON.stringify(transactionRelationship));
       this.loggerService.log('data cache', dataCache);
 
       return this.buildSuccessResponse(configuredSchema, tazamaPayload, transactionRelationship, dataCache);
