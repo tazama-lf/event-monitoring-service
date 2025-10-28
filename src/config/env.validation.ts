@@ -23,6 +23,7 @@ export interface AppConfiguration {
     readonly port: number;
     readonly password: string;
     readonly db: number;
+    readonly isCluster: boolean;
   };
   readonly nats: {
     readonly serverUrl: string;
@@ -110,6 +111,7 @@ export function validateEnvironment(config: Record<string, unknown>): AppConfigu
       port: redisPort,
       password: config.REDIS_PASSWORD as string,
       db: parseInt(config.REDIS_DB as string, 10) || 0,
+      isCluster: config.REDIS_IS_CLUSTER as boolean,
     },
     nats: {
       serverUrl: config.SERVER_URL as string,
