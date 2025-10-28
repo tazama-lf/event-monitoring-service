@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
+// This file ensures that the application has all the necessary environment variables configured correctly before it starts running, preventing runtime failures due to missing or invalid configuration.
 
 /**
  * Configuration validation schema for the Event Monitoring Service
@@ -15,6 +16,11 @@ export interface AppConfiguration {
     readonly user: string;
     readonly password: string;
     readonly name: string;
+    readonly ssl: boolean;
+    readonly connectionTimeoutMillis: number;
+    readonly idleTimeoutMillis: number;
+    readonly max: number;
+    readonly min: number;
   };
   readonly redis: {
     readonly host: string;
@@ -64,10 +70,47 @@ export function validateEnvironment(config: Record<string, unknown>): AppConfigu
     throw new Error('Environment variable STARTUP_TYPE is required');
   }
 
+  // Validate database configuration
+  const dbPort = parseInt(config.DB_PORT as string, 10) || 5432;
+  const dbConnectionTimeout = parseInt(config.DB_CONNECTION_TIMEOUT as string, 10) || 10000;
+  const dbIdleTimeout = parseInt(config.DB_IDLE_TIMEOUT as string, 10) || 10000;
+  const dbPoolMax = parseInt(config.DB_POOL_MAX as string, 10) || 10;
+  const dbPoolMin = parseInt(config.DB_POOL_MIN as string, 10) || 2;
+
+  // Validate database port range
+  if (dbPort < 1 || dbPort > 65535) {
+    throw new Error('Environment variable DB_PORT must be between 1 and 65535');
+  }
+
+  // Validate timeout values
+  if (dbConnectionTimeout < 1000) {
+    throw new Error('Environment variable DB_CONNECTION_TIMEOUT must be at least 1000ms');
+  }
+  if (dbIdleTimeout < 1000) {
+    throw new Error('Environment variable DB_IDLE_TIMEOUT must be at least 1000ms');
+  }
+
+  // Validate pool configuration
+  if (dbPoolMax < 1) {
+    throw new Error('Environment variable DB_POOL_MAX must be at least 1');
+  }
+  if (dbPoolMin < 0) {
+    throw new Error('Environment variable DB_POOL_MIN must be at least 0');
+  }
+  if (dbPoolMin > dbPoolMax) {
+    throw new Error('Environment variable DB_POOL_MIN cannot be greater than DB_POOL_MAX');
+  }
+
   // Validate cache TTL if provided
   const cacheTtl = config.CACHE_TTL as string;
   if (cacheTtl && (isNaN(parseInt(cacheTtl, 10)) || parseInt(cacheTtl, 10) <= 0)) {
     throw new Error('Environment variable CACHE_TTL must be a positive number');
+  }
+
+  // Validate Redis port
+  const redisPort = parseInt(config.REDIS_PORT as string, 10);
+  if (isNaN(redisPort) || redisPort < 1 || redisPort > 65535) {
+    throw new Error('Environment variable REDIS_PORT must be a valid port number between 1 and 65535');
   }
 
   return {
@@ -78,14 +121,19 @@ export function validateEnvironment(config: Record<string, unknown>): AppConfigu
     databaseUrl: config.DATABASE_URL as string,
     database: {
       host: (config.DB_HOST as string) || 'localhost',
-      port: parseInt(config.DB_PORT as string, 10) || 5432,
+      port: dbPort,
       user: (config.DB_USER as string) || 'postgres',
       password: (config.DB_PASSWORD as string) || 'password',
       name: (config.DB_NAME as string) || 'event_monitoring_dev',
+      ssl: config.NODE_ENV === 'production',
+      connectionTimeoutMillis: dbConnectionTimeout,
+      idleTimeoutMillis: dbIdleTimeout,
+      max: dbPoolMax,
+      min: dbPoolMin,
     },
     redis: {
       host: config.REDIS_HOST as string,
-      port: parseInt(config.REDIS_PORT as string, 10),
+      port: redisPort,
       password: config.REDIS_PASSWORD as string,
       db: parseInt(config.REDIS_DB as string, 10) || 0,
     },
