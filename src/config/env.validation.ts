@@ -9,7 +9,7 @@ export interface AppConfiguration {
   readonly nodeEnv: string;
   readonly maxCpu: number;
   readonly port: number;
-  readonly databaseUrl: string;
+  readonly configurationDatabaseUrl: string;
   readonly database: {
     readonly host: string;
     readonly port: number;
@@ -17,16 +17,11 @@ export interface AppConfiguration {
     readonly password: string;
     readonly name: string;
     readonly ssl: boolean;
-    readonly connectionTimeoutMillis: number;
-    readonly idleTimeoutMillis: number;
-    readonly max: number;
-    readonly min: number;
   };
   readonly redis: {
     readonly host: string;
     readonly port: number;
     readonly password: string;
-    readonly db: number;
   };
   readonly nats: {
     readonly serverUrl: string;
@@ -37,6 +32,11 @@ export interface AppConfiguration {
   };
   readonly cache: {
     readonly timeToLive: number;
+  };
+  readonly auth: {
+    readonly tazamaAuthUrl: string;
+    readonly authPublicKeyPath: string;
+    readonly certPathPublic: string;
   };
 }
 
@@ -72,39 +72,16 @@ export function validateEnvironment(config: Record<string, unknown>): AppConfigu
 
   // Validate database configuration
   const dbPort = parseInt(config.DB_PORT as string, 10) || 5432;
-  const dbConnectionTimeout = parseInt(config.DB_CONNECTION_TIMEOUT as string, 10) || 10000;
-  const dbIdleTimeout = parseInt(config.DB_IDLE_TIMEOUT as string, 10) || 10000;
-  const dbPoolMax = parseInt(config.DB_POOL_MAX as string, 10) || 10;
-  const dbPoolMin = parseInt(config.DB_POOL_MIN as string, 10) || 2;
 
   // Validate database port range
   if (dbPort < 1 || dbPort > 65535) {
     throw new Error('Environment variable DB_PORT must be between 1 and 65535');
   }
 
-  // Validate timeout values
-  if (dbConnectionTimeout < 1000) {
-    throw new Error('Environment variable DB_CONNECTION_TIMEOUT must be at least 1000ms');
-  }
-  if (dbIdleTimeout < 1000) {
-    throw new Error('Environment variable DB_IDLE_TIMEOUT must be at least 1000ms');
-  }
-
-  // Validate pool configuration
-  if (dbPoolMax < 1) {
-    throw new Error('Environment variable DB_POOL_MAX must be at least 1');
-  }
-  if (dbPoolMin < 0) {
-    throw new Error('Environment variable DB_POOL_MIN must be at least 0');
-  }
-  if (dbPoolMin > dbPoolMax) {
-    throw new Error('Environment variable DB_POOL_MIN cannot be greater than DB_POOL_MAX');
-  }
-
-  // Validate cache TTL if provided
-  const cacheTtl = config.CACHE_TTL as string;
+  // Validate cache TTL if provided (using TTL instead of CACHE_TTL)
+  const cacheTtl = config.TTL as string;
   if (cacheTtl && (isNaN(parseInt(cacheTtl, 10)) || parseInt(cacheTtl, 10) <= 0)) {
-    throw new Error('Environment variable CACHE_TTL must be a positive number');
+    throw new Error('Environment variable TTL must be a positive number');
   }
 
   // Validate Redis port
@@ -117,8 +94,8 @@ export function validateEnvironment(config: Record<string, unknown>): AppConfigu
     functionName: (config.FUNCTION_NAME as string) || 'event-monitoring-service',
     nodeEnv: (config.NODE_ENV as string) || 'development',
     maxCpu: parseInt(config.MAX_CPU as string, 10) || 1,
-    port: parseInt(config.APP_PORT as string, 10) || 3002,
-    databaseUrl: config.DATABASE_URL as string,
+    port: parseInt(config.APP_PORT as string, 10),
+    configurationDatabaseUrl: config.CONFIGURATION_DATABASE_URL as string,
     database: {
       host: (config.DB_HOST as string) || 'localhost',
       port: dbPort,
@@ -126,16 +103,11 @@ export function validateEnvironment(config: Record<string, unknown>): AppConfigu
       password: (config.DB_PASSWORD as string) || 'password',
       name: (config.DB_NAME as string) || 'event_monitoring_dev',
       ssl: config.NODE_ENV === 'production',
-      connectionTimeoutMillis: dbConnectionTimeout,
-      idleTimeoutMillis: dbIdleTimeout,
-      max: dbPoolMax,
-      min: dbPoolMin,
     },
     redis: {
       host: config.REDIS_HOST as string,
       port: redisPort,
       password: config.REDIS_PASSWORD as string,
-      db: parseInt(config.REDIS_DB as string, 10) || 0,
     },
     nats: {
       serverUrl: config.SERVER_URL as string,
@@ -145,7 +117,12 @@ export function validateEnvironment(config: Record<string, unknown>): AppConfigu
       streamSubject: (config.STREAM_SUBJECT as string) || 'config.notification',
     },
     cache: {
-      timeToLive: parseInt(config.CACHE_TTL as string, 10) || 3600, // Default to 1 hour if not specified
+      timeToLive: parseInt(config.TTL as string, 10) || 3600, // Using TTL instead of CACHE_TTL
+    },
+    auth: {
+      tazamaAuthUrl: (config.TAZAMA_AUTH_URL as string) || '',
+      authPublicKeyPath: (config.AUTH_PUBLIC_KEY_PATH as string) || '',
+      certPathPublic: (config.CERT_PATH_PUBLIC as string) || '',
     },
   };
 }
