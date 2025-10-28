@@ -3,6 +3,7 @@ import { LoggerService } from '@tazama-lf/frms-coe-lib';
 import { DatabaseService } from '../database/database.service';
 import { extractTenantId } from '../utils/extract_tenant_id';
 import { TazamaPayload, TransactionRelationship } from '../dems-engine/dems-engine.service';
+import { randomUUID } from 'crypto';
 
 @Injectable()
 export class DatabaseOperationsService {
@@ -151,7 +152,7 @@ export class DatabaseOperationsService {
     try {
       const tenantId = extractTenantId(endpoint);
       const quarantineRecord = {
-        id: `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        id: randomUUID(),
         correlation_id: correlationId || null,
         tenant_id: tenantId,
         endpoint_path: endpoint,
