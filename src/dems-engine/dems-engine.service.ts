@@ -183,10 +183,14 @@ export class DemsEngineService {
     if (configuredMapping) {
       try {
         for (const mapping of configuredMapping) {
-          const destination = mapping.destination.split('.')[1];
-          const type = mapping.destination.split('.')[0];
-          const separator = mapping.delimiter;
+          // sources are payload paths from which to extract data
           const sources = mapping.source;
+
+          // redis.dbtrId can be broken down into redis and dbtrId
+          const destination = typeof mapping.destination === 'string' ? mapping.destination.split('.')[1] : mapping.destination;
+          const type = typeof mapping.destination === 'string' ? mapping.destination.split('.')[0] : mapping.destination;
+
+          const separator = mapping.delimiter;
           const transformation = mapping.transformation;
 
           // dealing with the constant value injection first
@@ -200,6 +204,27 @@ export class DemsEngineService {
             continue; // skip to next mapping
           }
 
+          if (typeof destination !== 'string' || typeof type !== 'string') {
+            // this means split usecase (therefore destination is an array) - one to many mapping
+
+            const sourceValue = getValueByPath<string>(payload, mapping.source[0]);
+            const splitValues = sourceValue.split(mapping.delimiter); // iska first index destination k first index pe...and so on
+
+            for (let j = 0; j < mapping.destination.length; j++) {
+              const dest = mapping.destination[j].split('.')[1];
+              const destType = mapping.destination[j].split('.')[0];
+
+              if (destType === 'redis') {
+                dataCache[dest] = splitValues[j];
+              }
+              if (destType === 'transaction') {
+                transactionRelationship[dest] = splitValues[j];
+              }
+            }
+
+            continue; // skip for now
+          }
+
           let dataCacheValue = mapping.prefix ? mapping.prefix : '';
           let sum = 0;
           let transactionRelationshipValue = mapping.prefix ? mapping.prefix : '';
@@ -210,7 +235,6 @@ export class DemsEngineService {
 
               if (transformation == 'SUM') {
                 const value: number = getValueByPath<number>(payload, sources[i]);
-                console.log('value', value);
                 sum += value;
               } else {
                 dataCacheValue += value;
@@ -224,7 +248,7 @@ export class DemsEngineService {
               const value = getValueByPath<string>(payload, sources[i]);
               if (transformation == 'SUM') {
                 const value = getValueByPath<number>(payload, sources[i]);
-                console.log('value', value);
+                // console.log('value', value);
                 sum += value;
               } else {
                 transactionRelationshipValue += value;
