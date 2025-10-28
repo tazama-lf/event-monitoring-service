@@ -248,7 +248,6 @@ export class DemsEngineService {
               const value = getValueByPath<string>(payload, sources[i]);
               if (transformation == 'SUM') {
                 const value = getValueByPath<number>(payload, sources[i]);
-                // console.log('value', value);
                 sum += value;
               } else {
                 transactionRelationshipValue += value;
@@ -306,24 +305,16 @@ export class DemsEngineService {
         let splitResultValue: string;
         let isDestinationArray: boolean;
 
-        console.log('---------------------------------------------------------------------------');
-        console.log('--> See this', { functionToCall, sources });
-
         sources = sources.map((source: string) => {
           const mapping = configuredMapping.find((sch: any) => {
-            console.log('-----> sch.destination', sch.destination, 'source', source);
             isDestinationArray = false; //assuming false for initially
 
             if (typeof sch.destination !== 'string') {
               for (let i = 0; i < sch.destination.length; i++) {
                 if (sch.destination[i] === source) {
                   isDestinationArray = true;
-                  console.log('-----> sch.destination[i]', sch.destination[i]);
-                  console.log('-----> source', source);
                   const result: string = getValueByPath(payload, sch.source[0]);
-                  console.log('-----> getValueByPath', result);
                   const splitResult = result.split(sch.delimiter);
-                  console.log('-----> splitResult', splitResult[i]);
                   splitResultValue = splitResult[i];
                   return splitResult[i];
                 }
@@ -334,12 +325,8 @@ export class DemsEngineService {
           });
 
           if (isDestinationArray) {
-            console.log('-----> isDestinationArray is true');
-            console.log('mapping:', mapping);
             return splitResultValue;
           }
-
-          console.log('x------------x--------------x------------x');
 
           if (mapping.constantValue) {
             return mapping.constantValue;
@@ -351,12 +338,9 @@ export class DemsEngineService {
           });
 
           const combinedValue = extractedValues.join('');
-          console.log('combined value:', combinedValue);
-          console.log('x------------x--------------x------------x');
           return combinedValue;
         });
 
-        console.log('Final sources for function call:', sources);
         await this.databaseOperationsService[functionToCall](...Object.values(sources));
       }
     }

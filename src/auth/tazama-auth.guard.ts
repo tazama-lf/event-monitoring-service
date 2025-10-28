@@ -12,7 +12,6 @@ export class TazamaAuthGuard implements CanActivate {
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const logContext = 'TazamaAuthGuard.canActivate()';
-    console.log('activated can activateeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee');
 
     // Check if route is public
     const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [context.getHandler(), context.getClass()]);
@@ -25,23 +24,16 @@ export class TazamaAuthGuard implements CanActivate {
     // Get required claims from decorator
     const requiredClaims = this.reflector.getAllAndOverride<string[]>(CLAIMS_KEY, [context.getHandler(), context.getClass()]);
 
-    console.log('requiredClaims:', requiredClaims);
-
     const anyRequiredClaims = this.reflector.getAllAndOverride<string[]>(ANY_CLAIMS_KEY, [context.getHandler(), context.getClass()]);
-
-    console.log('anyRequiredClaims:', anyRequiredClaims);
 
     const request = context.switchToHttp().getRequest();
     const authHeader = request.headers.authorization;
-    console.log('authHeader --> :', authHeader);
 
     // Validate authorization header
     if (!authHeader?.startsWith('Bearer ')) {
       this.logger.warn('No Bearer token provided', logContext);
       throw new UnauthorizedException('No Bearer token provided');
     }
-
-    console.log('bearer token found');
 
     // Check if we have either type of claims requirement
     if ((!requiredClaims || requiredClaims.length === 0) && (!anyRequiredClaims || anyRequiredClaims.length === 0)) {
@@ -55,12 +47,8 @@ export class TazamaAuthGuard implements CanActivate {
       // Determine which claims to validate
       const claimsToValidate = requiredClaims || anyRequiredClaims || [];
 
-      console.log('claimsToValidate:', claimsToValidate);
-
       // Validate token and claims using tazama-auth-lib
       const validated: ClaimValidationResult = validateTokenAndClaims(token, claimsToValidate);
-
-      console.log('validated claims:', validated);
 
       let hasValidAccess = false;
       let validClaims: string[] = [];
