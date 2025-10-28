@@ -17,7 +17,7 @@ export class DemsEngineController {
 
   @Post('*endpoint')
   @RequireDemsWriteRole()
-  async MessageHandler(
+  async messageHandler(
     @Param('endpoint') endpoint: string,
     @Body() payload: any,
     @Headers('tenantId') tenantId: string,
