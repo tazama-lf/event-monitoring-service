@@ -1,4 +1,4 @@
-import { BadRequestException, Body, Controller, Headers, UseGuards, HttpStatus, NotFoundException, Param, Post } from '@nestjs/common';
+import { BadRequestException, Body, Controller, UseGuards, HttpStatus, NotFoundException, Param, Post } from '@nestjs/common';
 import { DemsEngineService } from './dems-engine.service';
 import { LoggerService } from '@tazama-lf/frms-coe-lib';
 import { isValidEndpointFormat, transformEndpoint } from '../utils/transform_endpoint';
@@ -20,7 +20,6 @@ export class DemsEngineController {
   async messageHandler(
     @Param('endpoint') endpoint: string,
     @Body() payload: any,
-    @Headers('tenantId') tenantId: string,
     @User() user: AuthenticatedUser,
   ): Promise<{ message: string; isMatch: boolean; transactionRelationship: any; schema: any; payload: any; statusCode: number }> {
     if (isValidEndpointFormat(endpoint) === false) {
@@ -34,7 +33,7 @@ export class DemsEngineController {
       `Processing request for clientId: ${user.token.clientId}, tenantId: ${user.token.tenantId}, endpoint: ${transformedEndpoint}`,
     );
 
-    const result = await this.demsEngineService.handleMessage(payload, transformedEndpoint, tenantId);
+    const result = await this.demsEngineService.handleMessage(payload, transformedEndpoint, user.token.tenantId);
 
     if (!result.isMatch) {
       this.logger.log(`Problem is: ${result.message}`);
