@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { Injectable, LoggerService, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Pool, PoolClient, QueryResult, QueryResultRow } from 'pg';
 import { DatabaseConfig } from '../config/database.config';
@@ -9,7 +9,10 @@ import { DatabaseConfig } from '../config/database.config';
 export class DatabaseService implements OnModuleInit, OnModuleDestroy {
   private pool!: Pool;
 
-  constructor(private readonly configService: ConfigService) {}
+  constructor(
+    private readonly configService: ConfigService,
+    private readonly logger: LoggerService,
+  ) {}
 
   async onModuleInit(): Promise<void> {
     const dbConfig = this.configService.get<DatabaseConfig>('database');
@@ -35,9 +38,9 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
     try {
       const client = await this.pool.connect();
       client.release();
-      console.log('Database connection established successfully');
+      this.logger.log('Database connection established successfully');
     } catch (error) {
-      console.error('Failed to connect to database:', error);
+      this.logger.error('Failed to connect to database:', error);
       throw error;
     }
   }
@@ -45,7 +48,7 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
   async onModuleDestroy(): Promise<void> {
     if (this.pool) {
       await this.pool.end();
-      console.log('Database connection pool closed');
+      this.logger.log('Database connection pool closed');
     }
   }
 
@@ -60,11 +63,11 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
     try {
       const result = await this.pool.query<T>(text, params);
       const duration = Date.now() - start;
-      console.log('Executed query', { text, duration, rows: result.rowCount });
+      this.logger.log('Executed query', { text, duration, rows: result.rowCount });
       return result;
     } catch (error) {
       const duration = Date.now() - start;
-      console.error('Query error', { text, duration, error: (error as Error).message });
+      this.logger.error('Query error', { text, duration, error: (error as Error).message });
       throw error;
     }
   }
