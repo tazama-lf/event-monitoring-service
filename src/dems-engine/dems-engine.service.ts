@@ -299,34 +299,65 @@ export class DemsEngineService {
    */
   private async executeConfiguredFunctions(payload: any, configuredMapping: any, configuredFunctions: any): Promise<void> {
     if (configuredFunctions) {
-      try {
-        for (const row of configuredFunctions) {
-          // prepare params (getPayloadByPath) --> and call each function one by one
-          const functionToCall = row.functionName;
-          let sources = row.params || [];
+      for (const row of configuredFunctions) {
+        // prepare params (getPayloadByPath) --> and call each function one by one
+        const functionToCall = row.functionName;
+        let sources = row.params || [];
+        let splitResultValue: string;
+        let isDestinationArray: boolean;
 
-          sources = sources.map((source: string) => {
-            const mapping = configuredMapping.find((sch: any) => sch.destination === source);
+        console.log('---------------------------------------------------------------------------');
+        console.log('--> See this', { functionToCall, sources });
 
-            if (mapping.constantValue) {
-              return mapping.constantValue;
+        sources = sources.map((source: string) => {
+          const mapping = configuredMapping.find((sch: any) => {
+            console.log('-----> sch.destination', sch.destination, 'source', source);
+            isDestinationArray = false; //assuming false for initially
+
+            if (typeof sch.destination !== 'string') {
+              for (let i = 0; i < sch.destination.length; i++) {
+                if (sch.destination[i] === source) {
+                  isDestinationArray = true;
+                  console.log('-----> sch.destination[i]', sch.destination[i]);
+                  console.log('-----> source', source);
+                  const result: string = getValueByPath(payload, sch.source[0]);
+                  console.log('-----> getValueByPath', result);
+                  const splitResult = result.split(sch.delimiter);
+                  console.log('-----> splitResult', splitResult[i]);
+                  splitResultValue = splitResult[i];
+                  return splitResult[i];
+                }
+              }
             }
 
-            const extractedValues = mapping.source.map((s: string) => {
-              const value = getValueByPath(payload, s);
-              return value;
-            });
-
-            const combinedValue = extractedValues.join('');
-
-            return combinedValue;
+            return sch.destination === source;
           });
 
-          await this.databaseOperationsService[functionToCall](...Object.values(sources));
-        }
-      } catch (error) {
-        this.loggerService.error(`Failed to execute configured functions: ${String(error)}`);
-        throw error;
+          if (isDestinationArray) {
+            console.log('-----> isDestinationArray is true');
+            console.log('mapping:', mapping);
+            return splitResultValue;
+          }
+
+          console.log('x------------x--------------x------------x');
+
+          if (mapping.constantValue) {
+            return mapping.constantValue;
+          }
+
+          const extractedValues = mapping.source.map((s: string) => {
+            const value = getValueByPath(payload, s);
+            return value;
+          });
+
+          const combinedValue = extractedValues.join('');
+          console.log('combined value:', combinedValue);
+          console.log('x------------x--------------x------------x');
+          return combinedValue;
+        });
+
+        console.log('Final sources for function call:', sources);
+        await this.databaseOperationsService[functionToCall](...Object.values(sources));
       }
     }
   }
