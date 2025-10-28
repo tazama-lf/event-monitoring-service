@@ -1,7 +1,6 @@
 import { Injectable, BadRequestException, InternalServerErrorException, ConflictException } from '@nestjs/common';
 import { LoggerService } from '@tazama-lf/frms-coe-lib';
 import { DatabaseService } from '../database/database.service';
-import { extractTenantId } from '../utils/extract_tenant_id';
 import { TazamaPayload, TransactionRelationship } from '../dems-engine/dems-engine.service';
 import { randomUUID } from 'crypto';
 
@@ -148,9 +147,8 @@ export class DatabaseOperationsService {
     }
   }
 
-  async saveToQuarantine(payload: any, endpoint: string, differences: string[], correlationId?: string): Promise<void> {
+  async saveToQuarantine(payload: any, endpoint: string, differences: string[], tenantId: string, correlationId?: string): Promise<void> {
     try {
-      const tenantId = extractTenantId(endpoint);
       const quarantineRecord = {
         id: randomUUID(),
         correlation_id: correlationId || null,

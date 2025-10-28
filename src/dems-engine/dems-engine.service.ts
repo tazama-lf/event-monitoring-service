@@ -118,12 +118,14 @@ export class DemsEngineService {
    * @param payload The payload to validate
    * @param configuredSchema The schema to validate against
    * @param endpoint The endpoint path for error tracking
+   * @param tenantId The tenant ID for logging
    * @returns Validation result with isValid flag and formatted errors
    */
   private async validatePayload(
     payload: any,
     configuredSchema: any,
     endpoint: string,
+    tenantId: string,
   ): Promise<{ isValid: boolean; differences?: string[] }> {
     let isValid;
     try {
@@ -145,7 +147,7 @@ export class DemsEngineService {
 
       const correlationId = crypto.randomUUID();
 
-      await this.databaseOperationsService.saveToQuarantine(payload, endpoint, differences, correlationId);
+      await this.databaseOperationsService.saveToQuarantine(payload, endpoint, differences, tenantId, correlationId);
 
       return { isValid: false, differences };
     }
@@ -471,7 +473,7 @@ export class DemsEngineService {
 
       const [configuredSchema, configuredMapping, configuredFunctions] = result;
 
-      const validationResult = await this.validatePayload(payload, configuredSchema, endpoint);
+      const validationResult = await this.validatePayload(payload, configuredSchema, endpoint, tenantId);
       if (!validationResult.isValid) {
         const errorMessage = validationResult.differences?.[0]?.includes('AJV validation error')
           ? 'Error during schemaa validation'
