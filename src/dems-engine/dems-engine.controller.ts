@@ -42,7 +42,7 @@ export class DemsEngineController {
 
     const result = await this.demsEngineService.handleMessage(payload, transformedEndpoint, user.token.tenantId);
 
-    if (!result.isMatch) {
+    if (!('success' in result)) {
       this.logger.log(`Problem is: ${result.message}`);
 
       if (result.message === 'Schema not found for the specified endpoint') {
@@ -60,12 +60,26 @@ export class DemsEngineController {
       });
     }
 
+    // Handle the transaction processing that was moved from service
+    try {
+      await this.demsEngineService.saveTransactionDataAndNotify(result.tazamaPayload, result.transactionType, result.endToEndId);
+    } catch (error) {
+      this.logger.error(`Failed to save transaction data or notify: ${String(error)}`);
+      throw new BadRequestException({
+        message: 'Error saving transaction data or sending notification',
+        differences: [`Transaction processing failed: ${String(error)}`],
+      });
+    }
+
+    this.logger.log(' transaction relationship', JSON.stringify(result.transactionRelationship));
+    this.logger.log('data cache', result.dataCache);
+
     return {
-      message: result.message,
-      isMatch: result.isMatch,
+      message: 'Everything is OK!',
+      isMatch: true,
       transactionRelationship: result.transactionRelationship,
-      schema: result.schema,
-      payload: result.payload,
+      schema: result.configuredSchema,
+      payload: result.tazamaPayload,
       statusCode: HttpStatus.OK,
     };
   }

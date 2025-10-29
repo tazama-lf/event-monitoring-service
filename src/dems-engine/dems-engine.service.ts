@@ -25,6 +25,16 @@ interface SuccessResponse {
   dataCache: any;
 }
 
+interface ProcessingResult {
+  success: true;
+  configuredSchema: any;
+  tazamaPayload: TazamaPayload;
+  transactionRelationship: TransactionRelationship;
+  dataCache: any;
+  transactionType: string;
+  endToEndId: string;
+}
+
 export interface TazamaPayload {
   transaction: any;
   TxTp: string;
@@ -401,7 +411,7 @@ export class DemsEngineService {
    * @param endToEndId The end-to-end ID for the transaction
    * @param transactionRelationship The transaction relationship data
    */
-  private async saveTransactionDataAndNotify(tazamaPayload: TazamaPayload, transactionType: string, endToEndId: string): Promise<void> {
+  async saveTransactionDataAndNotify(tazamaPayload: TazamaPayload, transactionType: string, endToEndId: string): Promise<void> {
     try {
       await Promise.all([
         this.databaseOperationsService.saveTransactionHistory(tazamaPayload, `${transactionType}_${endToEndId}`),
@@ -464,7 +474,7 @@ export class DemsEngineService {
     };
   }
 
-  async handleMessage(payload: { any }, endpoint: string, tenantId: string): Promise<any> {
+  async handleMessage(payload: { any }, endpoint: string, tenantId: string): Promise<ErrorResponse | ProcessingResult> {
     try {
       const result = await this.findSchemaAndMapping(endpoint);
       if (!result) {
@@ -495,18 +505,15 @@ export class DemsEngineService {
 
       const tazamaPayload = this.buildTazamaPayload(enhancedRequest, transactionType, tenantId, dataCache);
 
-      try {
-        await this.saveTransactionDataAndNotify(tazamaPayload, transactionType, endToEndId);
-      } catch (error) {
-        this.loggerService.error(`Failed to save transaction data or notify: ${String(error)}`);
-        return this.buildErrorResponse('Error saving transaction data or sending notification', [
-          `Transaction processing failed: ${String(error)}`,
-        ]);
-      }
-      this.loggerService.log(' transaction relationship', JSON.stringify(transactionRelationship));
-      this.loggerService.log('data cache', dataCache);
-
-      return this.buildSuccessResponse(configuredSchema, tazamaPayload, transactionRelationship, dataCache);
+      return {
+        success: true,
+        configuredSchema,
+        tazamaPayload,
+        transactionRelationship,
+        dataCache,
+        transactionType,
+        endToEndId,
+      };
     } catch (error) {
       this.loggerService.error(`Unexpected error in handleMessage: ${String(error)}`);
       return this.buildErrorResponse('Unexpected error occurred while processing message', [`Internal error: ${String(error)}`]);
