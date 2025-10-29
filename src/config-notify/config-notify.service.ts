@@ -10,7 +10,7 @@ enum Status {
 }
 
 interface NatsMessage {
-  transactionId: string; // This will be the config.id from database
+  transactionID: string; // This will be the config.id from database
 }
 
 interface CacheData {
@@ -74,12 +74,12 @@ export class ConfigNotifyService implements OnModuleInit, OnModuleDestroy {
 
   private async handleNatsMessage(reqObj: unknown, handleResponse: (response: object) => Promise<void>): Promise<void> {
     const message = reqObj as NatsMessage;
-    this.logger.log(`Received NATS notification for config ID: ${message.transactionId}`);
+    this.logger.log(`Received NATS notification for config ID: ${message.transactionID}`);
 
     try {
       const result = await this.databaseService.query<CacheData>(
         'SELECT endpoint_path AS "endpointPath", schema, mapping, functions FROM config WHERE id = $1',
-        [message.transactionId],
+        [message.transactionID],
       );
       const config = result.rows[0];
 
@@ -87,19 +87,19 @@ export class ConfigNotifyService implements OnModuleInit, OnModuleDestroy {
         await this.setCache(config);
         this.logger.log(`Updated cache for key: ${config.endpointPath}`);
       } else {
-        this.logger.warn(`Config not found for ID: ${message.transactionId}`);
+        this.logger.warn(`Config not found for ID: ${message.transactionID}`);
       }
 
       await handleResponse({
-        transactionId: message.transactionId,
+        transactionID: message.transactionID,
         status: Status.ACK,
         timestamp: new Date().toISOString(),
       });
-      this.logger.log(`ACK sent successfully for transaction: ${message.transactionId}`);
+      this.logger.log(`ACK sent successfully for transaction: ${message.transactionID}`);
     } catch (error) {
       this.logger.error(`Error processing message: ${String(error)}`);
       await handleResponse({
-        transactionId: message.transactionId,
+        transactionID: message.transactionID,
         status: Status.NACK,
         error: error instanceof Error ? error.message : String(error),
         timestamp: new Date().toISOString(),
