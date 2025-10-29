@@ -8,6 +8,7 @@ import { NatsModule } from './nats/nats.module';
 import { DemsEngineModule } from './dems-engine/dems-engine.module';
 import { AuthModule } from './auth/auth.module';
 import { DatabaseModule } from './database/database.module';
+import { ApmModule } from './apm/apm.module';
 import { validateEnvironment } from './config/env.validation';
 
 @Module({
@@ -18,6 +19,7 @@ import { validateEnvironment } from './config/env.validation';
       cache: true,
       validate: validateEnvironment,
     }),
+    ApmModule,
     DatabaseModule,
     ConfigNotifyModule,
     LoggerModule,
