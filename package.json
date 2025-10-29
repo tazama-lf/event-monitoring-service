@@ -32,19 +32,22 @@
     "@tazama-lf/frms-coe-lib": "6.0.0-rc.9",
     "@tazama-lf/frms-coe-startup-lib": "3.0.0-rc.1",
     "@types/jsonwebtoken": "^9.0.10",
+    "@types/xml2js": "^0.4.14",
     "ajv": "^8.17.1",
     "ajv-formats": "^3.0.1",
     "axios": "^1.12.2",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.2",
     "dotenv": "^17.2.2",
+    "express": "^5.1.0",
     "jsonwebtoken": "^9.0.2",
     "nats": "^2.29.3",
     "node-cache": "^5.1.2",
     "pg": "^8.16.3",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
-    "uuid": "^13.0.0"
+    "uuid": "^13.0.0",
+    "xml2js": "^0.6.2"
   },
   "devDependencies": {
     "@eslint-community/eslint-plugin-eslint-comments": "^4.5.0",

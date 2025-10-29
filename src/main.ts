@@ -4,6 +4,7 @@ import { NestFactory } from '@nestjs/core';
 import { ConfigService } from '@nestjs/config';
 import { AppModule } from './app.module';
 import { ValidationPipe } from '@nestjs/common';
+import * as express from 'express';
 config();
 
 const ERROR_EXIT_CODE = 1;
@@ -11,6 +12,13 @@ const ERROR_EXIT_CODE = 1;
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule);
   const configService = app.get(ConfigService);
+
+  // Configure middleware to handle raw XML bodies
+  app.use(
+    express.text({
+      type: ['application/xml', 'text/xml', 'text/plain'],
+    }),
+  );
 
   app.useGlobalPipes(
     new ValidationPipe({

@@ -46,7 +46,7 @@ export class ConfigNotifyService implements OnModuleInit, OnModuleDestroy {
     }
 
     try {
-      await this.natsService.init(this.handleNatsMessage.bind(this) as never, this.logger, [this.consumerStream], this.producerStream);
+      // await this.natsService.init(this.handleNatsMessage.bind(this) as never, this.logger, [this.consumerStream], this.producerStream);
       this.isInitialized = true;
       this.logger.log(`NATS consumer initialized for ${this.consumerStream}`);
 

@@ -16,17 +16,8 @@ interface ErrorResponse {
   schema?: any;
 }
 
-interface SuccessResponse {
-  isMatch: true;
-  message: string;
-  transactionRelationship: any;
-  schema: any;
-  payload: any;
-  dataCache: any;
-}
-
 interface ProcessingResult {
-  success: true;
+  success: boolean;
   configuredSchema: any;
   tazamaPayload: TazamaPayload;
   transactionRelationship: TransactionRelationship;
@@ -455,25 +446,6 @@ export class DemsEngineService {
     };
   }
 
-  /**
-   * Builds a success response object
-   * @param schema The validated schema
-   * @param payload The processed payload
-   * @param dataCache The processed data cache
-   * @returns Formatted success response
-   */
-  private buildSuccessResponse(schema: any, payload: any, transactionRelationship: any, dataCache: any): SuccessResponse {
-    this.loggerService.log('THE END');
-    return {
-      isMatch: true,
-      message: 'Everything is OK!',
-      transactionRelationship,
-      schema,
-      payload,
-      dataCache,
-    };
-  }
-
   async handleMessage(payload: { any }, endpoint: string, tenantId: string): Promise<ErrorResponse | ProcessingResult> {
     try {
       const result = await this.findSchemaAndMapping(endpoint);
@@ -504,6 +476,7 @@ export class DemsEngineService {
       }
 
       const tazamaPayload = this.buildTazamaPayload(enhancedRequest, transactionType, tenantId, dataCache);
+      this.loggerService.log('Successfully built Tazama payload for ED. all ok');
 
       return {
         success: true,
