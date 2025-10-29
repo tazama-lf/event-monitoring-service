@@ -37,6 +37,7 @@ export class DemsEngineController {
       });
     }
     const transformedEndpoint = transformEndpoint(endpoint);
+    let transformedPayload: any;
 
     this.logger.log(
       `Processing request for clientId: ${user.token.clientId}, tenantId: ${user.token.tenantId}, endpoint: ${transformedEndpoint}`,
@@ -48,10 +49,12 @@ export class DemsEngineController {
         explicitArray: false, // Don't wrap single values in arrays
         ignoreAttrs: false, // Include attributes
         mergeAttrs: true, // Merge attributes with element content
-        explicitRoot: false, // Don't include root wrapper
+        explicitRoot: true, // Don't include root wrapper
+        explicitChildren: true,
+        normalize: true,
       };
 
-      const transformedPayload = await new Promise((resolve, reject) => {
+      transformedPayload = await new Promise((resolve, reject) => {
         parseString(payload, options, (err, result) => {
           if (err) {
             console.log('Dems Engine Controller - XML Parsing Error:', err);
@@ -82,6 +85,7 @@ export class DemsEngineController {
         message: result.message,
         differences: result.differences,
         schema: result.schema,
+        payload: transformedPayload,
       });
     }
 
