@@ -56,6 +56,7 @@ export class ConfigNotifyService implements OnModuleInit, OnModuleDestroy {
       const configs = result.rows;
 
       for (const config of configs) {
+        console.log('preloadng', config.endpointPath);
         this.logger.log('Preloading cache for config:', config.endpointPath);
         await this.setCache(config);
       }
