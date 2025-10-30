@@ -10,6 +10,7 @@ import { DatabaseOperationsService } from '../commons';
 import { DatabaseService } from '../database/database.service';
 import { ApmSpan } from '../apm/apm.decorators';
 import { parseString, ParserOptions } from 'xml2js';
+import { returnArrayFieldsFromSchema, replaceObjectsWithArrays, createSchemaAwareNumberProcessor } from '../utils/xml2js.utils';
 
 interface ErrorResponse {
   isMatch: false;
@@ -452,179 +453,6 @@ export class DemsEngineService {
     };
   }
 
-  private async returnArrayFieldsFromSchema(schema: any): Promise<{ arrayFields: string[]; stringFields: string[] }> {
-    const arrayFields: string[] = [];
-    const stringFields: string[] = [];
-
-    const traverseSchema = (obj: any, path: string = '') => {
-      if (!obj || typeof obj !== 'object') {
-        return;
-      }
-
-      // Check if current object has properties
-      if (obj.properties) {
-        for (const [key, value] of Object.entries(obj.properties)) {
-          const currentPath = path ? `${path}.${key}` : key;
-          const property = value as any;
-
-          // Check if this property is an array
-          if (property.type === 'array') {
-            arrayFields.push(currentPath);
-          }
-
-          // Check if this property is a string
-          if (property.type === 'string') {
-            stringFields.push(currentPath);
-          }
-
-          // Recursively check nested objects
-          if (property.type === 'object' && property.properties) {
-            traverseSchema(property, currentPath);
-          }
-
-          // Handle array items that might contain objects
-          if (property.type === 'array' && property.items) {
-            if (property.items.type === 'object' && property.items.properties) {
-              traverseSchema(property.items, currentPath);
-            }
-          }
-
-          // Handle anyOf, oneOf, allOf schemas
-          if (property.anyOf || property.oneOf || property.allOf) {
-            const schemaVariants = property.anyOf || property.oneOf || property.allOf;
-            schemaVariants.forEach((variant: any) => {
-              if (variant.type === 'object' && variant.properties) {
-                traverseSchema(variant, currentPath);
-              }
-            });
-          }
-        }
-      }
-
-      // Handle root level anyOf, oneOf, allOf
-      if (obj.anyOf || obj.oneOf || obj.allOf) {
-        const schemaVariants = obj.anyOf || obj.oneOf || obj.allOf;
-        schemaVariants.forEach((variant: any) => {
-          if (variant.properties) {
-            traverseSchema(variant, path);
-          }
-        });
-      }
-    };
-
-    traverseSchema(schema);
-    return { arrayFields, stringFields };
-  }
-
-  /**
-   * Replaces objects with arrays for fields that are marked as arrays in the schema
-   * and converts numbers back to strings for fields that should be strings
-   * @param payload The payload to modify
-   * @param arrayFields Array of dot-notation paths that should be arrays
-   * @param stringFields Array of dot-notation paths that should be strings
-   * @returns Modified payload with objects converted to arrays and numbers converted to strings where needed
-   */
-  private replaceObjectsWithArrays(payload: any, arrayFields: string[], stringFields: string[]): any {
-    // Create a deep copy to avoid mutating the original payload
-    const modifiedPayload = JSON.parse(JSON.stringify(payload));
-
-    // Handle array conversions
-    arrayFields.forEach((fieldPath) => {
-      this.convertObjectToArrayAtPath(modifiedPayload, fieldPath);
-    });
-
-    // Handle number to string conversions
-    stringFields.forEach((fieldPath) => {
-      this.convertNumberToStringAtPath(modifiedPayload, fieldPath);
-    });
-
-    return modifiedPayload;
-  }
-
-  /**
-   * Converts a number to a string at a specific dot-notation path
-   * @param obj The object to modify
-   * @param path The dot-notation path to the field
-   */
-  private convertNumberToStringAtPath(obj: any, path: string): void {
-    const pathParts = path.split('.');
-    let current = obj;
-
-    // Navigate to the parent of the target field
-    for (let i = 0; i < pathParts.length - 1; i++) {
-      if (current && typeof current === 'object' && current[pathParts[i]]) {
-        current = current[pathParts[i]];
-      } else {
-        // Path doesn't exist in the payload, skip this conversion
-        return;
-      }
-    }
-
-    const targetFieldName = pathParts[pathParts.length - 1];
-
-    // Check if the target field exists and is a number
-    if (current && current[targetFieldName] !== undefined && typeof current[targetFieldName] === 'number') {
-      // Convert the number to a string
-      current[targetFieldName] = String(current[targetFieldName]);
-
-      this.loggerService.log(`Converted field '${path}' from number to string: ${current[targetFieldName]}`);
-    }
-  }
-
-  /**
-   * Converts an object to an array at a specific dot-notation path
-   * @param obj The object to modify
-   * @param path The dot-notation path to the field
-   */
-  private convertObjectToArrayAtPath(obj: any, path: string): void {
-    const pathParts = path.split('.');
-    let current = obj;
-
-    // Navigate to the parent of the target field
-    for (let i = 0; i < pathParts.length - 1; i++) {
-      if (current && typeof current === 'object' && current[pathParts[i]]) {
-        current = current[pathParts[i]];
-      } else {
-        // Path doesn't exist in the payload, skip this conversion
-        return;
-      }
-    }
-
-    const targetFieldName = pathParts[pathParts.length - 1];
-
-    // Check if the target field exists and is an object (not already an array)
-    if (current?.[targetFieldName] && typeof current[targetFieldName] === 'object' && !Array.isArray(current[targetFieldName])) {
-      // Convert the object to an array containing that object
-      current[targetFieldName] = [current[targetFieldName]];
-
-      this.loggerService.log(`Converted field '${path}' from object to array`);
-    }
-  }
-
-  /**
-   * Custom value processor that only converts to numbers if the field is not a string in the schema
-   * @param stringFields Array of dot-notation paths that should remain as strings
-   * @returns A function that processes values based on schema types
-   */
-  private createSchemaAwareNumberProcessor(stringFields: string[]) {
-    return (value: any, name: string, path?: string) => {
-      // Build the full path for the current field
-      const fullPath = path ? `${path}.${name}` : name;
-
-      // If this field is marked as a string in the schema, don't convert to number
-      if (stringFields.some((stringField) => stringField.endsWith(name) || stringField === fullPath)) {
-        return value; // Keep as string
-      }
-
-      // Otherwise, apply number parsing
-      if (typeof value === 'string' && !isNaN(Number(value)) && value.trim() !== '') {
-        return Number(value);
-      }
-
-      return value;
-    };
-  }
-
   @ApmSpan('dems-handle-message')
   async handleMessage(
     payload: { any },
@@ -647,7 +475,7 @@ export class DemsEngineService {
       }
 
       const [configuredSchema] = schemaResult;
-      const { stringFields } = await this.returnArrayFieldsFromSchema(configuredSchema);
+      const { stringFields } = await returnArrayFieldsFromSchema(configuredSchema);
 
       const options: ParserOptions = {
         explicitArray: false, // Don't wrap single values in arrays
@@ -656,7 +484,7 @@ export class DemsEngineService {
         explicitRoot: true, // Don't include root wrapper
         explicitChildren: true,
         normalize: true,
-        valueProcessors: [this.createSchemaAwareNumberProcessor(stringFields)], // Use custom processor
+        valueProcessors: [createSchemaAwareNumberProcessor(stringFields)], // Use custom processor
       };
 
       // xml into json
@@ -686,14 +514,14 @@ export class DemsEngineService {
 
       if (isPayloadXml) {
         // below are all the array fields and string fields in the schema for XML case
-        const { arrayFields, stringFields } = await this.returnArrayFieldsFromSchema(configuredSchema);
+        const { arrayFields, stringFields } = await returnArrayFieldsFromSchema(configuredSchema);
         console.log('These fields are arrays in the schema:', arrayFields);
         console.log('These fields are strings in the schema:', stringFields);
         console.log('-----------------------------------------------------------');
 
         // Convert the transformed payload to ensure array fields are properly formatted
         // Note: We don't need string conversion here anymore since the parser handles it
-        payload = this.replaceObjectsWithArrays(transformedPayload, arrayFields, []);
+        payload = replaceObjectsWithArrays(transformedPayload, arrayFields, [], this.loggerService);
         console.log('Payload after array conversion:', payload);
       }
 
