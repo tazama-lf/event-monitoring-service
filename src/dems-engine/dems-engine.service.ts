@@ -230,7 +230,7 @@ export class DemsEngineService {
             if (type === 'redis') {
               dataCache[destination] = mapping.constantValue;
             }
-            if (type === 'transaction') {
+            if (type === 'transactionDetails') {
               transactionRelationship[destination] = mapping.constantValue;
             }
             continue;
@@ -247,7 +247,7 @@ export class DemsEngineService {
               if (destType === 'redis') {
                 dataCache[dest] = splitValues[j];
               }
-              if (destType === 'transaction') {
+              if (destType === 'transactionDetails') {
                 transactionRelationship[dest] = splitValues[j];
               }
             }
@@ -271,7 +271,7 @@ export class DemsEngineService {
                 dataCacheValue += separator;
               }
             }
-            if (type === 'transaction') {
+            if (type === 'transactionDetails') {
               const value = getValueByPath<string>(payload, sources[i]);
               if (transformation == 'SUM') {
                 const numValue = getValueByPath<number>(payload, sources[i]);
@@ -294,7 +294,7 @@ export class DemsEngineService {
             }
           }
 
-          if (type === 'transaction') {
+          if (type === 'transactionDetails') {
             transactionRelationshipValue += mapping.suffix ? mapping.suffix : '';
             if (transformation == 'SUM') {
               transactionRelationship[destination] = sum.toString();
