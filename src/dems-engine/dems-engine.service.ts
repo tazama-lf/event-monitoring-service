@@ -192,13 +192,13 @@ export class DemsEngineService {
    * @returns Object containing dataCache, transactionRelationship, and endToEndId
    */
   @ApmSpan('dems-process-mappings')
-  private processMappings(
+  private async processMappings(
     payload: any,
     configuredMapping: any,
     endpoint: string,
-  ): { dataCache: any; transactionRelationship: TransactionRelationship; endToEndId: string } {
+  ): Promise<{ dataCache: any; transactionRelationship: TransactionRelationship; endToEndId: string }> {
     const dataCache: any = {};
-    const transactionRelationship: TransactionRelationship = {
+    const transactionRelationship: any = {
       from: '',
       to: '',
       TxTp: '',
@@ -215,22 +215,15 @@ export class DemsEngineService {
     };
     let endToEndId = '';
 
-    // new case: sum and split
-
     if (configuredMapping) {
       try {
         for (const mapping of configuredMapping) {
-          // sources are payload paths from which to extract data
           const sources = mapping.source;
-
-          // redis.dbtrId can be broken down into redis and dbtrId
           const destination = typeof mapping.destination === 'string' ? mapping.destination.split('.')[1] : mapping.destination;
           const type = typeof mapping.destination === 'string' ? mapping.destination.split('.')[0] : mapping.destination;
-
           const separator = mapping.delimiter;
           const transformation = mapping.transformation;
 
-          // dealing with the constant value injection first
           if (mapping.constantValue) {
             if (type === 'redis') {
               dataCache[destination] = mapping.constantValue;
@@ -238,14 +231,12 @@ export class DemsEngineService {
             if (type === 'transaction') {
               transactionRelationship[destination] = mapping.constantValue;
             }
-            continue; // skip to next mapping
+            continue;
           }
 
           if (typeof destination !== 'string' || typeof type !== 'string') {
-            // this means split usecase (therefore destination is an array) - one to many mapping
-
             const sourceValue = getValueByPath<string>(payload, mapping.source[0]);
-            const splitValues = sourceValue.split(mapping.delimiter); // iska first index destination k first index pe...and so on
+            const splitValues = sourceValue.split(mapping.delimiter);
 
             for (let j = 0; j < mapping.destination.length; j++) {
               const dest = mapping.destination[j].split('.')[1];
@@ -258,8 +249,7 @@ export class DemsEngineService {
                 transactionRelationship[dest] = splitValues[j];
               }
             }
-
-            continue; // skip for now
+            continue;
           }
 
           let dataCacheValue = mapping.prefix ? mapping.prefix : '';
@@ -269,14 +259,12 @@ export class DemsEngineService {
           for (let i = 0; i < sources.length; i++) {
             if (type === 'redis') {
               const value = getValueByPath<string>(payload, sources[i]);
-
               if (transformation == 'SUM') {
-                const value: number = getValueByPath<number>(payload, sources[i]);
-                sum += value;
+                const numValue: number = getValueByPath<number>(payload, sources[i]);
+                sum += numValue;
               } else {
                 dataCacheValue += value;
               }
-
               if (i < sources.length - 1) {
                 dataCacheValue += separator;
               }
@@ -284,12 +272,11 @@ export class DemsEngineService {
             if (type === 'transaction') {
               const value = getValueByPath<string>(payload, sources[i]);
               if (transformation == 'SUM') {
-                const value = getValueByPath<number>(payload, sources[i]);
-                sum += value;
+                const numValue = getValueByPath<number>(payload, sources[i]);
+                sum += numValue;
               } else {
                 transactionRelationshipValue += value;
               }
-
               if (i < sources.length - 1) {
                 transactionRelationshipValue += separator;
               }
@@ -313,19 +300,31 @@ export class DemsEngineService {
               transactionRelationship[destination] = transactionRelationshipValue;
             }
 
-            if (destination === 'endToEndId') {
+            // Fix the case sensitivity issue
+            if (destination === 'EndToEndId') {
+              // Changed from 'endToEndId' to 'EndToEndId'
               endToEndId = transactionRelationshipValue;
             }
           }
         }
       } catch (error) {
         this.loggerService.error(`Failed to process mapping data: ${String(error)}`);
+        // Return valid objects even on error
+        return {
+          dataCache,
+          transactionRelationship: transactionRelationship as TransactionRelationship,
+          endToEndId,
+        };
       }
     } else {
       this.loggerService.log(`No mapping configured for endpoint: ${endpoint}`);
     }
 
-    return { dataCache, transactionRelationship, endToEndId };
+    return {
+      dataCache,
+      transactionRelationship: transactionRelationship as TransactionRelationship,
+      endToEndId,
+    };
   }
 
   /**
@@ -473,7 +472,9 @@ export class DemsEngineService {
       const transactionType = extractTransactionType(endpoint);
       const enhancedRequest = { ...payload, TenantId: tenantId, TxTp: transactionType };
 
-      const { dataCache, transactionRelationship, endToEndId } = this.processMappings(enhancedRequest, configuredMapping, endpoint);
+      // Add await here since processMappings is returning a Promise
+      const mappingResult = await this.processMappings(enhancedRequest, configuredMapping, endpoint);
+      const { dataCache, transactionRelationship, endToEndId } = mappingResult;
 
       try {
         await this.executeConfiguredFunctions(enhancedRequest, configuredMapping, configuredFunctions);
