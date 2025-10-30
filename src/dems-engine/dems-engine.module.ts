@@ -7,9 +7,10 @@ import { RedisModule } from '../redis/redis.module';
 import { NatsModule } from '../nats/nats.module';
 import { DatabaseOperationsService } from '../commons';
 import { AuthModule } from '../auth/auth.module';
+import { ApmModule } from '../apm/apm.module';
 
 @Module({
-  imports: [LoggerModule, ConfigModule, RedisModule, NatsModule, AuthModule],
+  imports: [LoggerModule, ConfigModule, RedisModule, NatsModule, AuthModule, ApmModule],
   controllers: [DemsEngineController],
   providers: [DemsEngineService, DatabaseOperationsService],
 })

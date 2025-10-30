@@ -8,6 +8,7 @@ import { NatsService } from '../nats/nats.service';
 import { getValueByPath } from '../utils/has_nested_property';
 import { DatabaseOperationsService } from '../commons';
 import { DatabaseService } from '../database/database.service';
+import { ApmSpan } from '../apm/apm.decorators';
 
 interface ErrorResponse {
   isMatch: false;
@@ -68,6 +69,7 @@ export class DemsEngineService {
     this.timeToLive = this.configService.get<number>('cache.timeToLive', 3600);
   }
 
+  @ApmSpan('dems-find-schema-and-mapping')
   async findSchemaAndMapping(endpoint: string): Promise<FindSchemaAndMappingResult> {
     this.loggerService.log(`Looking up schema for endpoint: ${endpoint}`);
 
@@ -122,6 +124,7 @@ export class DemsEngineService {
    * @param tenantId The tenant ID for logging
    * @returns Validation result with isValid flag and formatted errors
    */
+  @ApmSpan('dems-validate-payload')
   private async validatePayload(
     payload: any,
     configuredSchema: any,
@@ -188,6 +191,7 @@ export class DemsEngineService {
    * @param endpoint The endpoint path for logging
    * @returns Object containing dataCache, transactionRelationship, and endToEndId
    */
+  @ApmSpan('dems-process-mappings')
   private processMappings(
     payload: any,
     configuredMapping: any,
@@ -329,6 +333,7 @@ export class DemsEngineService {
    * @param payload The payload to extract data from
    * @param configuredMapping The mapping configuration containing functions to execute
    */
+  @ApmSpan('dems-execute-configured-functions')
   private async executeConfiguredFunctions(payload: any, configuredMapping: any, configuredFunctions: any): Promise<void> {
     if (configuredFunctions) {
       for (const row of configuredFunctions) {
@@ -402,6 +407,7 @@ export class DemsEngineService {
    * @param endToEndId The end-to-end ID for the transaction
    * @param transactionRelationship The transaction relationship data
    */
+  @ApmSpan('dems-save-transaction-and-notify')
   async saveTransactionDataAndNotify(tazamaPayload: TazamaPayload, transactionType: string, endToEndId: string): Promise<void> {
     try {
       await Promise.all([
@@ -446,6 +452,7 @@ export class DemsEngineService {
     };
   }
 
+  @ApmSpan('dems-handle-message')
   async handleMessage(payload: { any }, endpoint: string, tenantId: string): Promise<ErrorResponse | ProcessingResult> {
     try {
       const result = await this.findSchemaAndMapping(endpoint);
