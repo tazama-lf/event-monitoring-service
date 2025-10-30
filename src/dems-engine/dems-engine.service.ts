@@ -11,6 +11,7 @@ import { DatabaseService } from '../database/database.service';
 import { ApmSpan } from '../apm/apm.decorators';
 import { parseString, ParserOptions } from 'xml2js';
 import { returnArrayFieldsFromSchema, replaceObjectsWithArrays, createSchemaAwareNumberProcessor } from '../utils/xml2js.utils';
+import { randomUUID } from 'crypto';
 
 interface ErrorResponse {
   isMatch: false;
@@ -151,8 +152,7 @@ export class DemsEngineService {
         this.loggerService.warn(`  ${index + 1}. ${difference}`);
       });
 
-      const correlationId = crypto.randomUUID();
-
+      const correlationId = randomUUID();
       await this.databaseOperationsService.saveToQuarantine(payload, endpoint, differences, tenantId, correlationId);
 
       return { isValid: false, differences };
