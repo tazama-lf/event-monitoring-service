@@ -9,6 +9,8 @@ import { getValueByPath } from '../utils/has_nested_property';
 import { DatabaseOperationsService } from '../commons';
 import { DatabaseService } from '../database/database.service';
 import { ApmSpan } from '../apm/apm.decorators';
+import { parseString, ParserOptions } from 'xml2js';
+import { parseNumbers } from 'xml2js/lib/processors';
 
 interface ErrorResponse {
   isMatch: false;
@@ -451,8 +453,155 @@ export class DemsEngineService {
     };
   }
 
+  private async returnArrayFieldsFromSchema(schema: any): Promise<string[]> {
+    const arrayFields: string[] = [];
+
+    const traverseSchema = (obj: any, path: string = '') => {
+      if (!obj || typeof obj !== 'object') {
+        return;
+      }
+
+      // Check if current object has properties
+      if (obj.properties) {
+        for (const [key, value] of Object.entries(obj.properties)) {
+          const currentPath = path ? `${path}.${key}` : key;
+          const property = value as any;
+
+          // Check if this property is an array
+          if (property.type === 'array') {
+            arrayFields.push(currentPath);
+            console.log('Found array field:', currentPath);
+          }
+
+          // Recursively check nested objects
+          if (property.type === 'object' && property.properties) {
+            traverseSchema(property, currentPath);
+          }
+
+          // Handle array items that might contain objects
+          if (property.type === 'array' && property.items) {
+            if (property.items.type === 'object' && property.items.properties) {
+              traverseSchema(property.items, currentPath);
+            }
+          }
+
+          // Handle anyOf, oneOf, allOf schemas
+          if (property.anyOf || property.oneOf || property.allOf) {
+            const schemaVariants = property.anyOf || property.oneOf || property.allOf;
+            schemaVariants.forEach((variant: any) => {
+              if (variant.type === 'object' && variant.properties) {
+                traverseSchema(variant, currentPath);
+              }
+            });
+          }
+        }
+      }
+
+      // Handle root level anyOf, oneOf, allOf
+      if (obj.anyOf || obj.oneOf || obj.allOf) {
+        const schemaVariants = obj.anyOf || obj.oneOf || obj.allOf;
+        schemaVariants.forEach((variant: any) => {
+          if (variant.properties) {
+            traverseSchema(variant, path);
+          }
+        });
+      }
+    };
+
+    traverseSchema(schema);
+    return arrayFields;
+  }
+
+  /**
+   * Replaces objects with arrays for fields that are marked as arrays in the schema
+   * @param payload The payload to modify
+   * @param arrayFields Array of dot-notation paths that should be arrays
+   * @returns Modified payload with objects converted to arrays where needed
+   */
+  private replaceObjectsWithArrays(payload: any, arrayFields: string[]): any {
+    // Create a deep copy to avoid mutating the original payload
+    const modifiedPayload = JSON.parse(JSON.stringify(payload));
+
+    arrayFields.forEach((fieldPath) => {
+      this.convertObjectToArrayAtPath(modifiedPayload, fieldPath);
+    });
+
+    return modifiedPayload;
+  }
+
+  /**
+   * Converts an object to an array at a specific dot-notation path
+   * @param obj The object to modify
+   * @param path The dot-notation path to the field
+   */
+  private convertObjectToArrayAtPath(obj: any, path: string): void {
+    const pathParts = path.split('.');
+    let current = obj;
+
+    // Navigate to the parent of the target field
+    for (let i = 0; i < pathParts.length - 1; i++) {
+      if (current && typeof current === 'object' && current[pathParts[i]]) {
+        current = current[pathParts[i]];
+      } else {
+        // Path doesn't exist in the payload, skip this conversion
+        return;
+      }
+    }
+
+    const targetFieldName = pathParts[pathParts.length - 1];
+
+    // Check if the target field exists and is an object (not already an array)
+    if (current?.[targetFieldName] && typeof current[targetFieldName] === 'object' && !Array.isArray(current[targetFieldName])) {
+      // Convert the object to an array containing that object
+      current[targetFieldName] = [current[targetFieldName]];
+
+      this.loggerService.log(`Converted field '${path}' from object to array`);
+    }
+  }
+
   @ApmSpan('dems-handle-message')
-  async handleMessage(payload: { any }, endpoint: string, tenantId: string): Promise<ErrorResponse | ProcessingResult> {
+  async handleMessage(
+    payload: { any },
+    endpoint: string,
+    tenantId: string,
+    isPayloadXml: boolean,
+  ): Promise<ErrorResponse | ProcessingResult> {
+    let transformedPayload: any; //contains the XML --> JSON converted payload
+
+    console.log('Dems Engine Service - Received isxml status:', isPayloadXml);
+
+    if (isPayloadXml) {
+      console.log('----------------------------------------------------------------------------------------------');
+      console.log('Dems Engine service - Parsing XML Payload', payload);
+
+      const options: ParserOptions = {
+        explicitArray: false, // Don't wrap single values in arrays
+        ignoreAttrs: false, // Include attributes
+        mergeAttrs: true, // Merge attributes with element content
+        explicitRoot: true, // Don't include root wrapper
+        explicitChildren: true,
+        normalize: true,
+        valueProcessors: [parseNumbers],
+      };
+
+      // xml into json
+      // payload || schema
+      transformedPayload = await new Promise((resolve, reject) => {
+        parseString(payload, options, (err, result) => {
+          if (err) {
+            console.log('XML Parsing Error:', err);
+            reject(err);
+          } else {
+            resolve(result);
+          }
+        });
+      });
+      // I need to modify the transformedPayload
+      // need to see from schema that which fields are type:array
+      console.log('Converted Payload into JSON:', transformedPayload);
+      console.log('----------------------------------------------------------------------------------------------');
+    }
+
     try {
       const result = await this.findSchemaAndMapping(endpoint);
       if (!result) {
@@ -460,6 +609,18 @@ export class DemsEngineService {
       }
 
       const [configuredSchema, configuredMapping, configuredFunctions] = result;
+      console.log('-----------------------------------------------------------');
+
+      if (isPayloadXml) {
+        // below are all the array fields in the schema for XML case
+        const arrayFields = await this.returnArrayFieldsFromSchema(configuredSchema);
+        console.log('These fields are arrays in the schema:', arrayFields);
+        console.log('-----------------------------------------------------------');
+
+        // Convert the transformed payload to ensure array fields are properly formatted
+        payload = this.replaceObjectsWithArrays(transformedPayload, arrayFields);
+        console.log('Payload after array conversion:', payload);
+      }
 
       const validationResult = await this.validatePayload(payload, configuredSchema, endpoint, tenantId);
       if (!validationResult.isValid) {
@@ -489,7 +650,7 @@ export class DemsEngineService {
       return {
         success: true,
         configuredSchema,
-        tazamaPayload,
+        tazamaPayload: isPayloadXml ? transformedPayload : tazamaPayload,
         transactionRelationship,
         dataCache,
         transactionType,

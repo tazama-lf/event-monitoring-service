@@ -6,7 +6,6 @@ import { TazamaAuthGuard } from '../auth/tazama-auth.guard';
 import { RequireDemsWriteRole } from '../auth/auth.decorator';
 import { User } from '../auth/user.decorator';
 import { AuthenticatedUser } from '../auth/auth.types';
-import { parseString, ParserOptions } from 'xml2js';
 
 @Controller('/dems-engine')
 @UseGuards(TazamaAuthGuard)
@@ -31,43 +30,23 @@ export class DemsEngineController {
     payload: any;
     statusCode: number;
   }> {
+    let isPayloadXml = false;
     if (isValidEndpointFormat(endpoint) === false) {
       throw new BadRequestException({
         message: 'Invalid endpoint format. Endpoint must be a non-empty string containing commas.',
       });
     }
     const transformedEndpoint = transformEndpoint(endpoint);
-    let transformedPayload: any;
 
     this.logger.log(
       `Processing request for clientId: ${user.token.clientId}, tenantId: ${user.token.tenantId}, endpoint: ${transformedEndpoint}`,
     );
 
-    console.log('Dems Engine Controller - Received Payload:', req.headers['content-type']);
     if (req.headers['content-type'] === 'application/xml' || req.headers['content-type'] === 'text/xml') {
-      const options: ParserOptions = {
-        explicitArray: false, // Don't wrap single values in arrays
-        ignoreAttrs: false, // Include attributes
-        mergeAttrs: true, // Merge attributes with element content
-        explicitRoot: true, // Don't include root wrapper
-        explicitChildren: true,
-        normalize: true,
-      };
-
-      transformedPayload = await new Promise((resolve, reject) => {
-        parseString(payload, options, (err, result) => {
-          if (err) {
-            console.log('Dems Engine Controller - XML Parsing Error:', err);
-            reject(err);
-          } else {
-            resolve(result);
-          }
-        });
-      });
-      console.log('Dems Engine Controller - Converted Payload:', transformedPayload);
+      isPayloadXml = true;
     }
 
-    const result = await this.demsEngineService.handleMessage(payload, transformedEndpoint, user.token.tenantId);
+    const result = await this.demsEngineService.handleMessage(payload, transformedEndpoint, user.token.tenantId, isPayloadXml);
     console.log('Dems Engine Controller - Result:', result);
 
     if (!('success' in result)) {
@@ -85,7 +64,6 @@ export class DemsEngineController {
         message: result.message,
         differences: result.differences,
         schema: result.schema,
-        payload: transformedPayload,
       });
     }
 
