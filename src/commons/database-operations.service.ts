@@ -115,13 +115,13 @@ export class DatabaseOperationsService {
 
   async saveTransactionHistory(transaction: TazamaPayload, key: string): Promise<void> {
     const txtp = transaction.TxTp.replace('.', '').toLowerCase();
-    const destination = `${txtp}`;
+
     try {
-      await this.databaseService.query(`INSERT INTO ${destination} (document) VALUES ($1)`, [transaction.transaction]);
+      await this.databaseService.query(`INSERT INTO ${txtp} (document) VALUES ($1)`, [transaction.transaction]);
       this.loggerService.log(`Saved transaction history with key: ${key}`);
     } catch (error) {
       this.handleDatabaseError(error, 'save transaction history', {
-        details: `key ${key}, table ${destination}`,
+        details: `key ${key}, table ${txtp}`,
       });
     }
   }
