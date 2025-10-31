@@ -12,6 +12,7 @@ import { ApmSpan } from '../apm/apm.decorators';
 import { parseString, ParserOptions } from 'xml2js';
 import { returnArrayFieldsFromSchema, replaceObjectsWithArrays, createSchemaAwareNumberProcessor } from '../utils/xml2js.utils';
 import { randomUUID } from 'crypto';
+import { TransactionDetails } from '../interfaces/iTransactionRelationship';
 
 interface ErrorResponse {
   isMatch: false;
@@ -24,7 +25,7 @@ interface ProcessingResult {
   success: boolean;
   configuredSchema: any;
   tazamaPayload: TazamaPayload;
-  transactionRelationship: TransactionRelationship;
+  transactionRelationship: TransactionDetails;
   dataCache: any;
   transactionType: string;
   endToEndId: string;
@@ -34,22 +35,6 @@ export interface TazamaPayload {
   transaction: any;
   TxTp: string;
   dataCache: any;
-}
-
-export interface TransactionRelationship {
-  from: string;
-  to: string;
-  TxTp: string;
-  MsgId: string;
-  CreDtTm: string;
-  Amt?: string;
-  Ccy?: string;
-  PmtInfId: string;
-  EndToEndId: string;
-  lat?: string;
-  long?: string;
-  TxSts?: string;
-  TenantId: string;
 }
 
 type FindSchemaAndMappingResult = [any, any, any] | null;
@@ -198,22 +183,21 @@ export class DemsEngineService {
     payload: any,
     configuredMapping: any,
     endpoint: string,
-  ): Promise<{ dataCache: any; transactionRelationship: TransactionRelationship; endToEndId: string }> {
+  ): Promise<{ dataCache: any; transactionRelationship: TransactionDetails; endToEndId: string }> {
     const dataCache: any = {};
-    const transactionRelationship: any = {
-      from: '',
-      to: '',
+    const transactionRelationship: TransactionDetails = {
+      source: '',
+      destination: '',
       TxTp: '',
+      TenantId: '',
       MsgId: '',
       CreDtTm: '',
       Amt: '',
       Ccy: '',
-      PmtInfId: '',
       EndToEndId: '',
       lat: '',
       long: '',
       TxSts: '',
-      TenantId: '',
     };
     let endToEndId = '';
 
@@ -314,7 +298,7 @@ export class DemsEngineService {
         // Return valid objects even on error
         return {
           dataCache,
-          transactionRelationship: transactionRelationship as TransactionRelationship,
+          transactionRelationship: transactionRelationship,
           endToEndId,
         };
       }
@@ -324,7 +308,7 @@ export class DemsEngineService {
 
     return {
       dataCache,
-      transactionRelationship: transactionRelationship as TransactionRelationship,
+      transactionRelationship: transactionRelationship,
       endToEndId,
     };
   }
@@ -406,7 +390,7 @@ export class DemsEngineService {
    * @param tazamaPayload The Tazama payload to process
    * @param transactionType The transaction type
    * @param endToEndId The end-to-end ID for the transaction
-   * @param transactionRelationship The transaction relationship data
+   * @param TransactionDetails The transaction relationship data
    */
   @ApmSpan('dems-save-transaction-and-notify')
   async saveTransactionDataAndNotify(tazamaPayload: TazamaPayload, transactionType: string, endToEndId: string): Promise<void> {

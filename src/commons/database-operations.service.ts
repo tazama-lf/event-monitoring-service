@@ -1,10 +1,11 @@
 import { Injectable, BadRequestException, InternalServerErrorException, ConflictException } from '@nestjs/common';
 import { LoggerService } from '@tazama-lf/frms-coe-lib';
 import { DatabaseService } from '../database/database.service';
-import { TazamaPayload, TransactionRelationship } from '../dems-engine/dems-engine.service';
+import { TazamaPayload } from '../dems-engine/dems-engine.service';
 import { randomUUID } from 'crypto';
 import { ErrorPattern } from '../interfaces/iErrorPattern';
 import { QuarantineStatus } from '../enums/quarantineStatus.enum';
+import { TransactionDetails } from '../interfaces/iTransactionRelationship';
 
 @Injectable()
 export class DatabaseOperationsService {
@@ -127,23 +128,25 @@ export class DatabaseOperationsService {
     }
   }
 
-  async saveTransactionRelationship(relationship: TransactionRelationship): Promise<void> {
-    if (!relationship.from || !relationship.to) {
-      this.loggerService.error(`Missing required fields in transaction relationship: from=${relationship.from}, to=${relationship.to}`);
+  async saveTransactionRelationship(relationship: TransactionDetails): Promise<void> {
+    if (!relationship.source || !relationship.destination) {
+      this.loggerService.error(
+        `Missing required fields in transaction relationship: from=${relationship.source}, to=${relationship.destination}`,
+      );
       throw new BadRequestException('Transaction relationship must have both source and destination');
     }
 
     try {
       await this.databaseService.query('INSERT INTO transaction (source, destination, transaction) VALUES ($1, $2, $3)', [
-        relationship.from,
-        relationship.to,
+        relationship.source,
+        relationship.destination,
         relationship,
       ]);
 
-      this.loggerService.log(`Saved transaction relationship: ${relationship.from} -> ${relationship.to}`);
+      this.loggerService.log(`Saved transaction relationship: ${relationship.source} -> ${relationship.destination}`);
     } catch (error) {
       this.handleDatabaseError(error, 'save transaction relationship', {
-        details: `${relationship.from} -> ${relationship.to}`,
+        details: `${relationship.source} -> ${relationship.destination}`,
       });
     }
   }

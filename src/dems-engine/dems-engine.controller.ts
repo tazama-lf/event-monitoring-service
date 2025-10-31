@@ -1,11 +1,12 @@
 import { BadRequestException, Body, Controller, UseGuards, HttpStatus, NotFoundException, Param, Post, Req } from '@nestjs/common';
-import { DemsEngineService, TransactionRelationship } from './dems-engine.service';
+import { DemsEngineService } from './dems-engine.service';
 import { LoggerService } from '@tazama-lf/frms-coe-lib';
 import { isValidEndpointFormat, transformEndpoint } from '../utils/transform_endpoint';
 import { TazamaAuthGuard } from '../auth/tazama-auth.guard';
 import { RequireDemsWriteRole } from '../auth/auth.decorator';
 import { User } from '../auth/user.decorator';
 import { AuthenticatedUser } from '../auth/auth.types';
+import { TransactionDetails } from '../interfaces/iTransactionRelationship';
 
 @Controller('/dems-engine')
 @UseGuards(TazamaAuthGuard)
@@ -25,7 +26,7 @@ export class DemsEngineController {
   ): Promise<{
     message: string;
     isMatch: boolean;
-    transactionRelationship: TransactionRelationship;
+    transactionRelationship: TransactionDetails;
     schema: any;
     payload: any;
     statusCode: number;
