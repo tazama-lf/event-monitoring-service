@@ -4,10 +4,7 @@ import { DatabaseService } from '../database/database.service';
 import { TazamaPayload, TransactionRelationship } from '../dems-engine/dems-engine.service';
 import { randomUUID } from 'crypto';
 import { ErrorPattern } from '../interfaces/iErrorPattern';
-
-const enum QuarantineStatus {
-  FAILED = 'failed',
-}
+import { QuarantineStatus } from '../enums/quarantineStatus.enum';
 
 @Injectable()
 export class DatabaseOperationsService {

@@ -3,22 +3,9 @@ import { ConfigService } from '@nestjs/config';
 import { LoggerService, RedisService } from '@tazama-lf/frms-coe-lib';
 import { StartupFactory } from '@tazama-lf/frms-coe-startup-lib';
 import { DatabaseService } from '../database/database.service';
-
-enum Status {
-  ACK = 'ACK',
-  NACK = 'NACK',
-}
-
-interface NatsMessage {
-  transactionID: string; // This will be the config.id from database
-}
-
-interface CacheData {
-  endpointPath: string;
-  schema: object;
-  mapping: object;
-  functions: object;
-}
+import { Status } from '../enums/configNotifyStatus.enum';
+import { CacheData } from '../interfaces/iCacheData';
+import { NatsMessage } from '../interfaces/iNatsMessage';
 
 @Injectable()
 export class ConfigNotifyService implements OnModuleInit, OnModuleDestroy {
