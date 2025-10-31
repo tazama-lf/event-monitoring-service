@@ -1,11 +1,11 @@
 import { Injectable, BadRequestException, InternalServerErrorException, ConflictException } from '@nestjs/common';
 import { LoggerService } from '@tazama-lf/frms-coe-lib';
 import { DatabaseService } from '../database/database.service';
-import { TazamaPayload } from '../dems-engine/dems-engine.service';
 import { randomUUID } from 'crypto';
 import { ErrorPattern } from '../interfaces/iErrorPattern';
 import { QuarantineStatus } from '../enums/quarantineStatus.enum';
 import { TransactionDetails } from '../interfaces/iTransactionRelationship';
+import { TazamaPayload } from '../interfaces/iTazamaPayload';
 
 @Injectable()
 export class DatabaseOperationsService {

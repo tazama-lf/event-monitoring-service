@@ -13,30 +13,9 @@ import { parseString, ParserOptions } from 'xml2js';
 import { returnArrayFieldsFromSchema, replaceObjectsWithArrays, createSchemaAwareNumberProcessor } from '../utils/xml2js.utils';
 import { randomUUID } from 'crypto';
 import { TransactionDetails } from '../interfaces/iTransactionRelationship';
-
-interface ErrorResponse {
-  isMatch: false;
-  message: string;
-  differences: string[];
-  schema?: any;
-}
-
-interface ProcessingResult {
-  success: boolean;
-  configuredSchema: any;
-  tazamaPayload: TazamaPayload;
-  transactionRelationship: TransactionDetails;
-  dataCache: any;
-  transactionType: string;
-  endToEndId: string;
-}
-
-export interface TazamaPayload {
-  transaction: any;
-  TxTp: string;
-  dataCache: any;
-}
-
+import { ErrorResponse } from '../interfaces/iErrorResponse';
+import { ProcessingResult } from '../interfaces/iProcessingResult';
+import { TazamaPayload } from '../interfaces/iTazamaPayload';
 type FindSchemaAndMappingResult = [any, any, any] | null;
 
 @Injectable()

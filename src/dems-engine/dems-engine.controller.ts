@@ -1,4 +1,5 @@
-import { BadRequestException, Body, Controller, UseGuards, HttpStatus, NotFoundException, Param, Post, Req } from '@nestjs/common';
+import { BadRequestException, Body, Controller, UseGuards, Param, Post, Req } from '@nestjs/common';
+import { Request } from 'express';
 import { DemsEngineService } from './dems-engine.service';
 import { LoggerService } from '@tazama-lf/frms-coe-lib';
 import { isValidEndpointFormat, transformEndpoint } from '../utils/transform_endpoint';
@@ -6,7 +7,8 @@ import { TazamaAuthGuard } from '../auth/tazama-auth.guard';
 import { RequireDemsWriteRole } from '../auth/auth.decorator';
 import { User } from '../auth/user.decorator';
 import { AuthenticatedUser } from '../auth/auth.types';
-import { TransactionDetails } from '../interfaces/iTransactionRelationship';
+import { MessageHandlerResponse } from '../interfaces/iMessagerHandlerResponse';
+import { isXmlContentType } from '../utils/xml2js.utils';
 
 @Controller('/dems-engine')
 @UseGuards(TazamaAuthGuard)
@@ -22,16 +24,8 @@ export class DemsEngineController {
     @Param('endpoint') endpoint: string,
     @Body() payload: any,
     @User() user: AuthenticatedUser,
-    @Req() req: any,
-  ): Promise<{
-    message: string;
-    isMatch: boolean;
-    transactionRelationship: TransactionDetails;
-    schema: any;
-    payload: any;
-    statusCode: number;
-  }> {
-    let isPayloadXml = false;
+    @Req() req: Request,
+  ): Promise<MessageHandlerResponse> {
     if (isValidEndpointFormat(endpoint) === false) {
       throw new BadRequestException({
         message: 'Invalid endpoint format. Endpoint must be a non-empty string containing commas.',
@@ -43,23 +37,13 @@ export class DemsEngineController {
       `Processing request for clientId: ${user.token.clientId}, tenantId: ${user.token.tenantId}, endpoint: ${transformedEndpoint}`,
     );
 
-    if (req.headers['content-type'] === 'application/xml' || req.headers['content-type'] === 'text/xml') {
-      isPayloadXml = true;
-    }
+    const isPayloadXml = isXmlContentType(req);
 
     const result = await this.demsEngineService.handleMessage(payload, transformedEndpoint, user.token.tenantId, isPayloadXml);
-    console.log('Dems Engine Controller - Result:', result);
+    this.logger.log('Dems Engine Controller - Result:', JSON.stringify(result));
 
     if (!('success' in result)) {
       this.logger.log(`Problem is: ${result.message}`);
-
-      if (result.message === 'Schema not found for the specified endpoint') {
-        throw new NotFoundException({
-          message: result.message,
-          differences: result.differences,
-          schema: result.schema,
-        });
-      }
 
       throw new BadRequestException({
         message: result.message,
@@ -79,7 +63,7 @@ export class DemsEngineController {
     }
 
     this.logger.log(' transaction relationship', JSON.stringify(result.transactionRelationship));
-    this.logger.log('data cache', result.dataCache);
+    this.logger.log('data cache', JSON.stringify(result.dataCache));
 
     return {
       message: 'Everything is OK!',
@@ -87,7 +71,6 @@ export class DemsEngineController {
       transactionRelationship: result.transactionRelationship,
       schema: result.configuredSchema,
       payload: result.tazamaPayload,
-      statusCode: HttpStatus.OK,
     };
   }
 }

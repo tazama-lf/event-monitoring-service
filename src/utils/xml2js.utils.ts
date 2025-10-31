@@ -1,4 +1,5 @@
 import { LoggerService } from '@tazama-lf/frms-coe-lib';
+import { Request } from 'express';
 
 /**
  * Utility functions for XML2JS processing and schema-based transformations
@@ -187,4 +188,8 @@ export function createSchemaAwareNumberProcessor(stringFields: string[]) {
 
     return value;
   };
+}
+
+export function isXmlContentType(req: Request): boolean {
+  return req.headers['content-type'] === 'application/xml';
 }
