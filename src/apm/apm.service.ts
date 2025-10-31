@@ -39,12 +39,4 @@ export class ApmService implements OnModuleInit {
   startSpan(name: string): Span | null {
     return this.apm.startSpan(name);
   }
-
-  /**
-   * Get current trace parent for distributed tracing
-   * @returns Trace parent string or null if not available
-   */
-  getCurrentTraceparent(): string | null {
-    return this.apm.getCurrentTraceparent();
-  }
 }

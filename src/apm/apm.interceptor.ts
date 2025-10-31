@@ -5,7 +5,7 @@ import { Observable, throwError } from 'rxjs';
 import { tap, catchError } from 'rxjs/operators';
 import { ApmService } from './apm.service';
 import apm, { type Transaction } from 'elastic-apm-node';
-import type { Request } from 'express';
+import type { Request, Response } from 'express';
 
 @Injectable()
 export class ApmInterceptor implements NestInterceptor {
@@ -13,7 +13,7 @@ export class ApmInterceptor implements NestInterceptor {
 
   intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
     const request = context.switchToHttp().getRequest<Request>();
-    const response = context.switchToHttp().getResponse();
+    const response = context.switchToHttp().getResponse<Response>();
 
     // Create transaction name based on HTTP method and route
     const routePath = request.route?.path || request.url;
