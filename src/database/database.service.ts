@@ -19,7 +19,7 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
     const dbConfig = this.configService.get<DatabaseConfig>('database');
 
     if (!dbConfig) {
-      throw new Error('Database configuration not found');
+      throw new Error('Database configuration not found in database.service');
     }
 
     this.pool = new Pool({
