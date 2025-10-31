@@ -1,5 +1,6 @@
 import { LoggerService } from '@tazama-lf/frms-coe-lib';
 import { Request } from 'express';
+import { ReturnArrayFieldsFromSchema } from '../interfaces/iXml2js.interfaces';
 
 /**
  * Utility functions for XML2JS processing and schema-based transformations
@@ -11,10 +12,7 @@ import { Request } from 'express';
  * @param loggerService Logger service for error logging
  * @returns Object containing arrays of field paths for arrays and strings
  */
-export async function returnArrayFieldsFromSchema(
-  schema: any,
-  loggerService?: LoggerService,
-): Promise<{ arrayFields: string[]; stringFields: string[] }> {
+export async function returnArrayFieldsFromSchema(schema: any, loggerService?: LoggerService): Promise<ReturnArrayFieldsFromSchema> {
   try {
     const arrayFields: string[] = [];
     const stringFields: string[] = [];
@@ -24,43 +22,40 @@ export async function returnArrayFieldsFromSchema(
         return;
       }
 
-      // Check if current object has properties
-      if (obj.properties) {
-        for (const [key, value] of Object.entries(obj.properties)) {
-          const currentPath = path ? `${path}.${key}` : key;
-          const property = value as any;
+      for (const [key, value] of Object.entries(obj.properties)) {
+        const currentPath = path ? `${path}.${key}` : key;
+        const property = value as any;
 
-          // Check if this property is an array
-          if (property.type === 'array') {
-            arrayFields.push(currentPath);
+        // Check if this property is an array
+        if (property.type === 'array') {
+          arrayFields.push(currentPath);
+        }
+
+        // Check if this property is a string
+        if (property.type === 'string') {
+          stringFields.push(currentPath);
+        }
+
+        // Recursively check nested objects
+        if (property.type === 'object' && property.properties) {
+          traverseSchema(property, currentPath);
+        }
+
+        // Handle array items that might contain objects
+        if (property.type === 'array' && property.items) {
+          if (property.items.type === 'object' && property.items.properties) {
+            traverseSchema(property.items, currentPath);
           }
+        }
 
-          // Check if this property is a string
-          if (property.type === 'string') {
-            stringFields.push(currentPath);
-          }
-
-          // Recursively check nested objects
-          if (property.type === 'object' && property.properties) {
-            traverseSchema(property, currentPath);
-          }
-
-          // Handle array items that might contain objects
-          if (property.type === 'array' && property.items) {
-            if (property.items.type === 'object' && property.items.properties) {
-              traverseSchema(property.items, currentPath);
+        // Handle anyOf, oneOf, allOf schemas
+        if (property.anyOf || property.oneOf || property.allOf) {
+          const schemaVariants = property.anyOf || property.oneOf || property.allOf;
+          schemaVariants.forEach((variant: any) => {
+            if (variant.type === 'object' && variant.properties) {
+              traverseSchema(variant, currentPath);
             }
-          }
-
-          // Handle anyOf, oneOf, allOf schemas
-          if (property.anyOf || property.oneOf || property.allOf) {
-            const schemaVariants = property.anyOf || property.oneOf || property.allOf;
-            schemaVariants.forEach((variant: any) => {
-              if (variant.type === 'object' && variant.properties) {
-                traverseSchema(variant, currentPath);
-              }
-            });
-          }
+          });
         }
       }
 
@@ -99,7 +94,7 @@ export async function returnArrayFieldsFromSchema(
 export function replaceObjectsWithArrays(payload: any, arrayFields: string[], stringFields: string[], loggerService?: LoggerService): any {
   try {
     // Create a deep copy to avoid mutating the original payload
-    const modifiedPayload = JSON.parse(JSON.stringify(payload));
+    const modifiedPayload = structuredClone(payload);
 
     // Handle array conversions
     arrayFields.forEach((fieldPath) => {
@@ -135,7 +130,7 @@ export function convertNumberToStringAtPath(obj: any, path: string, loggerServic
 
     // Navigate to the parent of the target field
     for (let i = 0; i < pathParts.length - 1; i++) {
-      if (current && typeof current === 'object' && current[pathParts[i]]) {
+      if (current && typeof current === 'object' && !Array.isArray(current) && current[pathParts[i]]) {
         current = current[pathParts[i]];
       } else {
         // Path doesn't exist in the payload, skip this conversion
@@ -175,7 +170,7 @@ export function convertObjectToArrayAtPath(obj: any, path: string, loggerService
 
     // Navigate to the parent of the target field
     for (let i = 0; i < pathParts.length - 1; i++) {
-      if (current && typeof current === 'object' && current[pathParts[i]]) {
+      if (current && typeof current === 'object' && !Array.isArray(current) && current[pathParts[i]]) {
         current = current[pathParts[i]];
       } else {
         // Path doesn't exist in the payload, skip this conversion
@@ -208,30 +203,13 @@ export function convertObjectToArrayAtPath(obj: any, path: string, loggerService
  * @param loggerService Optional logger service for logging
  * @returns A function that processes values based on schema types
  */
-export function createSchemaAwareNumberProcessor(stringFields: string[], loggerService?: LoggerService) {
-  try {
-    return (value: any, name: string, path?: string) => {
-      // Build the full path for the current field
-      const fullPath = path ? `${path}.${name}` : name;
-
-      // If this field is marked as a string in the schema, don't convert to number
-      if (stringFields.some((stringField) => stringField.endsWith(name) || stringField === fullPath)) {
-        return value; // Keep as string
-      }
-
-      // Otherwise, apply number parsing
-      if (typeof value === 'string' && !isNaN(Number(value)) && value.trim() !== '') {
-        return Number(value);
-      }
-
-      return value;
-    };
-  } catch (error) {
-    if (loggerService) {
-      loggerService.error(`Error in createSchemaAwareNumberProcessor: ${String(error)}. String fields: ${stringFields.join(',')}`);
-    }
-    throw error;
-  }
+export function createSchemaAwareNumberProcessor(stringFields: string[]) {
+  const stringFieldSet = new Set(stringFields);
+  return (value: any, name: string, path = '') => {
+    const fullPath = path ? `${path}.${name}` : name;
+    if (stringFieldSet.has(fullPath)) return value;
+    return typeof value === 'string' && value.trim() !== '' && !isNaN(+value) ? +value : value;
+  };
 }
 
 export function isXmlContentType(req: Request, loggerService?: LoggerService): boolean {
