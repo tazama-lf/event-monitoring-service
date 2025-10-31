@@ -3,6 +3,7 @@ import { LoggerService } from '@tazama-lf/frms-coe-lib';
 import { DatabaseService } from '../database/database.service';
 import { TazamaPayload, TransactionRelationship } from '../dems-engine/dems-engine.service';
 import { randomUUID } from 'crypto';
+import { ErrorPattern } from '../interfaces/iErrorPattern';
 
 @Injectable()
 export class DatabaseOperationsService {
@@ -10,61 +11,61 @@ export class DatabaseOperationsService {
     private readonly loggerService: LoggerService,
     private readonly databaseService: DatabaseService,
   ) {}
+  ERROR_PATTERNS: ErrorPattern[] = [
+    {
+      pattern: 'unique constraint',
+      exception: ConflictException,
+      log: 'warn',
+      getMessage: (context: string, additionalInfo?: Record<string, string>) => `Duplicate ${context}: ${additionalInfo?.details || ''}`,
+    },
+    {
+      pattern: 'foreign key constraint',
+      exception: BadRequestException,
+      log: 'error',
+      getMessage: (context: string, additionalInfo?: Record<string, string>) =>
+        `Invalid reference in ${context}: ${additionalInfo?.details || ''}`,
+    },
+    {
+      pattern: 'invalid input syntax',
+      exception: BadRequestException,
+      log: 'error',
+      getMessage: (context: string) => `Invalid data format in ${context}`,
+    },
+    {
+      pattern: 'connection',
+      exception: InternalServerErrorException,
+      log: 'error',
+      getMessage: (context: string) => `Database connection failed while ${context}`,
+    },
+    {
+      pattern: 'disk full',
+      exception: InternalServerErrorException,
+      log: 'error',
+      getMessage: (context: string) => `Insufficient storage space while ${context}`,
+    },
+    {
+      pattern: 'relation',
+      condition: (msg: string) => msg.includes('relation') && msg.includes('does not exist'),
+      exception: BadRequestException,
+      log: 'error',
+      getMessage: (context: string) => `Table does not exist for ${context}`,
+    },
+    {
+      pattern: 'duplicate key',
+      exception: ConflictException,
+      log: 'warn',
+      getMessage: (context: string) => `Duplicate entry in ${context}`,
+    },
+  ];
 
   private handleDatabaseError(error: unknown, context: string, additionalInfo?: Record<string, any>): never {
     const errorMessage = String(error);
 
-    const errorPatterns = [
-      {
-        pattern: 'unique constraint',
-        exception: ConflictException,
-        log: 'warn' as const,
-        getMessage: () => `Duplicate ${context}: ${additionalInfo?.details || ''}`,
-      },
-      {
-        pattern: 'foreign key constraint',
-        exception: BadRequestException,
-        log: 'error' as const,
-        getMessage: () => `Invalid reference in ${context}: ${additionalInfo?.details || ''}`,
-      },
-      {
-        pattern: 'invalid input syntax',
-        exception: BadRequestException,
-        log: 'error' as const,
-        getMessage: () => `Invalid data format in ${context}`,
-      },
-      {
-        pattern: 'connection',
-        exception: InternalServerErrorException,
-        log: 'error' as const,
-        getMessage: () => 'Database connection failed',
-      },
-      {
-        pattern: 'disk full',
-        exception: InternalServerErrorException,
-        log: 'error' as const,
-        getMessage: () => 'Insufficient storage space',
-      },
-      {
-        pattern: 'relation',
-        condition: (msg: string) => msg.includes('relation') && msg.includes('does not exist'),
-        exception: BadRequestException,
-        log: 'error' as const,
-        getMessage: () => `Table does not exist for ${context}`,
-      },
-      {
-        pattern: 'duplicate key',
-        exception: ConflictException,
-        log: 'warn' as const,
-        getMessage: () => `Duplicate entry in ${context}`,
-      },
-    ];
-
-    for (const errorPattern of errorPatterns) {
+    for (const errorPattern of this.ERROR_PATTERNS) {
       const matches = errorPattern.condition ? errorPattern.condition(errorMessage) : errorMessage.includes(errorPattern.pattern);
 
       if (matches) {
-        const message = errorPattern.getMessage();
+        const message = errorPattern.getMessage(context, additionalInfo);
         this.loggerService[errorPattern.log](`${context}: ${message} - ${errorMessage}`);
         throw new errorPattern.exception(message);
       }
