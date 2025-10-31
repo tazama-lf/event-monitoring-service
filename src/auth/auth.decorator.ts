@@ -14,8 +14,6 @@ export const RequireClaims = (...claims: string[]) => SetMetadata(CLAIMS_KEY, cl
  */
 export const EventMonitoringClaims = {
   DEMS_WRITE: 'dems:write',
-  DEMS_ADMIN: 'dems:admin',
-  DEFAULT_ROLES_TAZAMA_EMS: 'default-roles-tazama-ems',
 } as const;
 
 /**
