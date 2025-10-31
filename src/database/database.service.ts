@@ -39,7 +39,6 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
     try {
       const client = await this.pool.connect();
       client.release();
-      console.log('Database connection established successfully');
       this.logger.log('Database connection established successfully');
     } catch (error) {
       this.logger.error('Failed to connect to database:', error);
@@ -84,33 +83,5 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
    */
   async getClient(): Promise<PoolClient> {
     return this.pool.connect();
-  }
-
-  /**
-   * Execute queries within a transaction
-   * @param callback Function that contains the queries to execute
-   * @returns Result of the callback function
-   */
-  async transaction<T>(callback: (client: PoolClient) => Promise<T>): Promise<T> {
-    const client = await this.pool.connect();
-    try {
-      await client.query('BEGIN');
-      const result = await callback(client);
-      await client.query('COMMIT');
-      return result;
-    } catch (error) {
-      await client.query('ROLLBACK');
-      throw error;
-    } finally {
-      client.release();
-    }
-  }
-
-  /**
-   * Get the underlying pool for advanced operations
-   * @returns The database pool
-   */
-  getPool(): Pool {
-    return this.pool;
   }
 }
