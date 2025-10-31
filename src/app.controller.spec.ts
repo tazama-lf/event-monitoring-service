@@ -1,22 +1,16 @@
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
-import { NatsService } from './nats/nats.service';
 
 describe('AppController', () => {
   let controller: AppController;
   let mockAppService: Partial<AppService>;
-  let mockNatsService: Partial<NatsService>;
 
   beforeEach(() => {
     mockAppService = {
       getHello: jest.fn().mockReturnValue('hello world'),
     };
 
-    mockNatsService = {
-      isReady: jest.fn().mockReturnValue(true),
-    };
-
-    controller = new AppController(mockAppService as AppService, mockNatsService as NatsService);
+    controller = new AppController(mockAppService as AppService);
   });
 
   afterEach(() => {
