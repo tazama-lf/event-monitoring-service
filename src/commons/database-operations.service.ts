@@ -5,6 +5,10 @@ import { TazamaPayload, TransactionRelationship } from '../dems-engine/dems-engi
 import { randomUUID } from 'crypto';
 import { ErrorPattern } from '../interfaces/iErrorPattern';
 
+const enum QuarantineStatus {
+  FAILED = 'failed',
+}
+
 @Injectable()
 export class DatabaseOperationsService {
   constructor(
@@ -163,7 +167,7 @@ export class DatabaseOperationsService {
           timestamp: new Date().toISOString(),
         }),
         raw_payload: JSON.stringify(payload),
-        status: 'failed',
+        status: QuarantineStatus.FAILED,
       };
 
       await this.databaseService.query(
