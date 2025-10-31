@@ -99,7 +99,7 @@ export function validateEnvironment(config: Record<string, unknown>): AppConfigu
     port: parseInt(config.APP_PORT as string, 10),
     configurationDatabaseUrl: config.CONFIGURATION_DATABASE_URL as string,
     database: {
-      host: (config.DB_HOST as string) || 'localhost',
+      host: (config.DB_HOST as string) || ('localhost' as string),
       port: dbPort,
       user: (config.DB_USER as string) || 'postgres',
       password: (config.DB_PASSWORD as string) || 'password',

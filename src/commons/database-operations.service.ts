@@ -152,7 +152,7 @@ export class DatabaseOperationsService {
         destination,
         JSON.stringify(transactionObj),
       ]);
-
+      console.log('Saved transaction relationship successfully.');
       this.loggerService.log(`Saved transaction relationship: ${source} -> ${destination}`);
     } catch (error) {
       console.log('Error saving transaction relationship:', error);

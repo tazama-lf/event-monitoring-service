@@ -22,7 +22,7 @@ async function bootstrap(): Promise<void> {
   // Configure middleware to handle raw XML bodies
   app.use(
     express.text({
-      type: ['application/xml', 'text/xml', 'text/plain'],
+      type: ['application/xml'],
     }),
   );
 

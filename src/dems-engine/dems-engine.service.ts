@@ -299,6 +299,7 @@ export class DemsEngineService {
    */
   @ApmSpan('dems-execute-configured-functions')
   private async executeConfiguredFunctions(payload: any, configuredMapping: any, configuredFunctions: any): Promise<void> {
+    console.log('Executing configured functions...', configuredFunctions);
     if (configuredFunctions) {
       for (const row of configuredFunctions) {
         // prepare params (getPayloadByPath) --> and call each function one by one
@@ -516,7 +517,7 @@ export class DemsEngineService {
         await this.executeConfiguredFunctions(enhancedRequest, configuredMapping, configuredFunctions);
       } catch (error) {
         this.loggerService.error(`Failed to execute configured functions: ${String(error)}`);
-        return this.buildErrorResponse('Error executing configured functions', [`Function execution failed: ${String(error)}`]);
+        return this.buildErrorResponse('compare functions with mapping', [`Function execution failed: ${String(error)}`]);
       }
 
       const tazamaPayload = this.buildTazamaPayload(enhancedRequest, transactionType, tenantId, dataCache);
