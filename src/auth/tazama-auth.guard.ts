@@ -3,6 +3,7 @@ import { Reflector } from '@nestjs/core';
 import { validateTokenAndClaims } from '@tazama-lf/auth-lib';
 import type { TazamaToken, ClaimValidationResult, AuthenticatedUser } from './auth.types';
 import { CLAIMS_KEY } from './auth.decorator';
+import { decode } from 'jsonwebtoken';
 
 @Injectable()
 export class TazamaAuthGuard implements CanActivate {
@@ -32,10 +33,15 @@ export class TazamaAuthGuard implements CanActivate {
     }
 
     try {
-      const token = authHeader.split(' ')[1];
+      const tokenParts = authHeader.split(' ');
+      if (tokenParts.length !== 2) {
+        this.logger.warn('Malformed authorization header', this.LOG_CONTEXT);
+        throw new UnauthorizedException('Malformed authorization header');
+      }
 
+      const token = tokenParts[1];
       // Determine which claims to validate
-      const claimsToValidate = requiredClaims || [];
+      const claimsToValidate = requiredClaims;
 
       // Validate token and claims using tazama-auth-lib
       const validated: ClaimValidationResult = validateTokenAndClaims(token, claimsToValidate);
@@ -96,9 +102,7 @@ export class TazamaAuthGuard implements CanActivate {
 
   private extractTokenPayload(token: string): TazamaToken {
     try {
-      // Decode JWT without verification (since validation is done by tazama-auth-lib)
-      const jwt = require('jsonwebtoken');
-      const decoded = jwt.decode(token) as TazamaToken;
+      const decoded = decode(token) as TazamaToken;
 
       if (!decoded) {
         throw new Error('Failed to decode token');
