@@ -8,11 +8,11 @@ import { CLAIMS_KEY } from './auth.decorator';
 export class TazamaAuthGuard implements CanActivate {
   private readonly logger = new Logger(TazamaAuthGuard.name);
 
+  private readonly LOG_CONTEXT = `${TazamaAuthGuard.name}.canActivate`;
+
   constructor(private reflector: Reflector) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
-    const logContext = 'TazamaAuthGuard.canActivate()';
-
     // Get required claims from decorator
     const requiredClaims = this.reflector.getAllAndOverride<string[]>(CLAIMS_KEY, [context.getHandler(), context.getClass()]);
 
@@ -21,13 +21,13 @@ export class TazamaAuthGuard implements CanActivate {
 
     // Validate authorization header
     if (!authHeader?.startsWith('Bearer ')) {
-      this.logger.warn('No Bearer token provided', logContext);
+      this.logger.warn('No Bearer token provided', this.LOG_CONTEXT);
       throw new UnauthorizedException('No Bearer token provided');
     }
 
     // Check if we have either type of claims requirement
     if (!requiredClaims || requiredClaims.length === 0) {
-      this.logger.warn('No required claims specified for protected route', logContext);
+      this.logger.warn('No required claims specified for protected route', this.LOG_CONTEXT);
       throw new UnauthorizedException('No required claims specified');
     }
 
@@ -54,7 +54,7 @@ export class TazamaAuthGuard implements CanActivate {
         if (!hasAllClaims) {
           this.logger.warn(
             `User missing required claims. Required: [${requiredClaims.join(', ')}], Invalid: [${invalidClaims.join(', ')}]`,
-            logContext,
+            this.LOG_CONTEXT,
           );
         }
       }
@@ -78,13 +78,13 @@ export class TazamaAuthGuard implements CanActivate {
 
       this.logger.log(
         `Authentication successful for clientId: ${decodedToken.clientId}, tenantId: ${decodedToken.tenantId}, claims: [${validClaims.join(', ')}]`,
-        logContext,
+        this.LOG_CONTEXT,
       );
 
       return true;
     } catch (error) {
       const err = error as Error;
-      this.logger.error(`Authentication failed: ${err.name}: ${err.message}`, logContext);
+      this.logger.error(`Authentication failed: ${err.name}: ${err.message}`, this.LOG_CONTEXT);
 
       if (error instanceof UnauthorizedException) {
         throw error;
