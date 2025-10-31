@@ -2,22 +2,22 @@
 
 import { registerAs } from '@nestjs/config';
 import { DatabaseConfig } from '../interfaces/iDatabaseConfig';
+import { validateEnvironment } from './env.validation';
 
 export default registerAs('database', (): DatabaseConfig => {
-  // At this point, environment variables have already been validated by env.validation.ts
-  // We can safely use the validated configuration from the global config
-  const config = process.env;
+  const config = validateEnvironment(process.env);
+  const db = config.database;
 
   return {
-    host: config.DB_HOST!,
-    port: parseInt(config.DB_PORT!, 10),
-    user: config.DB_USER!,
-    password: config.DB_PASSWORD!,
-    database: config.DB_NAME!,
-    ssl: config.NODE_ENV === 'production',
-    connectionTimeoutMillis: parseInt(config.DB_CONNECTION_TIMEOUT!, 10),
-    idleTimeoutMillis: parseInt(config.DB_IDLE_TIMEOUT!, 10),
-    max: parseInt(config.DB_POOL_MAX!, 10),
-    min: parseInt(config.DB_POOL_MIN!, 10),
+    host: db.host,
+    port: db.port,
+    user: db.user,
+    password: db.password,
+    database: db.name,
+    ssl: db.ssl,
+    connectionTimeoutMillis: parseInt(process.env.DB_CONNECTION_TIMEOUT_MILLIS || '10000', 10),
+    idleTimeoutMillis: parseInt(process.env.DB_IDLE_TIMEOUT_MILLIS || '30000', 10),
+    max: parseInt(process.env.DB_MAX_CONNECTIONS || '20', 10),
+    min: parseInt(process.env.DB_MIN_CONNECTIONS || '2', 10),
   };
 });

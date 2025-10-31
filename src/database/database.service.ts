@@ -39,6 +39,7 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
     try {
       const client = await this.pool.connect();
       client.release();
+      console.log('Database connection established successfully');
       this.logger.log('Database connection established successfully');
     } catch (error) {
       this.logger.error('Failed to connect to database:', error);
