@@ -4,7 +4,6 @@ import { DatabaseService } from '../database/database.service';
 import { randomUUID } from 'crypto';
 import { ErrorPattern } from '../interfaces/iErrorPattern';
 import { QuarantineStatus } from '../enums/quarantineStatus.enum';
-import { TransactionDetails } from '../interfaces/iTransactionRelationship';
 import { TazamaPayload } from '../interfaces/iTazamaPayload';
 
 @Injectable()
@@ -119,6 +118,7 @@ export class DatabaseOperationsService {
     const txtp = transaction.TxTp.replace('.', '').toLowerCase();
 
     try {
+      console.log(`Saving transaction history to table: ${txtp}`);
       await this.databaseService.query(`INSERT INTO ${txtp} (document) VALUES ($1)`, [transaction.transaction]);
       this.loggerService.log(`Saved transaction history with key: ${key}`);
     } catch (error) {
@@ -128,25 +128,36 @@ export class DatabaseOperationsService {
     }
   }
 
-  async saveTransactionRelationship(relationship: TransactionDetails): Promise<void> {
-    if (!relationship.source || !relationship.destination) {
-      this.loggerService.error(
-        `Missing required fields in transaction relationship: from=${relationship.source}, to=${relationship.destination}`,
-      );
+  async saveTransactionRelationship(...relationship: string[]): Promise<void> {
+    console.log('Saving transaction relationship:', relationship);
+    const source = relationship[0];
+    const destination = relationship[1];
+    const transactionObj = {
+      TxTp: relationship[2],
+      TenantId: relationship[3],
+      MsgId: relationship[4],
+      CreDtTm: relationship[5],
+      EndToEndId: relationship[6],
+    };
+    console.log(`Source: ${source}, Destination: ${destination}, Transaction Data: ${JSON.stringify(transactionObj)}`);
+
+    if (!source || !destination) {
+      this.loggerService.error(`Missing required fields in transaction relationship: from=${source}, to=${destination}`);
       throw new BadRequestException('Transaction relationship must have both source and destination');
     }
 
     try {
       await this.databaseService.query('INSERT INTO transaction (source, destination, transaction) VALUES ($1, $2, $3)', [
-        relationship.source,
-        relationship.destination,
-        relationship,
+        source,
+        destination,
+        JSON.stringify(transactionObj),
       ]);
 
-      this.loggerService.log(`Saved transaction relationship: ${relationship.source} -> ${relationship.destination}`);
+      this.loggerService.log(`Saved transaction relationship: ${source} -> ${destination}`);
     } catch (error) {
+      console.log('Error saving transaction relationship:', error);
       this.handleDatabaseError(error, 'save transaction relationship', {
-        details: `${relationship.source} -> ${relationship.destination}`,
+        details: `${relationship[0]} -> ${relationship[1]}`,
       });
     }
   }

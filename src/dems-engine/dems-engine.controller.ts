@@ -18,6 +18,19 @@ export class DemsEngineController {
     private readonly logger: LoggerService,
   ) {}
 
+  // [{
+  //   params: [
+  //     'transactionDetails.source',
+  //     'transactionDetails.destination',
+  //     'transactionDetails.TxTp',
+  //     'transactionDetails.tenantId',
+  //     'transactionDetails.MsgId',
+  //     'transactionDetails.CreDtTm',
+  //     'transactionDetails.EndToEndId',
+  //   ],
+  //   functionName: 'saveTransactionRelationship',
+  // }];
+
   @Post('*endpoint')
   @RequireDemsWriteRole()
   async messageHandler(

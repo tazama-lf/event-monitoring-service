@@ -303,7 +303,10 @@ export class DemsEngineService {
       for (const row of configuredFunctions) {
         // prepare params (getPayloadByPath) --> and call each function one by one
         const functionToCall = row.functionName;
+        console.log('-----------------------------------------------------------');
+        console.log(`Preparing to execute function: ${functionToCall}`);
         let sources = row.params || [];
+        console.log('Sources before processing:', sources);
         let splitResultValue: string;
         let isDestinationArray: boolean;
 
@@ -334,15 +337,19 @@ export class DemsEngineService {
             return mapping.constantValue;
           }
 
+          console.log('Payload Path:', mapping.source);
+
           const extractedValues = mapping.source.map((s: string) => {
             const value = getValueByPath(payload, s);
             return value;
           });
 
           const combinedValue = extractedValues.join('');
+          console.log('Combined value -->', combinedValue, 'for ', source);
           return combinedValue;
         });
 
+        console.log(`Executing function: ${functionToCall} with params:`, sources);
         await this.databaseOperationsService[functionToCall](...Object.values(sources));
       }
     }
@@ -501,6 +508,9 @@ export class DemsEngineService {
 
       const mappingResult = await this.processMappings(enhancedRequest, configuredMapping, endpoint);
       const { dataCache, transactionRelationship, endToEndId } = mappingResult;
+      console.log('Processed Data Cache:', dataCache);
+      console.log('Transaction Relationship:', transactionRelationship);
+      console.log('EndToEndId:', endToEndId);
 
       try {
         await this.executeConfiguredFunctions(enhancedRequest, configuredMapping, configuredFunctions);
