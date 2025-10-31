@@ -1,19 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { registerAs } from '@nestjs/config';
-
-export interface DatabaseConfig {
-  host: string;
-  port: number;
-  user: string;
-  password: string;
-  database: string;
-  ssl?: boolean;
-  connectionTimeoutMillis?: number;
-  idleTimeoutMillis?: number;
-  max?: number; // Maximum number of clients in the pool
-  min?: number; // Minimum number of clients in the pool
-}
+import { DatabaseConfig } from '../interfaces/iDatabaseConfig';
 
 export default registerAs('database', (): DatabaseConfig => {
   // At this point, environment variables have already been validated by env.validation.ts

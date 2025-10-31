@@ -3,7 +3,7 @@
 import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Pool, PoolClient, QueryResult, QueryResultRow } from 'pg';
-import { DatabaseConfig } from '../config/database.config';
+import { DatabaseConfig } from '../interfaces/iDatabaseConfig';
 import { LoggerService } from '@tazama-lf/frms-coe-lib';
 
 @Injectable()
