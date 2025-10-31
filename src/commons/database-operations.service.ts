@@ -127,6 +127,11 @@ export class DatabaseOperationsService {
   }
 
   async saveTransactionRelationship(relationship: TransactionRelationship): Promise<void> {
+    if (!relationship.from || !relationship.to) {
+      this.loggerService.error(`Missing required fields in transaction relationship: from=${relationship.from}, to=${relationship.to}`);
+      throw new BadRequestException('Transaction relationship must have both source and destination');
+    }
+
     try {
       await this.databaseService.query('INSERT INTO transaction (source, destination, transaction) VALUES ($1, $2, $3)', [
         relationship.from,
@@ -136,12 +141,6 @@ export class DatabaseOperationsService {
 
       this.loggerService.log(`Saved transaction relationship: ${relationship.from} -> ${relationship.to}`);
     } catch (error) {
-      // Special validation before handling database error
-      if (!relationship.from || !relationship.to) {
-        this.loggerService.error(`Missing required fields in transaction relationship: from=${relationship.from}, to=${relationship.to}`);
-        throw new BadRequestException('Transaction relationship must have both source and destination');
-      }
-
       this.handleDatabaseError(error, 'save transaction relationship', {
         details: `${relationship.from} -> ${relationship.to}`,
       });
