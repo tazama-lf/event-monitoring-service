@@ -102,26 +102,27 @@ export class TazamaAuthGuard implements CanActivate {
 
   private extractTokenPayload(token: string): TazamaToken {
     try {
-      const decoded = decode(token) as TazamaToken;
+      const decoded = decode(token);
 
-      if (!decoded) {
+      if (!decoded || typeof decoded !== 'object') {
         throw new Error('Failed to decode token');
       }
 
-      // Validate required TazamaToken fields
-      if (!decoded.clientId) {
+      const tokenPayload = decoded as Partial<TazamaToken>;
+
+      if (!tokenPayload.clientId) {
         throw new Error('Token missing clientId');
       }
 
-      if (!decoded.tenantId) {
+      if (!tokenPayload.tenantId) {
         throw new Error('Token missing tenantId');
       }
 
-      if (!decoded.claims || !Array.isArray(decoded.claims)) {
+      if (!tokenPayload.claims || !Array.isArray(tokenPayload.claims)) {
         throw new Error('Token missing or invalid claims array');
       }
 
-      return decoded;
+      return tokenPayload as TazamaToken;
     } catch (error) {
       const err = error as Error;
       this.logger.error(`Failed to extract token payload: ${err.message}`);
