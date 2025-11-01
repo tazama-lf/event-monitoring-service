@@ -260,16 +260,12 @@ describe('ConfigNotifyService', () => {
       // Reset and set up the mock with implementation
       mockDatabaseService.query.mockReset();
       mockDatabaseService.query.mockImplementation(() => {
-        console.log('Mock database query called, returning:', emptyResult);
-        console.log('emptyResult.rows[0]:', emptyResult.rows[0]);
-        console.log('!!emptyResult.rows[0]:', !!emptyResult.rows[0]);
         return Promise.resolve(emptyResult);
       });
 
       // Create a spy to see exactly what handleResponse gets called with
       const originalHandleResponse = handleResponse;
       handleResponse = jest.fn().mockImplementation((response) => {
-        console.log('handleResponse called with:', response);
         return originalHandleResponse(response);
       });
 
@@ -278,12 +274,8 @@ describe('ConfigNotifyService', () => {
       expect(mockLogger.log).toHaveBeenCalledWith('Received NATS notification for config ID: 456');
 
       // Debug: Check all calls to handleResponse
-      console.log('handleResponse call count:', handleResponse.mock.calls.length);
-      console.log('handleResponse calls:', handleResponse.mock.calls);
 
       // Debug: Check all calls to database service
-      console.log('Database query call count:', mockDatabaseService.query.mock.calls.length);
-      console.log('Database query calls:', mockDatabaseService.query.mock.calls);
 
       expect(handleResponse).toHaveBeenCalledTimes(1);
       // Based on the debug output, the service is actually returning ACK for some reason

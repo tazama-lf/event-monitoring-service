@@ -118,7 +118,6 @@ export class DatabaseOperationsService {
     const txtp = transaction.TxTp.replace('.', '').toLowerCase();
 
     try {
-      console.log(`Saving transaction history to table: ${txtp}`);
       await this.databaseService.query(`INSERT INTO ${txtp} (document) VALUES ($1)`, [transaction.transaction]);
       this.loggerService.log(`Saved transaction history with key: ${key}`);
     } catch (error) {
@@ -129,7 +128,6 @@ export class DatabaseOperationsService {
   }
 
   async saveTransactionRelationship(...relationship: string[]): Promise<void> {
-    console.log('Saving transaction relationship:', relationship);
     const source = relationship[0];
     const destination = relationship[1];
     const transactionObj = {
@@ -139,7 +137,6 @@ export class DatabaseOperationsService {
       CreDtTm: relationship[5],
       EndToEndId: relationship[6],
     };
-    console.log(`Source: ${source}, Destination: ${destination}, Transaction Data: ${JSON.stringify(transactionObj)}`);
 
     if (!source || !destination) {
       this.loggerService.error(`Missing required fields in transaction relationship: from=${source}, to=${destination}`);
@@ -152,10 +149,8 @@ export class DatabaseOperationsService {
         destination,
         JSON.stringify(transactionObj),
       ]);
-      console.log('Saved transaction relationship successfully.');
       this.loggerService.log(`Saved transaction relationship: ${source} -> ${destination}`);
     } catch (error) {
-      console.log('Error saving transaction relationship:', error);
       this.handleDatabaseError(error, 'save transaction relationship', {
         details: `${relationship[0]} -> ${relationship[1]}`,
       });

@@ -300,7 +300,6 @@ describe('DatabaseOperationsService', () => {
 
       await service.saveTransactionHistory(mockTazamaPayload, 'transaction-key-123');
 
-      expect(console.log).toHaveBeenCalledWith('Saving transaction history to table: testtransaction');
       expect(mockDatabaseService.query).toHaveBeenCalledWith('INSERT INTO testtransaction (document) VALUES ($1)', [
         mockTazamaPayload.transaction,
       ]);
@@ -320,7 +319,6 @@ describe('DatabaseOperationsService', () => {
         const payload = { ...mockTazamaPayload, TxTp: testCase.TxTp };
         await service.saveTransactionHistory(payload, 'test-key');
 
-        expect(console.log).toHaveBeenCalledWith(`Saving transaction history to table: ${testCase.expectedTable}`);
         expect(mockDatabaseService.query).toHaveBeenCalledWith(`INSERT INTO ${testCase.expectedTable} (document) VALUES ($1)`, [
           payload.transaction,
         ]);
@@ -385,8 +383,6 @@ describe('DatabaseOperationsService', () => {
 
       await service.saveTransactionRelationship(...relationship);
 
-      expect(console.log).toHaveBeenCalledWith('Saving transaction relationship:', relationship);
-      expect(console.log).toHaveBeenCalledWith(expect.stringContaining('Source: source-123, Destination: destination-456'));
       expect(mockDatabaseService.query).toHaveBeenCalledWith(
         'INSERT INTO transaction (source, destination, transaction) VALUES ($1, $2, $3)',
         [
@@ -401,7 +397,6 @@ describe('DatabaseOperationsService', () => {
           }),
         ],
       );
-      expect(console.log).toHaveBeenCalledWith('Saved transaction relationship successfully.');
       expect(mockLoggerService.log).toHaveBeenCalledWith('Saved transaction relationship: source-123 -> destination-456');
     });
 
@@ -435,7 +430,6 @@ describe('DatabaseOperationsService', () => {
       ];
 
       await expect(service.saveTransactionRelationship(...relationship)).rejects.toThrow(InternalServerErrorException);
-      expect(console.log).toHaveBeenCalledWith('Error saving transaction relationship:', error);
       expect(mockLoggerService.error).toHaveBeenCalledWith(
         expect.stringContaining('save transaction relationship: Database connection failed while save transaction relationship'),
       );

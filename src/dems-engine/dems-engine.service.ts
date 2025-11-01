@@ -299,15 +299,11 @@ export class DemsEngineService {
    */
   @ApmSpan('dems-execute-configured-functions')
   private async executeConfiguredFunctions(payload: any, configuredMapping: any, configuredFunctions: any): Promise<void> {
-    console.log('Executing configured functions...', configuredFunctions);
     if (configuredFunctions) {
       for (const row of configuredFunctions) {
         // prepare params (getPayloadByPath) --> and call each function one by one
         const functionToCall = row.functionName;
-        console.log('-----------------------------------------------------------');
-        console.log(`Preparing to execute function: ${functionToCall}`);
         let sources = row.params || [];
-        console.log('Sources before processing:', sources);
         let splitResultValue: string;
         let isDestinationArray: boolean;
 
@@ -338,19 +334,15 @@ export class DemsEngineService {
             return mapping.constantValue;
           }
 
-          console.log('Payload Path:', mapping.source);
-
           const extractedValues = mapping.source.map((s: string) => {
             const value = getValueByPath(payload, s);
             return value;
           });
 
           const combinedValue = extractedValues.join('');
-          console.log('Combined value -->', combinedValue, 'for ', source);
           return combinedValue;
         });
 
-        console.log(`Executing function: ${functionToCall} with params:`, sources);
         await this.databaseOperationsService[functionToCall](...Object.values(sources));
       }
     }
@@ -433,13 +425,7 @@ export class DemsEngineService {
   ): Promise<ErrorResponse | ProcessingResult> {
     let transformedPayload: any; //contains the XML --> JSON converted payload
 
-    console.log('Dems Engine Service - Received isxml status:', isPayloadXml);
-
     if (isPayloadXml) {
-      console.log('----------------------------------------------------------------------------------------------');
-      console.log('Dems Engine service - Parsing XML Payload', payload);
-
-      // First, get the schema to determine string fields
       const schemaResult = await this.findSchemaAndMapping(endpoint);
       if (!schemaResult) {
         return this.buildErrorResponse('Schema not found for the specified endpoint', ['No schema exists for this endpoint']);
@@ -458,20 +444,15 @@ export class DemsEngineService {
         valueProcessors: [createSchemaAwareNumberProcessor(stringFields)], // Use custom processor
       };
 
-      // xml into json
       transformedPayload = await new Promise((resolve, reject) => {
         parseString(payload, options, (err, result) => {
           if (err) {
-            console.log('XML Parsing Error:', err);
             reject(err);
           } else {
             resolve(result);
           }
         });
       });
-
-      console.log('Converted Payload into JSON:', transformedPayload);
-      console.log('----------------------------------------------------------------------------------------------');
     }
 
     try {
@@ -481,19 +462,14 @@ export class DemsEngineService {
       }
 
       const [configuredSchema, configuredMapping, configuredFunctions] = result;
-      console.log('-----------------------------------------------------------');
 
       if (isPayloadXml) {
         // below are all the array fields and string fields in the schema for XML case
-        const { arrayFields, stringFields } = await returnArrayFieldsFromSchema(configuredSchema);
-        console.log('These fields are arrays in the schema:', arrayFields);
-        console.log('These fields are strings in the schema:', stringFields);
-        console.log('-----------------------------------------------------------');
+        const { arrayFields } = await returnArrayFieldsFromSchema(configuredSchema);
 
         // Convert the transformed payload to ensure array fields are properly formatted
         // Note: We don't need string conversion here anymore since the parser handles it
         payload = replaceObjectsWithArrays(transformedPayload, arrayFields, [], this.loggerService);
-        console.log('Payload after array conversion:', payload);
       }
 
       const validationResult = await this.validatePayload(payload, configuredSchema, endpoint, tenantId);
@@ -509,9 +485,6 @@ export class DemsEngineService {
 
       const mappingResult = await this.processMappings(enhancedRequest, configuredMapping, endpoint);
       const { dataCache, transactionRelationship, endToEndId } = mappingResult;
-      console.log('Processed Data Cache:', dataCache);
-      console.log('Transaction Relationship:', transactionRelationship);
-      console.log('EndToEndId:', endToEndId);
 
       try {
         await this.executeConfiguredFunctions(enhancedRequest, configuredMapping, configuredFunctions);

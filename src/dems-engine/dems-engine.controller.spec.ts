@@ -334,7 +334,7 @@ describe('DemsEngineController', () => {
         );
 
         const errorMessage = error instanceof Error ? error.message : typeof error === 'string' ? error : JSON.stringify(error);
-        expect(mockLoggerService.error).toHaveBeenCalledWith(`Failed to save transaction data or notify: ${errorMessage}`);
+        expect(mockLoggerService.error).toHaveBeenCalledWith(`Failed to save transaction data or notify: ${String(error)}`);
       }
     });
 
