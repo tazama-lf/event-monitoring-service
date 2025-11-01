@@ -330,7 +330,8 @@ describe('xml2js.utils', () => {
         convertNumberToStringAtPath(obj, 'count', mockLoggerService);
 
         expect(obj.count).toBe('42');
-        expect(mockLoggerService.log).toHaveBeenCalledWith('Converted field \'count\' from number to string: 42');
+        // eslint-disable-next-line quotes
+        expect(mockLoggerService.log).toHaveBeenCalledWith("Converted field 'count' from number to string: 42");
       });
 
       it('should convert number to string at nested path', () => {
@@ -425,7 +426,8 @@ describe('xml2js.utils', () => {
 
         expect(Array.isArray(obj.item)).toBe(true);
         expect(obj.item).toEqual([{ id: 1, name: 'test' }]);
-        expect(mockLoggerService.log).toHaveBeenCalledWith('Converted field \'item\' from object to array');
+        // eslint-disable-next-line quotes
+        expect(mockLoggerService.log).toHaveBeenCalledWith("Converted field 'item' from object to array");
       });
 
       it('should convert object to array at nested path', () => {

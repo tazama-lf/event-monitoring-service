@@ -23,9 +23,9 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">98.52% </span>
+                <span class="strong">98.41% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>67/68</span>
+                <span class='fraction'>62/63</span>
             </div>
         
             
@@ -44,9 +44,9 @@
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">98.48% </span>
+                <span class="strong">98.36% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>65/66</span>
+                <span class='fraction'>60/61</span>
             </div>
         
             
@@ -270,12 +270,7 @@
 <a name='L205'></a><a href='#L205'>205</a>
 <a name='L206'></a><a href='#L206'>206</a>
 <a name='L207'></a><a href='#L207'>207</a>
-<a name='L208'></a><a href='#L208'>208</a>
-<a name='L209'></a><a href='#L209'>209</a>
-<a name='L210'></a><a href='#L210'>210</a>
-<a name='L211'></a><a href='#L211'>211</a>
-<a name='L212'></a><a href='#L212'>212</a>
-<a name='L213'></a><a href='#L213'>213</a></td><td class="line-coverage quiet"><span class="cline-any cline-yes">5x</span>
+<a name='L208'></a><a href='#L208'>208</a></td><td class="line-coverage quiet"><span class="cline-any cline-yes">5x</span>
 <span class="cline-any cline-yes">5x</span>
 <span class="cline-any cline-yes">5x</span>
 <span class="cline-any cline-yes">5x</span>
@@ -396,7 +391,6 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">7x</span>
 <span class="cline-any cline-yes">7x</span>
-<span class="cline-any cline-yes">7x</span>
 <span class="cline-any cline-yes">6x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">1x</span>
@@ -409,14 +403,12 @@
 <span class="cline-any cline-yes">5x</span>
 <span class="cline-any cline-yes">5x</span>
 <span class="cline-any cline-yes">5x</span>
-<span class="cline-any cline-yes">5x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">5x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">5x</span>
 <span class="cline-any cline-yes">2x</span>
@@ -430,9 +422,7 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">2x</span>
-<span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -607,7 +597,6 @@ export class DatabaseOperationsService {
     const txtp = transaction.TxTp.replace('.', '').toLowerCase();
 &nbsp;
     try {
-      console.log(`Saving transaction history to table: ${txtp}`);
       await this.databaseService.query(`INSERT INTO ${txtp} (document) VALUES ($1)`, [transaction.transaction]);
       this.loggerService.log(`Saved transaction history with key: ${key}`);
     } catch (error) {
@@ -618,7 +607,6 @@ export class DatabaseOperationsService {
   }
 &nbsp;
   async saveTransactionRelationship(...relationship: string[]): Promise&lt;void&gt; {
-    console.log('Saving transaction relationship:', relationship);
     const source = relationship[0];
     const destination = relationship[1];
     const transactionObj = {
@@ -628,7 +616,6 @@ export class DatabaseOperationsService {
       CreDtTm: relationship[5],
       EndToEndId: relationship[6],
     };
-    console.log(`Source: ${source}, Destination: ${destination}, Transaction Data: ${JSON.stringify(transactionObj)}`);
 &nbsp;
     if (!source || !destination) {
       this.loggerService.error(`Missing required fields in transaction relationship: from=${source}, to=${destination}`);
@@ -641,10 +628,8 @@ export class DatabaseOperationsService {
         destination,
         JSON.stringify(transactionObj),
       ]);
-      console.log('Saved transaction relationship successfully.');
       this.loggerService.log(`Saved transaction relationship: ${source} -&gt; ${destination}`);
     } catch (error) {
-      console.log('Error saving transaction relationship:', error);
       this.handleDatabaseError(error, 'save transaction relationship', {
         details: `${relationship[0]} -&gt; ${relationship[1]}`,
       });
@@ -706,7 +691,7 @@ export class DatabaseOperationsService {
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2025-11-01T00:06:24.668Z
+                at 2025-11-01T18:41:50.754Z
             </div>
         <script src="../../prettify.js"></script>
         <script>

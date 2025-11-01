@@ -175,43 +175,50 @@ describe('getValueByPath', () => {
     it('should throw error when property does not exist', () => {
       expect(() => {
         getValueByPath(testObject, 'nonExistent.property');
-      }).toThrow('Property \'nonExistent.property\' not found');
+        // eslint-disable-next-line quotes
+      }).toThrow("Property 'nonExistent.property' not found");
     });
 
     it('should throw error when nested property does not exist', () => {
       expect(() => {
         getValueByPath(testObject, 'glossary.nonExistent.property');
-      }).toThrow('Property \'glossary.nonExistent.property\' not found');
+        // eslint-disable-next-line quotes
+      }).toThrow("Property 'glossary.nonExistent.property' not found");
     });
 
     it('should throw error when array index is out of bounds', () => {
       expect(() => {
         getValueByPath(testObject, 'users.10.name');
-      }).toThrow('Property \'users.10.name\' not found');
+        // eslint-disable-next-line quotes
+      }).toThrow("Property 'users.10.name' not found");
     });
 
     it('should throw error when accessing property on null', () => {
       expect(() => {
         getValueByPath(testObject, 'nullValue.property');
-      }).toThrow('Property \'nullValue.property\' not found');
+        // eslint-disable-next-line quotes
+      }).toThrow("Property 'nullValue.property' not found");
     });
 
     it('should throw error when accessing property on undefined', () => {
       expect(() => {
         getValueByPath(testObject, 'undefinedValue.property');
-      }).toThrow('Property \'undefinedValue.property\' not found');
+        // eslint-disable-next-line quotes
+      }).toThrow("Property 'undefinedValue.property' not found");
     });
 
     it('should throw error for empty path', () => {
       expect(() => {
         getValueByPath(testObject, '');
-      }).toThrow('Property \'\' not found');
+        // eslint-disable-next-line quotes
+      }).toThrow("Property '' not found");
     });
 
     it('should throw error when trying to access property on primitive', () => {
       expect(() => {
         getValueByPath(testObject, 'settings.theme.length.invalid');
-      }).toThrow('Property \'settings.theme.length.invalid\' not found');
+        // eslint-disable-next-line quotes
+      }).toThrow("Property 'settings.theme.length.invalid' not found");
     });
   });
 

@@ -333,7 +333,7 @@ describe('DemsEngineController', () => {
           BadRequestException,
         );
 
-        const errorMessage = error instanceof Error ? error.message : typeof error === 'string' ? error : JSON.stringify(error);
+        // eslint-disable-next-line @typescript-eslint/no-base-to-string
         expect(mockLoggerService.error).toHaveBeenCalledWith(`Failed to save transaction data or notify: ${String(error)}`);
       }
     });
