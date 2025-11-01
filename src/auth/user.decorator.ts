@@ -3,7 +3,10 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import { createParamDecorator, ExecutionContext } from '@nestjs/common';
 
-export const User = createParamDecorator((data: unknown, ctx: ExecutionContext) => {
+// Export the callback function separately for testing
+export const getUserFromContext = (data: unknown, ctx: ExecutionContext) => {
   const request = ctx.switchToHttp().getRequest();
   return request.user;
-});
+};
+
+export const User = createParamDecorator(getUserFromContext);

@@ -14,48 +14,71 @@ import { ReturnArrayFieldsFromSchema } from '../interfaces/iXml2js.interfaces';
  */
 export async function returnArrayFieldsFromSchema(schema: any, loggerService?: LoggerService): Promise<ReturnArrayFieldsFromSchema> {
   try {
+    // Handle null/undefined schema
+    if (!schema) {
+      if (loggerService) {
+        loggerService.error('Schema is null or undefined');
+      }
+      throw new Error('Schema cannot be null or undefined');
+    }
+
     const arrayFields: string[] = [];
     const stringFields: string[] = [];
+    const visited = new Set(); // Circular reference detection
 
     const traverseSchema = (obj: any, path: string = '') => {
       if (!obj || typeof obj !== 'object') {
         return;
       }
 
-      for (const [key, value] of Object.entries(obj.properties)) {
-        const currentPath = path ? `${path}.${key}` : key;
-        const property = value as any;
+      // Circular reference detection using object reference
+      if (visited.has(obj)) {
+        return;
+      }
+      visited.add(obj);
 
-        // Check if this property is an array
-        if (property.type === 'array') {
-          arrayFields.push(currentPath);
-        }
+      // Check if properties exist before trying to iterate
+      if (obj.properties && typeof obj.properties === 'object') {
+        for (const [key, value] of Object.entries(obj.properties)) {
+          const currentPath = path ? `${path}.${key}` : key;
+          const property = value as any;
 
-        // Check if this property is a string
-        if (property.type === 'string') {
-          stringFields.push(currentPath);
-        }
-
-        // Recursively check nested objects
-        if (property.type === 'object' && property.properties) {
-          traverseSchema(property, currentPath);
-        }
-
-        // Handle array items that might contain objects
-        if (property.type === 'array' && property.items) {
-          if (property.items.type === 'object' && property.items.properties) {
-            traverseSchema(property.items, currentPath);
+          // Ensure property exists before accessing its type
+          if (!property || typeof property !== 'object') {
+            continue;
           }
-        }
 
-        // Handle anyOf, oneOf, allOf schemas
-        if (property.anyOf || property.oneOf || property.allOf) {
-          const schemaVariants = property.anyOf || property.oneOf || property.allOf;
-          schemaVariants.forEach((variant: any) => {
-            if (variant.type === 'object' && variant.properties) {
-              traverseSchema(variant, currentPath);
+          // Check if this property is an array
+          if (property.type === 'array') {
+            arrayFields.push(currentPath);
+          }
+
+          // Check if this property is a string
+          if (property.type === 'string') {
+            stringFields.push(currentPath);
+          }
+
+          // Recursively check nested objects
+          if (property.type === 'object' && property.properties) {
+            traverseSchema(property, currentPath);
+          }
+
+          // Handle array items that might contain objects
+          if (property.type === 'array' && property.items) {
+            if (property.items.type === 'object' && property.items.properties) {
+              traverseSchema(property.items, currentPath);
             }
-          });
+          }
+
+          // Handle anyOf, oneOf, allOf schemas
+          if (property.anyOf || property.oneOf || property.allOf) {
+            const schemaVariants = property.anyOf || property.oneOf || property.allOf;
+            schemaVariants.forEach((variant: any) => {
+              if (variant && variant.type === 'object' && variant.properties) {
+                traverseSchema(variant, currentPath);
+              }
+            });
+          }
         }
       }
 
@@ -63,11 +86,13 @@ export async function returnArrayFieldsFromSchema(schema: any, loggerService?: L
       if (obj.anyOf || obj.oneOf || obj.allOf) {
         const schemaVariants = obj.anyOf || obj.oneOf || obj.allOf;
         schemaVariants.forEach((variant: any) => {
-          if (variant.properties) {
+          if (variant?.properties) {
             traverseSchema(variant, path);
           }
         });
       }
+
+      visited.delete(obj);
     };
 
     traverseSchema(schema);
@@ -93,6 +118,11 @@ export async function returnArrayFieldsFromSchema(schema: any, loggerService?: L
  */
 export function replaceObjectsWithArrays(payload: any, arrayFields: string[], stringFields: string[], loggerService?: LoggerService): any {
   try {
+    // Handle null/undefined payload by throwing
+    if (payload === null || payload === undefined) {
+      throw new Error('Payload cannot be null or undefined');
+    }
+
     // Create a deep copy to avoid mutating the original payload
     const modifiedPayload = structuredClone(payload);
 
@@ -125,6 +155,11 @@ export function replaceObjectsWithArrays(payload: any, arrayFields: string[], st
  */
 export function convertNumberToStringAtPath(obj: any, path: string, loggerService?: LoggerService): void {
   try {
+    // Handle null/undefined objects by throwing
+    if (obj === null || obj === undefined) {
+      throw new Error('Object cannot be null or undefined');
+    }
+
     const pathParts = path.split('.');
     let current = obj;
 
@@ -165,6 +200,11 @@ export function convertNumberToStringAtPath(obj: any, path: string, loggerServic
  */
 export function convertObjectToArrayAtPath(obj: any, path: string, loggerService?: LoggerService): void {
   try {
+    // Handle null/undefined objects by throwing
+    if (obj === null || obj === undefined) {
+      throw new Error('Object cannot be null or undefined');
+    }
+
     const pathParts = path.split('.');
     let current = obj;
 
@@ -208,12 +248,31 @@ export function createSchemaAwareNumberProcessor(stringFields: string[]) {
   return (value: any, name: string, path = '') => {
     const fullPath = path ? `${path}.${name}` : name;
     if (stringFieldSet.has(fullPath)) return value;
-    return typeof value === 'string' && value.trim() !== '' && !isNaN(+value) ? +value : value;
+
+    // Only convert to number if it's a string with no leading/trailing whitespace
+    // and is a valid number
+    if (typeof value === 'string') {
+      const trimmed = value.trim();
+      // If original has whitespace but trimmed doesn't, preserve the original
+      if (trimmed !== value) {
+        return value;
+      }
+      // Only convert if it's a valid number
+      if (trimmed !== '' && !isNaN(+trimmed)) {
+        return +trimmed;
+      }
+    }
+    return value;
   };
 }
 
 export function isXmlContentType(req: Request, loggerService?: LoggerService): boolean {
   try {
+    // Handle null/undefined request by throwing
+    if (req === null || req === undefined) {
+      throw new Error('Request cannot be null or undefined');
+    }
+
     return req.headers['content-type'] === 'application/xml';
   } catch (error) {
     if (loggerService) {

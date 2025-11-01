@@ -1,11 +1,24 @@
-import { Injectable, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
+import { Injectable, OnModuleInit, OnModuleDestroy, BadRequestException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { LoggerService, RedisService } from '@tazama-lf/frms-coe-lib';
 import { StartupFactory } from '@tazama-lf/frms-coe-startup-lib';
 import { DatabaseService } from '../database/database.service';
-import { Status } from '../enums/configNotifyStatus.enum';
-import { CacheData } from '../interfaces/iCacheData';
-import { NatsMessage } from '../interfaces/iNatsMessage';
+
+enum Status {
+  ACK = 'ACK',
+  NACK = 'NACK',
+}
+
+interface NatsMessage {
+  transactionID: string; // This will be the config.id from database
+}
+
+interface CacheData {
+  endpointPath: string;
+  schema: object;
+  mapping: object;
+  functions: object;
+}
 
 @Injectable()
 export class ConfigNotifyService implements OnModuleInit, OnModuleDestroy {
@@ -33,7 +46,7 @@ export class ConfigNotifyService implements OnModuleInit, OnModuleDestroy {
     }
 
     try {
-      await this.natsService.init(this.handleNatsMessage.bind(this) as never, this.logger, [this.consumerStream], this.producerStream);
+      await this.natsService.init(this.handleNatsMessage.bind(this), this.logger, [this.consumerStream], this.producerStream);
       this.isInitialized = true;
       this.logger.log(`NATS consumer initialized for ${this.consumerStream}`);
 
@@ -60,6 +73,18 @@ export class ConfigNotifyService implements OnModuleInit, OnModuleDestroy {
   }
 
   private async handleNatsMessage(reqObj: unknown, handleResponse: (response: object) => Promise<void>): Promise<void> {
+    if (!reqObj || typeof reqObj !== 'object') {
+      this.logger.error('Invalid NATS message: must be an object');
+      throw new BadRequestException('Invalid NATS message: must be an object');
+    }
+
+    const partialMessage = reqObj as Partial<NatsMessage>;
+
+    if (!partialMessage.transactionID || typeof partialMessage.transactionID !== 'string' || partialMessage.transactionID.trim() === '') {
+      this.logger.error('Invalid NATS message: transactionID is required and must be a non-empty string');
+      throw new BadRequestException('Invalid NATS message: transactionID is required and must be a non-empty string');
+    }
+
     const message = reqObj as NatsMessage;
     this.logger.log(`Received NATS notification for config ID: ${message.transactionID}`);
 
@@ -68,21 +93,29 @@ export class ConfigNotifyService implements OnModuleInit, OnModuleDestroy {
         'SELECT endpoint_path AS "endpointPath", schema, mapping, functions FROM config WHERE id = $1',
         [message.transactionID],
       );
-      const config = result.rows[0];
 
-      if (config) {
+      if (result.rows && result.rows.length > 0) {
+        const config = result.rows[0];
         await this.setCache(config);
         this.logger.log(`Updated cache for key: ${config.endpointPath}`);
+
+        await handleResponse({
+          transactionID: message.transactionID,
+          status: Status.ACK,
+          timestamp: new Date().toISOString(),
+        });
+        this.logger.log(`ACK sent successfully for transaction: ${message.transactionID}`);
       } else {
         this.logger.warn(`Config not found for ID: ${message.transactionID}`);
-      }
 
-      await handleResponse({
-        transactionID: message.transactionID,
-        status: Status.ACK,
-        timestamp: new Date().toISOString(),
-      });
-      this.logger.log(`ACK sent successfully for transaction: ${message.transactionID}`);
+        await handleResponse({
+          transactionID: message.transactionID,
+          status: Status.NACK,
+          error: `Configuration not found for ID: ${message.transactionID}`,
+          timestamp: new Date().toISOString(),
+        });
+        this.logger.log(`NACK sent for transaction: ${message.transactionID} - Config not found`);
+      }
     } catch (error) {
       this.logger.error(`Error processing message: ${String(error)}`);
       await handleResponse({

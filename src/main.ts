@@ -11,7 +11,7 @@ config();
 
 const ERROR_EXIT_CODE = 1;
 
-async function bootstrap(): Promise<void> {
+export async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule);
   const configService = app.get(ConfigService);
 

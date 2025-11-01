@@ -96,7 +96,7 @@ export class TazamaAuthGuard implements CanActivate {
         throw error;
       }
 
-      throw new UnauthorizedException('Token validation failed');
+      throw new UnauthorizedException('Invalid token format');
     }
   }
 

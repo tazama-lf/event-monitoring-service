@@ -12,9 +12,9 @@ export const RequireClaims = (...claims: string[]) => SetMetadata(CLAIMS_KEY, cl
  * Common Event Monitoring Service claims for convenience
  * Add roles if needed here
  */
-export const EventMonitoringClaims = {
+export const EventMonitoringClaims = Object.freeze({
   DEMS_WRITE: 'dems:write',
-} as const;
+} as const);
 
 /**
  * Convenience decorators for common Event Monitoring Service roles
