@@ -1,8 +1,8 @@
-import { Injectable, OnModuleInit, OnModuleDestroy, BadRequestException } from '@nestjs/common';
+import { Injectable, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { LoggerService, RedisService } from '@tazama-lf/frms-coe-lib';
-import { StartupFactory } from '@tazama-lf/frms-coe-startup-lib';
 import { DatabaseService } from '../database/database.service';
+import { NatsService } from '../nats/nats.service';
 
 enum Status {
   ACK = 'ACK',
@@ -22,8 +22,6 @@ interface CacheData {
 
 @Injectable()
 export class ConfigNotifyService implements OnModuleInit, OnModuleDestroy {
-  private readonly natsService = new StartupFactory();
-  private isInitialized = false;
   private readonly cacheTtl: number;
   private readonly consumerStream: string;
   private readonly producerStream: string;
@@ -33,6 +31,7 @@ export class ConfigNotifyService implements OnModuleInit, OnModuleDestroy {
     private readonly redis: RedisService,
     private readonly configService: ConfigService,
     private readonly databaseService: DatabaseService,
+    private readonly natsService: NatsService,
   ) {
     this.cacheTtl = this.configService.get<number>('CACHE_TTL', 86400);
     this.consumerStream = this.configService.get<string>('CONSUMER_STREAM', 'config.notification');
@@ -40,15 +39,10 @@ export class ConfigNotifyService implements OnModuleInit, OnModuleDestroy {
   }
 
   async onModuleInit(): Promise<void> {
-    if (this.isInitialized) {
-      this.logger.warn('NATS service already initialized');
-      return;
-    }
-
     try {
-      await this.natsService.init(this.handleNatsMessage.bind(this), this.logger, [this.consumerStream], this.producerStream);
-      this.isInitialized = true;
-      this.logger.log(`NATS consumer initialized for ${this.consumerStream}`);
+      await this.natsService.registerConsumer([this.consumerStream], this.producerStream, this.handleNatsMessage.bind(this));
+
+      this.logger.log(`NATS consumer registered for ${this.consumerStream}`);
 
       const result = await this.databaseService.query<CacheData>(
         'SELECT endpoint_path AS "endpointPath", schema, mapping, functions FROM config',
@@ -62,33 +56,31 @@ export class ConfigNotifyService implements OnModuleInit, OnModuleDestroy {
       this.logger.log(`Cache preloaded: ${configs.length} configurations`);
     } catch (error) {
       this.logger.error(`Failed to initialize ConfigNotifyService: ${String(error)}`);
-      this.isInitialized = false;
       throw error;
     }
   }
 
   onModuleDestroy(): void {
-    this.isInitialized = false;
     this.logger.log('ConfigNotifyService destroyed');
   }
 
   private async handleNatsMessage(reqObj: unknown, handleResponse: (response: object) => Promise<void>): Promise<void> {
-    if (!reqObj || typeof reqObj !== 'object') {
-      this.logger.error('Invalid NATS message: must be an object');
-      throw new BadRequestException('Invalid NATS message: must be an object');
-    }
-
-    const partialMessage = reqObj as Partial<NatsMessage>;
-
-    if (!partialMessage.transactionID || typeof partialMessage.transactionID !== 'string' || partialMessage.transactionID.trim() === '') {
-      this.logger.error('Invalid NATS message: transactionID is required and must be a non-empty string');
-      throw new BadRequestException('Invalid NATS message: transactionID is required and must be a non-empty string');
-    }
-
-    const message = reqObj as NatsMessage;
-    this.logger.log(`Received NATS notification for config ID: ${message.transactionID}`);
-
     try {
+      if (!reqObj || typeof reqObj !== 'object') {
+        this.logger.error('Invalid NATS message: must be an object');
+        return;
+      }
+
+      const partialMessage = reqObj as Partial<NatsMessage>;
+
+      if (!partialMessage.transactionID || typeof partialMessage.transactionID !== 'string' || partialMessage.transactionID.trim() === '') {
+        this.logger.error('Invalid NATS message: transactionID is required');
+        return;
+      }
+
+      // Now we know transactionID exists and is valid, safe to cast
+      const message = reqObj as NatsMessage;
+
       const result = await this.databaseService.query<CacheData>(
         'SELECT endpoint_path AS "endpointPath", schema, mapping, functions FROM config WHERE id = $1',
         [message.transactionID],
@@ -119,7 +111,7 @@ export class ConfigNotifyService implements OnModuleInit, OnModuleDestroy {
     } catch (error) {
       this.logger.error(`Error processing message: ${String(error)}`);
       await handleResponse({
-        transactionID: message.transactionID,
+        transactionID: 'error-occurred',
         status: Status.NACK,
         error: error instanceof Error ? error.message : String(error),
         timestamp: new Date().toISOString(),
