@@ -65,7 +65,10 @@ export class DemsEngineService {
     // not found in cache, query the database
 
     this.loggerService.log(`Cache miss for endpoint: ${endpoint}. Querying database...`);
-    const result = await this.databaseService.query('SELECT schema, mapping, functions FROM config WHERE endpoint_path = $1', [endpoint]);
+    const result = await this.databaseService.query(
+      "SELECT schema, mapping, functions FROM config WHERE endpoint_path = $1 and (status = 'STATUS_06_EXPORTED' or status = 'STATUS_08_DEPLOYED')",
+      [endpoint],
+    );
     const record = result.rows[0];
 
     if (record) {

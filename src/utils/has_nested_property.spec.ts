@@ -175,49 +175,42 @@ describe('getValueByPath', () => {
     it('should throw error when property does not exist', () => {
       expect(() => {
         getValueByPath(testObject, 'nonExistent.property');
-        // eslint-disable-next-line quotes
       }).toThrow("Property 'nonExistent.property' not found");
     });
 
     it('should throw error when nested property does not exist', () => {
       expect(() => {
         getValueByPath(testObject, 'glossary.nonExistent.property');
-        // eslint-disable-next-line quotes
       }).toThrow("Property 'glossary.nonExistent.property' not found");
     });
 
     it('should throw error when array index is out of bounds', () => {
       expect(() => {
         getValueByPath(testObject, 'users.10.name');
-        // eslint-disable-next-line quotes
       }).toThrow("Property 'users.10.name' not found");
     });
 
     it('should throw error when accessing property on null', () => {
       expect(() => {
         getValueByPath(testObject, 'nullValue.property');
-        // eslint-disable-next-line quotes
       }).toThrow("Property 'nullValue.property' not found");
     });
 
     it('should throw error when accessing property on undefined', () => {
       expect(() => {
         getValueByPath(testObject, 'undefinedValue.property');
-        // eslint-disable-next-line quotes
       }).toThrow("Property 'undefinedValue.property' not found");
     });
 
     it('should throw error for empty path', () => {
       expect(() => {
         getValueByPath(testObject, '');
-        // eslint-disable-next-line quotes
       }).toThrow("Property '' not found");
     });
 
     it('should throw error when trying to access property on primitive', () => {
       expect(() => {
         getValueByPath(testObject, 'settings.theme.length.invalid');
-        // eslint-disable-next-line quotes
       }).toThrow("Property 'settings.theme.length.invalid' not found");
     });
   });

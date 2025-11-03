@@ -16,6 +16,7 @@ export default tseslint.config(
       '*.config.js',
       '*.config.mjs',
       '*.setup.js',
+      '**/*.spec.ts',
     ],
   },
   eslint.configs.recommended,
@@ -55,7 +56,9 @@ export default tseslint.config(
       // From reference: complexity limits
       'complexity': ['warn', { max: 25 }],
       'max-depth': ['warn', { max: 5 }],
-      'no-console': 'warn', // Changed to warn for NestJS logging
+      'no-console': 'warn', // Changed to warn for NestJS logging,
+      // Disabled quotes rule to allow both single and double quotes
+      'quotes': 'off',
     },
   },
 );
