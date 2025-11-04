@@ -45,7 +45,7 @@ export class ConfigNotifyService implements OnModuleInit, OnModuleDestroy {
       this.logger.log(`NATS consumer registered for ${this.consumerStream}`);
 
       const result = await this.databaseService.query<CacheData>(
-        "SELECT endpoint_path AS \"endpointPath\", schema, mapping, functions FROM config where status = 'STATUS_06_EXPORTED' or status = 'STATUS_08_DEPLOYED'",
+        "SELECT endpoint_path AS \"endpointPath\", schema, mapping, functions FROM config where (status = 'STATUS_06_EXPORTED' or status = 'STATUS_08_DEPLOYED') and publishing_status = 'STATUS_101_PUBLISHED'",
       );
       const configs = result.rows;
 
