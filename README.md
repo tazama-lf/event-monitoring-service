@@ -1,5 +1,7 @@
 # DEMS - Dynamic Event Monitoring System
 
+To test the DEMS (Data Event Monitoring Service), follow the instructions mentioned in /docs/how to test dems.readme.md
+
 A high-performance runtime engine for the Tazama Financial Risk Management System (FRMS) that receives, validates, processes, and routes financial transaction requests to the Event Director while maintaining comprehensive data persistence and monitoring capabilities.
 
 ## 🏗️ Architecture Overview
@@ -16,23 +18,27 @@ DEMS serves as a critical middleware component in the Tazama FRMS ecosystem, act
 ## ✨ Key Features
 
 ### 🔒 Security & Authentication
+
 - **JWT-based Authentication**: Secure token validation using Tazama Auth Library
 - **Role-based Access Control**: Fine-grained permissions with DEMS write roles
 - **Input Validation**: Comprehensive request sanitization and validation
 
 ### 🚀 Performance & Scalability
+
 - **Redis Caching**: Sub-millisecond schema and configuration retrieval
 - **Connection Pooling**: Optimized database connections for high throughput
 - **Asynchronous Processing**: Non-blocking request handling with NestJS
 - **APM Integration**: Real-time performance monitoring and transaction tracing
 
 ### 📊 Data Processing
+
 - **Multi-format Support**: Native XML and JSON transaction processing
 - **Schema-aware Transformation**: Dynamic field conversion based on JSON schemas
 - **Transaction Relationship Mapping**: Automatic relationship detection and storage
 - **Event Sourcing**: Complete audit trail of all transaction events
 
 ### 🔄 Integration Capabilities
+
 - **NATS Messaging**: Reliable event streaming to downstream services
 - **PostgreSQL Persistence**: ACID-compliant transaction data storage
 - **RESTful API**: Standard HTTP/HTTPS endpoint exposure
@@ -40,23 +46,23 @@ DEMS serves as a critical middleware component in the Tazama FRMS ecosystem, act
 
 ## 🛠️ Technology Stack
 
-| Component | Technology | Version |
-|-----------|------------|---------|
-| **Runtime** | Node.js | 20+ |
-| **Framework** | NestJS | ^11.0.1 |
-| **Language** | TypeScript | ^5.7.3 |
-| **Database** | PostgreSQL | 15+ |
-| **Cache** | Redis | 7+ |
-| **Messaging** | NATS JetStream | 2.10+ |
-| **Validation** | AJV | ^8.17.1 |
-| **Testing** | Jest | ^30.0.0 |
-| **Monitoring** | Custom APM | - |
+| Component      | Technology     | Version |
+| -------------- | -------------- | ------- |
+| **Runtime**    | Node.js        | 20+     |
+| **Framework**  | NestJS         | ^11.0.1 |
+| **Language**   | TypeScript     | ^5.7.3  |
+| **Database**   | PostgreSQL     | 15+     |
+| **Cache**      | Redis          | 7+      |
+| **Messaging**  | NATS JetStream | 2.10+   |
+| **Validation** | AJV            | ^8.17.1 |
+| **Testing**    | Jest           | ^30.0.0 |
+| **Monitoring** | Custom APM     | -       |
 
 ## 🚀 Quick Start
 
 ### Prerequisites
 
-- Node.js 20+ 
+- Node.js 20+
 - Docker & Docker Compose
 - PostgreSQL 15+
 - Redis 7+
@@ -65,34 +71,40 @@ DEMS serves as a critical middleware component in the Tazama FRMS ecosystem, act
 ### Installation
 
 1. **Clone the repository**
+
 ```bash
 git clone <repository-url>
 cd event-monitoring-service
 ```
 
 2. **Install dependencies**
+
 ```bash
 npm install
 ```
 
 3. **Environment setup**
+
 ```bash
 cp .env.example .env
 # Configure your environment variables
 ```
 
 4. **Start infrastructure services**
+
 ```bash
 docker-compose up -d redis nats
 ```
 
 5. **Database setup**
+
 ```bash
 # Run your PostgreSQL instance and execute schema migrations
 npm run db:migrate
 ```
 
 6. **Development server**
+
 ```bash
 set -a && source .env && set +a && npm run start:dev
 ```
@@ -144,31 +156,35 @@ LOG_LEVEL=info
 Processes financial transaction requests and routes them to the Event Director.
 
 **Headers:**
+
 ```http
 Authorization: Bearer <jwt-token>
 Content-Type: application/json | application/xml
 ```
 
 **URL Parameters:**
+
 - `endpoint` (string): Comma-separated endpoint identifier (e.g., "pacs,008,001,10")
 
 **Request Body:**
+
 ```json
 {
   "transactionDetails": {
     "source": "string",
-    "destination": "string", 
+    "destination": "string",
     "TxTp": "string",
     "tenantId": "string",
     "MsgId": "string",
     "CreDtTm": "2024-01-01T00:00:00Z",
     "EndToEndId": "string"
-  },
+  }
   // Additional transaction data...
 }
 ```
 
 **Response:**
+
 ```json
 {
   "message": "Everything is OK!",
@@ -179,24 +195,30 @@ Content-Type: application/json | application/xml
     "destination": "string",
     "transactionType": "string"
   },
-  "schema": { /* JSON Schema */ },
-  "payload": { /* Processed transaction data */ }
+  "schema": {
+    /* JSON Schema */
+  },
+  "payload": {
+    /* Processed transaction data */
+  }
 }
 ```
 
 **Error Response:**
+
 ```json
 {
   "message": "Validation failed",
   "differences": ["Field 'amount' is required"],
-  "schema": { /* JSON Schema */ }
+  "schema": {
+    /* JSON Schema */
+  }
 }
 ```
 
 ## 🏃‍♂️ Development
 
-
-```
+````
 
 ### Testing
 
@@ -211,7 +233,7 @@ npm run test:watch
 
 # End-to-end testing
 npm run test:e2e
-```
+````
 
 ### Code Quality
 
@@ -238,6 +260,7 @@ docker-compose -f docker-compose.prod.yml up -d
 ### Container Configuration
 
 The multi-stage Dockerfile optimizes for:
+
 - **Build efficiency**: Separate build and runtime stages
 - **Security**: Non-root user execution
 - **Size optimization**: Alpine-based images
@@ -246,12 +269,14 @@ The multi-stage Dockerfile optimizes for:
 ## 📊 Monitoring & Observability
 
 ### APM Integration
+
 - **Transaction Tracing**: End-to-end request tracking
 - **Performance Metrics**: Response times, throughput, error rates
 - **Custom Spans**: Detailed operation-level monitoring
 - **Health Checks**: Service availability monitoring
 
 ### Logging
+
 - **Structured Logging**: JSON-formatted log entries
 - **Correlation IDs**: Request tracking across services
 - **Log Levels**: Configurable verbosity (error, warn, info, debug)
@@ -260,6 +285,7 @@ The multi-stage Dockerfile optimizes for:
 ## 🔄 Integration Patterns
 
 ### Event-Driven Architecture
+
 ```
 Client Request → DEMS → Schema Validation → Data Transform → Event Director
                   ↓
@@ -267,6 +293,7 @@ Client Request → DEMS → Schema Validation → Data Transform → Event Direc
 ```
 
 ### Data Flow
+
 1. **Request Reception**: HTTP/HTTPS endpoint receives transaction
 2. **Authentication**: JWT token validation and role verification
 3. **Schema Lookup**: Redis cache retrieval of validation schemas
@@ -288,6 +315,7 @@ Client Request → DEMS → Schema Validation → Data Transform → Event Direc
 7. **Open a Pull Request**
 
 ### Development Guidelines
+
 - Follow TypeScript best practices
 - Maintain test coverage above 95%
 - Use conventional commit messages
