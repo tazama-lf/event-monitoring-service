@@ -213,9 +213,10 @@ describe('DemsEngineService', () => {
       const result = await service.findSchemaAndMapping(endpoint);
 
       expect(mockLoggerService.log).toHaveBeenCalledWith(`Cache miss for endpoint: ${endpoint}. Querying database...`);
-      expect(mockDatabaseService.query).toHaveBeenCalledWith('SELECT schema, mapping, functions FROM config WHERE endpoint_path = $1', [
-        endpoint,
-      ]);
+      expect(mockDatabaseService.query).toHaveBeenCalledWith(
+        "SELECT schema, mapping, functions FROM config WHERE endpoint_path = $1 and publishing_status = 'active'",
+        [endpoint],
+      );
       expect(mockRedisService.setJson).toHaveBeenCalled();
       expect(result).toEqual([mockSchema, mockMapping, mockFunctions]);
     });
