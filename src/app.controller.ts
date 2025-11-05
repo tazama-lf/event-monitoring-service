@@ -8,7 +8,7 @@ export class AppController {
 
   @Get()
   @UseGuards(TazamaAuthGuard)
-  getHello(): string {
-    return this.appService.getHello();
+  handleHealthCheck(): string {
+    return this.appService.handleHealthCheck().status;
   }
 }
