@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { StartupFactory, type IStartupService } from '@tazama-lf/frms-coe-startup-lib';
 import { LoggerService } from '@tazama-lf/frms-coe-lib';
 
-type MessageHandler = (reqObj: unknown, handleResponse: (response: object) => Promise<void>) => Promise<void>;
+type MessageHandler = (reqObj: unknown) => Promise<void>;
 
 @Injectable()
 export class NatsService {
