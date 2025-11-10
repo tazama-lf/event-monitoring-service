@@ -185,7 +185,7 @@ describe('DemsEngineService', () => {
           },
         ]),
       );
-      mockRedisService.getJson.mockResolvedValue(null);
+      (mockRedisService.getJson as jest.Mock).mockResolvedValue(null);
       mockDatabaseOperationsService.saveTransactionHistory.mockResolvedValue(undefined);
       mockDatabaseOperationsService.saveTransactionRelationship.mockResolvedValue(undefined);
       mockNatsService.notifyEventDirector.mockResolvedValue(undefined);
