@@ -406,12 +406,7 @@ export class DemsEngineService {
   }
 
   @ApmSpan('dems-handle-message')
-  async handleMessage(
-    payload: { any },
-    endpoint: string,
-    tenantId: string,
-    isPayloadXml: boolean,
-  ): Promise<ErrorResponse | ProcessingResult> {
+  async handleMessage(payload: any, endpoint: string, tenantId: string, isPayloadXml: boolean): Promise<ErrorResponse | ProcessingResult> {
     let transformedPayload: any; //contains the XML --> JSON converted payload
 
     if (isPayloadXml) {
