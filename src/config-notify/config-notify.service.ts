@@ -4,11 +4,6 @@ import { LoggerService, RedisService } from '@tazama-lf/frms-coe-lib';
 import { DatabaseService } from '../database/database.service';
 import { NatsService } from '../nats/nats.service';
 
-enum Status {
-  ACK = 'ACK',
-  NACK = 'NACK',
-}
-
 interface NatsMessage {
   transactionID: string; // This will be the config.id from database
 }
@@ -34,8 +29,8 @@ export class ConfigNotifyService implements OnModuleInit, OnModuleDestroy {
     private readonly natsService: NatsService,
   ) {
     this.cacheTtl = this.configService.get<number>('CACHE_TTL', 86400);
-    this.consumerStream = this.configService.get<string>('CONSUMER_STREAM', 'config.notification');
-    this.producerStream = this.configService.get<string>('PRODUCER_STREAM', 'config.notification.response');
+    this.consumerStream = this.configService.get<string>('CONSUMER_STREAM', 'dems.notify');
+    this.producerStream = this.configService.get<string>('PRODUCER_STREAM', 'dems.notification.response');
   }
 
   async onModuleInit(): Promise<void> {
@@ -64,7 +59,7 @@ export class ConfigNotifyService implements OnModuleInit, OnModuleDestroy {
     this.logger.log('ConfigNotifyService destroyed');
   }
 
-  private async handleNatsMessage(reqObj: unknown, handleResponse: (response: object) => Promise<void>): Promise<void> {
+  private async handleNatsMessage(reqObj: unknown): Promise<void> {
     try {
       if (!reqObj || typeof reqObj !== 'object') {
         this.logger.error('Invalid NATS message: must be an object');
@@ -90,32 +85,12 @@ export class ConfigNotifyService implements OnModuleInit, OnModuleDestroy {
         const config = result.rows[0];
         await this.setCache(config);
         this.logger.log(`Updated cache for key: ${config.endpointPath}`);
-
-        await handleResponse({
-          transactionID: message.transactionID,
-          status: Status.ACK,
-          timestamp: new Date().toISOString(),
-        });
-        this.logger.log(`ACK sent successfully for transaction: ${message.transactionID}`);
+        this.logger.log(`Successfully processed transaction: ${message.transactionID}`);
       } else {
         this.logger.warn(`Config not found for ID: ${message.transactionID}`);
-
-        await handleResponse({
-          transactionID: message.transactionID,
-          status: Status.NACK,
-          error: `Configuration not found for ID: ${message.transactionID}`,
-          timestamp: new Date().toISOString(),
-        });
-        this.logger.log(`NACK sent for transaction: ${message.transactionID} - Config not found`);
       }
     } catch (error) {
       this.logger.error(`Error processing message: ${String(error)}`);
-      await handleResponse({
-        transactionID: 'error-occurred',
-        status: Status.NACK,
-        error: error instanceof Error ? error.message : String(error),
-        timestamp: new Date().toISOString(),
-      });
     }
   }
 
