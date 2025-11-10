@@ -1,4 +1,3 @@
-No idea how to start?
 Follow these steps to test the DEMS (Data Event Monitoring Service):
 
 1. Docker compose up to set up the correct environment and infrastructure:
@@ -19,6 +18,7 @@ Follow these steps to test the DEMS (Data Event Monitoring Service):
 5. Keycloak Setup (if applicable):
    - Ensure that Keycloak is running and configured correctly.
    - Create necessary realms, clients, and users for authentication.
+   - dems:write claim is required for testing write operations.
 
 6. Get a JWT Token:
    - Use a tool like Postman or curl to make a POST request to the authentication endpoint of the auth-service to obtain a JWT token.
