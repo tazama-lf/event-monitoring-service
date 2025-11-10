@@ -107,7 +107,7 @@ describe('DemsEngineService', () => {
         mapping: mockMapping,
         functions: mockFunctions,
       };
-      mockRedisService.getJson.mockResolvedValue(cachedData);
+      (mockRedisService.getJson as jest.Mock).mockResolvedValue(cachedData);
 
       const result = await service.findSchemaAndMapping('/test');
 
@@ -121,7 +121,7 @@ describe('DemsEngineService', () => {
         mapping: mockMapping,
         functions: mockFunctions,
       });
-      mockRedisService.getJson.mockResolvedValue(cachedDataString);
+      (mockRedisService.getJson as jest.Mock).mockResolvedValue(cachedDataString);
 
       const result = await service.findSchemaAndMapping('/test');
 
@@ -129,7 +129,7 @@ describe('DemsEngineService', () => {
     });
 
     it('should query database on cache miss', async () => {
-      mockRedisService.getJson.mockResolvedValue(null);
+      (mockRedisService.getJson as jest.Mock).mockResolvedValue(null);
       mockDatabaseService.query.mockResolvedValue(
         createMockQueryResult([
           {
@@ -147,7 +147,7 @@ describe('DemsEngineService', () => {
     });
 
     it('should return null when no schema found', async () => {
-      mockRedisService.getJson.mockResolvedValue(null);
+      (mockRedisService.getJson as jest.Mock).mockResolvedValue(null);
       mockDatabaseService.query.mockResolvedValue(createMockQueryResult([]));
 
       const result = await service.findSchemaAndMapping('/test');
@@ -156,7 +156,7 @@ describe('DemsEngineService', () => {
     });
 
     it('should handle parsing error', async () => {
-      mockRedisService.getJson.mockResolvedValue('invalid json');
+      (mockRedisService.getJson as jest.Mock).mockResolvedValue('invalid json');
       mockDatabaseService.query.mockResolvedValue(
         createMockQueryResult([
           {
