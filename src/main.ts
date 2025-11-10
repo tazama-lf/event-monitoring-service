@@ -6,6 +6,7 @@ import { AppModule } from './app.module';
 import { ValidationPipe } from '@nestjs/common';
 import { ApmInterceptor } from './apm/apm.interceptor';
 import { ApmService } from './apm/apm.service';
+import { AppClusterService } from './app-cluster.service';
 import * as express from 'express';
 config();
 
@@ -35,10 +36,19 @@ export async function bootstrap(): Promise<void> {
   );
 
   const port = configService.get<number>('port', 3002);
-  await app.listen(port);
+  try {
+    await app.listen(port);
+    console.log(`Application is running on: http://localhost:${port}`);
+  } catch (error) {
+    console.error('Failed to start the application:', error);
+    process.exit(ERROR_EXIT_CODE);
+  }
 }
-bootstrap().catch((error: unknown) => {
-  const errorMessage = error instanceof Error ? error.message : String(error);
-  process.stderr.write(`Application failed to start: ${errorMessage}\n`);
-  process.exit(ERROR_EXIT_CODE);
-});
+// bootstrap().catch((error: unknown) => {
+//   const errorMessage = error instanceof Error ? error.message : String(error);
+//   process.stderr.write(`Application failed to start: ${errorMessage}\n`);
+//   process.exit(ERROR_EXIT_CODE);
+// });
+
+// Use clustering to run multiple instances
+AppClusterService.clusterize(bootstrap);
