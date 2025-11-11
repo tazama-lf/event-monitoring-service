@@ -53,8 +53,8 @@ export class DemsEngineService {
         try {
           const parsedSchema = JSON.parse(cachedSchema);
 
-          // return only if parsedSchema.publishing_status is 'active'
-          if (parsedSchema.publishing_status !== 'active') {
+          // return only if parsedSchema.publishing_status is 'active' (if present)
+          if (parsedSchema.publishing_status && parsedSchema.publishing_status !== 'active') {
             this.loggerService.log(`Cached schema for endpoint: ${endpoint} is not active`);
             return null;
           }
