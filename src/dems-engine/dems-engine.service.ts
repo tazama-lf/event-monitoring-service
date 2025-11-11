@@ -11,6 +11,7 @@ import { DatabaseService } from '../database/database.service';
 import { ApmSpan } from '../apm/apm.decorators';
 import { parseString, ParserOptions } from 'xml2js';
 import { returnArrayFieldsFromSchema, replaceObjectsWithArrays, createSchemaAwareNumberProcessor } from '../utils/xml2js.utils';
+import { processSourceMapping } from '../utils/mapping-sources.utils';
 import { randomUUID } from 'crypto';
 import { TransactionDetails } from '../interfaces/iTransactionRelationship';
 import { ErrorResponse } from '../interfaces/iErrorResponse';
@@ -301,53 +302,38 @@ export class DemsEngineService {
    * @param configuredMapping The mapping configuration containing functions to execute
    */
   @ApmSpan('dems-execute-configured-functions')
-  private async executeConfiguredFunctions(payload: any, configuredMapping: any, configuredFunctions: any): Promise<void> {
+  private async executeConfiguredFunctions(
+    payload: any,
+    configuredMapping: any,
+    configuredFunctions: any,
+    transactionRelationship: TransactionDetails,
+  ): Promise<void> {
+    console.log('Executing configured functions...', configuredFunctions);
+    let containsSaveTransactionRelationship: boolean = false;
+
     if (configuredFunctions) {
       for (const row of configuredFunctions) {
         // prepare params (getPayloadByPath) --> and call each function one by one
         const functionToCall = row.functionName;
         let sources = row.params || [];
-        let splitResultValue: string;
-        let isDestinationArray: boolean;
 
-        sources = sources.map((source: string) => {
-          const mapping = configuredMapping.find((sch: any) => {
-            isDestinationArray = false; //assuming false for initially
+        if (functionToCall === 'saveTransactionRelationship') {
+          console.log('About to call saveTransactionRelationship with sources:', sources);
+          containsSaveTransactionRelationship = true;
+          continue;
+        }
 
-            if (typeof sch.destination !== 'string') {
-              for (let i = 0; i < sch.destination.length; i++) {
-                if (sch.destination[i] === source) {
-                  isDestinationArray = true;
-                  const result: string = getValueByPath(payload, sch.source[0]);
-                  const splitResult = result.split(sch.delimiter);
-                  splitResultValue = splitResult[i];
-                  return splitResult[i];
-                }
-              }
-            }
-
-            return sch.destination === source;
-          });
-
-          if (isDestinationArray) {
-            return splitResultValue;
-          }
-
-          if (mapping.constantValue) {
-            return mapping.constantValue;
-          }
-
-          const extractedValues = mapping.source.map((s: string) => {
-            const value = getValueByPath(payload, s);
-            return value;
-          });
-
-          const combinedValue = extractedValues.join('');
-          return combinedValue;
-        });
+        sources = processSourceMapping(sources, configuredMapping, payload);
+        console.log(`Calling function ${functionToCall} with sources:`, sources);
 
         await this.databaseOperationsService[functionToCall](...Object.values(sources));
       }
+    }
+
+    if (containsSaveTransactionRelationship !== null) {
+      console.log('Calling saveTransactionRelationship as part of configured functions');
+
+      await this.databaseOperationsService.saveTransactionRelationship(transactionRelationship);
     }
   }
 
@@ -484,15 +470,15 @@ export class DemsEngineService {
       }
 
       const transactionType = extractTransactionType(endpoint);
+
+      // this is required as per event-director payload structure
       const enhancedRequest = { ...payload, TenantId: tenantId, TxTp: transactionType };
 
-      const mappingResult = await this.processMappings(enhancedRequest, configuredMapping, endpoint);
-      const { dataCache, transactionRelationship, endToEndId } = mappingResult;
+      const { dataCache, transactionRelationship, endToEndId } = await this.processMappings(enhancedRequest, configuredMapping, endpoint);
 
       try {
-        await this.executeConfiguredFunctions(enhancedRequest, configuredMapping, configuredFunctions);
+        await this.executeConfiguredFunctions(enhancedRequest, configuredMapping, configuredFunctions, transactionRelationship);
       } catch (error) {
-        this.loggerService.error(`Failed to execute configured functions: ${String(error)}`);
         return this.buildErrorResponse('compare functions with mapping', [`Function execution failed: ${String(error)}`]);
       }
 
