@@ -45,12 +45,20 @@ export class DemsEngineService {
     const cachedSchema = await this.redisService.getJson(cacheKey);
 
     if (cachedSchema) {
+      console.log('Schema found is, ', typeof cachedSchema);
       this.loggerService.log(`Cache hit for endpoint: ${endpoint}`);
 
       // Only parse if cachedSchema is a string
       if (typeof cachedSchema === 'string') {
         try {
           const parsedSchema = JSON.parse(cachedSchema);
+
+          // return only if parsedSchema.publishing_status is 'active'
+          if (parsedSchema.publishing_status !== 'active') {
+            this.loggerService.log(`Cached schema for endpoint: ${endpoint} is not active`);
+            return null;
+          }
+
           return [parsedSchema.schema, parsedSchema.mapping, parsedSchema.functions] as [any, any, any];
         } catch (error) {
           this.loggerService.error(`Failed to parse cached schema for endpoint ${endpoint}: ${String(error)}`);
@@ -67,7 +75,7 @@ export class DemsEngineService {
 
     this.loggerService.log(`Cache miss for endpoint: ${endpoint}. Querying database...`);
     const result = await this.databaseService.query(
-      "SELECT schema, mapping, functions FROM config WHERE endpoint_path = $1 and publishing_status = 'active'",
+      "SELECT schema, mapping, functions, publishing_status FROM config WHERE endpoint_path = $1 and publishing_status = 'active'",
       [endpoint],
     );
     const record = result.rows[0];

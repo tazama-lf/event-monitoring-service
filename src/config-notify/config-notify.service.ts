@@ -1,4 +1,4 @@
-import { Injectable, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
+import { Injectable, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { LoggerService, RedisService } from '@tazama-lf/frms-coe-lib';
 import { DatabaseService } from '../database/database.service';
@@ -13,10 +13,11 @@ interface CacheData {
   schema: object;
   mapping: object;
   functions: object;
+  publishing_status: string;
 }
 
 @Injectable()
-export class ConfigNotifyService implements OnModuleInit, OnModuleDestroy {
+export class ConfigNotifyService implements OnModuleInit {
   private readonly cacheTtl: number;
   private readonly consumerStream: string;
 
@@ -39,7 +40,7 @@ export class ConfigNotifyService implements OnModuleInit, OnModuleDestroy {
       this.logger.log(`NATS consumer registered for ${this.consumerStream}`);
 
       const result = await this.databaseService.query<CacheData>(
-        'SELECT endpoint_path AS "endpointPath", schema, mapping, functions FROM config where publishing_status = \'active\' ',
+        'SELECT endpoint_path AS "endpointPath", schema, mapping, functions, publishing_status FROM config where publishing_status = \'active\' ',
       );
       const configs = result.rows;
 
@@ -52,10 +53,6 @@ export class ConfigNotifyService implements OnModuleInit, OnModuleDestroy {
       this.logger.error(`Failed to initialize ConfigNotifyService: ${String(error)}`);
       throw error;
     }
-  }
-
-  onModuleDestroy(): void {
-    this.logger.log('ConfigNotifyService destroyed');
   }
 
   private async handleNatsMessage(reqObj: unknown): Promise<void> {
@@ -76,7 +73,7 @@ export class ConfigNotifyService implements OnModuleInit, OnModuleDestroy {
       const message = reqObj as NatsMessage;
 
       const result = await this.databaseService.query<CacheData>(
-        'SELECT endpoint_path AS "endpointPath", schema, mapping, functions FROM config WHERE id = $1',
+        'SELECT endpoint_path AS "endpointPath", schema, mapping, functions, publishing_status FROM config WHERE id = $1',
         [message.transactionID],
       );
 
@@ -99,6 +96,7 @@ export class ConfigNotifyService implements OnModuleInit, OnModuleDestroy {
       schema: config.schema,
       mapping: config.mapping,
       functions: config.functions,
+      publishing_status: config.publishing_status,
     };
     await this.redis.setJson(key, JSON.stringify(data), this.cacheTtl);
   }
