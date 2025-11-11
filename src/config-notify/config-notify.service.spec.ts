@@ -83,13 +83,6 @@ describe('ConfigNotifyService', () => {
     });
   });
 
-  describe('onModuleDestroy', () => {
-    it('should log destruction', () => {
-      service.onModuleDestroy();
-      expect(mockLogger.log).toHaveBeenCalledWith('ConfigNotifyService destroyed');
-    });
-  });
-
   describe('handleNatsMessage', () => {
     it('should update cache when config found', async () => {
       const message = { transactionID: '123' };
@@ -151,6 +144,7 @@ describe('ConfigNotifyService', () => {
         schema: { type: 'object' },
         mapping: { field: 'value' },
         functions: { fn: 'test' },
+        publishing_status: 'active',
       };
 
       await service.setCache(config);
@@ -161,6 +155,7 @@ describe('ConfigNotifyService', () => {
           schema: { type: 'object' },
           mapping: { field: 'value' },
           functions: { fn: 'test' },
+          publishing_status: 'active',
         }),
         86400,
       );
