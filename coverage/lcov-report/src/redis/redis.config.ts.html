@@ -23,30 +23,30 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">100% </span>
+                <span class="strong">0% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>8/8</span>
+                <span class='fraction'>0/8</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">100% </span>
+                <span class="strong">0% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>5/5</span>
+                <span class='fraction'>0/5</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">100% </span>
+                <span class="strong">0% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>1/1</span>
+                <span class='fraction'>0/1</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">100% </span>
+                <span class="strong">0% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>7/7</span>
+                <span class='fraction'>0/7</span>
             </div>
         
             
@@ -61,7 +61,7 @@
             </div>
         </template>
     </div>
-    <div class='status-line high'></div>
+    <div class='status-line low'></div>
     <pre><table class="coverage">
 <tr><td class="line-count quiet"><a name='L1'></a><a href='#L1'>1</a>
 <a name='L2'></a><a href='#L2'>2</a>
@@ -90,16 +90,16 @@
 <a name='L25'></a><a href='#L25'>25</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">4x</span>
-<span class="cline-any cline-yes">10x</span>
-<span class="cline-any cline-yes">10x</span>
-<span class="cline-any cline-yes">10x</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">10x</span>
-<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -114,16 +114,16 @@
 <span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">import { ConfigService } from '@nestjs/config';
 import { RedisConfig } from '@tazama-lf/frms-coe-lib/lib/interfaces';
 &nbsp;
-export const createRedisConfig = (configService: ConfigService): RedisConfig =&gt; {
-  const host = configService.get&lt;string&gt;('redis.host');
-  const port = configService.get&lt;number&gt;('redis.port');
-  const password = configService.get&lt;string&gt;('redis.password');
+export const <span class="cstat-no" title="statement not covered" >createRedisConfig = <span class="cstat-no" title="statement not covered" ><span class="fstat-no" title="function not covered" >(</span>c</span>onfigService: ConfigService): RedisConfig =&gt; {</span>
+  const host = <span class="cstat-no" title="statement not covered" >configService.get&lt;string&gt;('redis.host');</span>
+  const port = <span class="cstat-no" title="statement not covered" >configService.get&lt;number&gt;('redis.port');</span>
+  const password = <span class="cstat-no" title="statement not covered" >configService.get&lt;string&gt;('redis.password');</span>
 &nbsp;
-  if (!host || !port || !password) {
-    throw new Error('Redis configuration is incomplete. Check REDIS_HOST, REDIS_PORT, and REDIS_PASSWORD environment variables.');
+<span class="cstat-no" title="statement not covered" >  if (!host || !port || !password) {</span>
+<span class="cstat-no" title="statement not covered" >    throw new Error('Redis configuration is incomplete. Check REDIS_HOST, REDIS_PORT, and REDIS_PASSWORD environment variables.');</span>
   }
 &nbsp;
-  return {
+<span class="cstat-no" title="statement not covered" >  return {</span>
     db: configService.get&lt;number&gt;('redis.db', 0),
     servers: [
       {
@@ -142,7 +142,7 @@ export const createRedisConfig = (configService: ConfigService): RedisConfig =&g
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2025-11-01T18:41:50.754Z
+                at 2025-11-11T05:17:07.979Z
             </div>
         <script src="../../prettify.js"></script>
         <script>
