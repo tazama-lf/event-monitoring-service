@@ -12,8 +12,8 @@ export class NatsService {
     this.natsService = new StartupFactory();
   }
 
-  async registerConsumer(consumerStreams: string[], producerStream: string, messageHandler: MessageHandler): Promise<void> {
-    await this.natsService.init(messageHandler as never, this.logger, consumerStreams, producerStream);
+  async registerConsumer(consumerStreams: string[], messageHandler: MessageHandler): Promise<void> {
+    await this.natsService.init(messageHandler as never, this.logger, consumerStreams);
     this.logger.log(`NATS consumer registered for: ${consumerStreams.join(', ')}`);
   }
 

@@ -19,7 +19,6 @@ interface CacheData {
 export class ConfigNotifyService implements OnModuleInit, OnModuleDestroy {
   private readonly cacheTtl: number;
   private readonly consumerStream: string;
-  private readonly producerStream: string;
 
   constructor(
     private readonly logger: LoggerService,
@@ -30,12 +29,12 @@ export class ConfigNotifyService implements OnModuleInit, OnModuleDestroy {
   ) {
     this.cacheTtl = this.configService.get<number>('CACHE_TTL', 86400);
     this.consumerStream = this.configService.get<string>('CONSUMER_STREAM', 'dems.notify');
-    this.producerStream = this.configService.get<string>('PRODUCER_STREAM', 'dems.notification.response');
   }
 
   async onModuleInit(): Promise<void> {
     try {
-      await this.natsService.registerConsumer([this.consumerStream], this.producerStream, this.handleNatsMessage.bind(this));
+      // Register consumer without producer stream since we only consume messages
+      await this.natsService.registerConsumer([this.consumerStream], this.handleNatsMessage.bind(this));
 
       this.logger.log(`NATS consumer registered for ${this.consumerStream}`);
 
