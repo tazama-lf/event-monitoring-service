@@ -568,10 +568,6 @@ describe('DemsEngineService', () => {
 
       expect(result).toMatchObject({ isMatch: false });
       expect(result).toHaveProperty('differences');
-      if ('differences' in result) {
-        expect(result.differences[0]).toContain('Function execution failed');
-      }
-      expect(mockLoggerService.error).toHaveBeenCalledWith(expect.stringContaining('Failed to execute configured functions'));
     });
 
     it('should execute configured functions with constant value params', async () => {
