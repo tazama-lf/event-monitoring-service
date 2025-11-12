@@ -13,7 +13,9 @@ export class NatsService {
   }
 
   async registerConsumer(consumerStreams: string[], messageHandler: MessageHandler): Promise<void> {
-    await this.natsService.init(messageHandler as never, this.logger, consumerStreams);
+    // Create an adapter that matches the expected signature
+    const adaptedHandler = (message: any) => messageHandler(message);
+    await this.natsService.init(adaptedHandler, this.logger, consumerStreams);
     this.logger.log(`NATS consumer registered for: ${consumerStreams.join(', ')}`);
   }
 

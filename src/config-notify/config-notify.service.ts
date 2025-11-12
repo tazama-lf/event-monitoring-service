@@ -37,7 +37,7 @@ export class ConfigNotifyService implements OnModuleInit {
       // Register consumer without producer stream since we only consume messages
       await this.natsService.registerConsumer([this.consumerStream], this.handleNatsMessage.bind(this));
 
-      this.logger.log(`NATS consumer registered for ${this.consumerStream}`);
+      this.logger.log(`NATS consumer registered for ${this.consumerStream}`, 'ConfigNotifyService onModuleInit');
 
       const result = await this.databaseService.query<CacheData>(
         'SELECT endpoint_path AS "endpointPath", schema, mapping, functions, publishing_status FROM config where publishing_status = \'active\' ',
@@ -45,7 +45,7 @@ export class ConfigNotifyService implements OnModuleInit {
       const configs = result.rows;
 
       for (const config of configs) {
-        this.logger.log('Preloading cache for config:', config.endpointPath);
+        // this.logger.log('Preloading cache for config:', config.endpointPath);
         await this.setCache(config);
       }
       this.logger.log(`Cache preloaded: ${configs.length} configurations`);
@@ -57,6 +57,7 @@ export class ConfigNotifyService implements OnModuleInit {
 
   private async handleNatsMessage(reqObj: unknown): Promise<void> {
     try {
+      console.log('received nats message:', reqObj);
       if (!reqObj || typeof reqObj !== 'object') {
         this.logger.error('Invalid NATS message: must be an object');
         return;
