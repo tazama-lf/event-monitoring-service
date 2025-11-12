@@ -38,6 +38,7 @@ export class ConfigNotifyService implements OnModuleInit {
       await this.natsService.registerConsumer([this.consumerStream], this.handleNatsMessage.bind(this));
 
       this.logger.log(`NATS consumer registered for ${this.consumerStream}`);
+      console.log(`NATS consumer registered for ${this.consumerStream}`);
 
       const result = await this.databaseService.query<CacheData>(
         'SELECT endpoint_path AS "endpointPath", schema, mapping, functions, publishing_status FROM config where publishing_status = \'active\' ',
@@ -61,6 +62,8 @@ export class ConfigNotifyService implements OnModuleInit {
         this.logger.error('Invalid NATS message: must be an object');
         return;
       }
+
+      console.log('Received NATS message:', reqObj);
 
       const partialMessage = reqObj as Partial<NatsMessage>;
 
