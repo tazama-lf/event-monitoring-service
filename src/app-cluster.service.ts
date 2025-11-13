@@ -31,16 +31,24 @@ export class AppClusterService {
    * This method creates a temporary NestJS app to access configuration
    */
   static async clusterize(callback: () => Promise<void>): Promise<void> {
+    // Create temporary app to access configuration
+    const tempApp = await NestFactory.create(AppModule, { logger: false });
+    const configService = tempApp.get(ConfigService);
+
+    const maxCpu = configService.get<number>('maxCpu', os.cpus().length);
+    const numCPUs = Math.min(maxCpu, os.cpus().length);
+
+    await tempApp.close();
+
+    // If MAX_CPU is 1, run as single process without clustering
+    if (numCPUs <= 1) {
+      console.log(`Running in single process mode (maxCpu: ${maxCpu})`);
+      await callback();
+      return;
+    }
+
+    // Only use clustering for MAX_CPU > 1
     if (cluster.default.isPrimary) {
-      // to access configuration (temp app)
-      const tempApp = await NestFactory.create(AppModule, { logger: false });
-      const configService = tempApp.get(ConfigService);
-
-      const maxCpu = configService.get<number>('maxCpu', os.cpus().length);
-      const numCPUs = Math.min(maxCpu, os.cpus().length);
-
-      await tempApp.close();
-
       console.log(`Master server started on ${process.pid} with ${numCPUs} workers (maxCpu: ${maxCpu})`);
       for (let i = 0; i < numCPUs; i++) {
         cluster.default.fork();
@@ -62,6 +70,14 @@ export class AppClusterService {
     const maxCpu = this.configService.get<number>('maxCpu', os.cpus().length);
     const numCPUs = Math.min(maxCpu, os.cpus().length);
 
+    // If MAX_CPU is 1, run as single process without clustering
+    if (numCPUs <= 1) {
+      console.log(`Running in single process mode (maxCpu: ${maxCpu})`);
+      await callback();
+      return;
+    }
+
+    // Only use clustering for MAX_CPU > 1
     if (cluster.default.isPrimary) {
       console.log(`Master server started on ${process.pid} with ${numCPUs} workers (maxCpu: ${maxCpu})`);
       for (let i = 0; i < numCPUs; i++) {
