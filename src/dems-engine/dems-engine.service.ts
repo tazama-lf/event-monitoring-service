@@ -23,6 +23,7 @@ type FindSchemaAndMappingResult = [any, any, any] | null;
 export class DemsEngineService {
   private readonly ajv: Ajv;
   private readonly timeToLive: number;
+  private readonly LOG_CONTEXT = DemsEngineService.name;
 
   constructor(
     private readonly loggerService: LoggerService,
@@ -45,7 +46,6 @@ export class DemsEngineService {
     const cachedSchema = await this.redisService.getJson(cacheKey);
 
     if (cachedSchema) {
-      console.log('Schema found is, ', typeof cachedSchema);
       this.loggerService.log(`Cache hit for endpoint: ${endpoint}`);
 
       // Only parse if cachedSchema is a string
@@ -62,7 +62,6 @@ export class DemsEngineService {
           return [parsedSchema.schema, parsedSchema.mapping, parsedSchema.functions] as [any, any, any];
         } catch (error) {
           this.loggerService.error(`Failed to parse cached schema for endpoint ${endpoint}: ${String(error)}`);
-          // Continue to database query if parsing fails
         }
       } else if (typeof cachedSchema === 'object' && cachedSchema !== null) {
         // If cachedSchema is already an object, use it directly
@@ -86,8 +85,10 @@ export class DemsEngineService {
         schema: record.schema,
         mapping: record.mapping,
         functions: record.functions,
+        publishing_status: record.publishing_status,
       };
       await this.redisService.setJson(cacheKey, JSON.stringify(data), this.timeToLive);
+
       return [record.schema, record.mapping, record.functions] as [any, any, any];
     }
 
@@ -392,7 +393,7 @@ export class DemsEngineService {
         errorMessage = `Failed to complete transaction operations: ${String(error)}`;
       }
 
-      this.loggerService.error(errorMessage);
+      this.loggerService.error(errorMessage, '', this.LOG_CONTEXT);
       throw error;
     }
   }

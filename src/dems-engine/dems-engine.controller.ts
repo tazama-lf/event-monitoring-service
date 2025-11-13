@@ -18,6 +18,8 @@ export class DemsEngineController {
     private readonly logger: LoggerService,
   ) {}
 
+  private readonly LOG_CONTEXT = DemsEngineController.name;
+
   @Post('*endpoint')
   @RequireDemsWriteRole()
   async messageHandler(
@@ -35,15 +37,15 @@ export class DemsEngineController {
 
     this.logger.log(
       `Processing request for clientId: ${user.token.clientId}, tenantId: ${user.token.tenantId}, endpoint: ${transformedEndpoint}`,
+      this.LOG_CONTEXT,
     );
 
     const isPayloadXml = isXmlContentType(req);
 
     const result = await this.demsEngineService.handleMessage(payload, transformedEndpoint, user.token.tenantId, isPayloadXml);
-    this.logger.log('Dems Engine Controller - Result:', JSON.stringify(result));
 
     if (!('success' in result)) {
-      this.logger.log(`Problem is: ${result.message}`);
+      this.logger.log(`Problem is: ${result.message}`, this.LOG_CONTEXT);
 
       throw new BadRequestException({
         message: result.message,
@@ -62,8 +64,8 @@ export class DemsEngineController {
       });
     }
 
-    this.logger.log(' transaction relationship', JSON.stringify(result.transactionRelationship));
-    this.logger.log('data cache', JSON.stringify(result.dataCache));
+    this.logger.log(' transaction relationship', JSON.stringify(result.transactionRelationship), this.LOG_CONTEXT);
+    this.logger.log('data cache', JSON.stringify(result.dataCache), this.LOG_CONTEXT);
 
     return {
       message: 'Everything is OK!',

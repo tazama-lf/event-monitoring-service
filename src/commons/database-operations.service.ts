@@ -13,6 +13,8 @@ export class DatabaseOperationsService {
     private readonly loggerService: LoggerService,
     private readonly databaseService: DatabaseService,
   ) {}
+
+  private readonly log_context = DatabaseOperationsService.name;
   ERROR_PATTERNS: ErrorPattern[] = [
     {
       pattern: 'unique constraint',
@@ -80,7 +82,7 @@ export class DatabaseOperationsService {
   async addAccount(accountId: string, tenantId: string): Promise<void> {
     try {
       await this.databaseService.query('INSERT INTO account (id, tenantid) VALUES ($1, $2)', [accountId, tenantId]);
-      this.loggerService.log(`Added account: ${accountId} for tenant: ${tenantId}`);
+      this.loggerService.log(`Added account: ${accountId} for tenant: ${tenantId}`, this.log_context);
     } catch (error) {
       this.handleDatabaseError(error, 'add account', {
         details: `account ${accountId} for tenant ${tenantId}`,
@@ -91,7 +93,7 @@ export class DatabaseOperationsService {
   async addEntity(entityId: string, tenantId: string, CreDtTm: string): Promise<void> {
     try {
       await this.databaseService.query('INSERT INTO entity (id, tenantid, credttm) VALUES ($1, $2, $3)', [entityId, tenantId, CreDtTm]);
-      this.loggerService.log(`Added entity: ${entityId} for tenant: ${tenantId} and CreDtTm: ${CreDtTm}`);
+      this.loggerService.log(`Added entity: ${entityId} for tenant: ${tenantId} and CreDtTm: ${CreDtTm}`, this.log_context);
     } catch (error) {
       this.handleDatabaseError(error, 'add entity', {
         details: `entity ${entityId} for tenant ${tenantId}`,
@@ -107,7 +109,10 @@ export class DatabaseOperationsService {
         CreDtTm,
         tenantId,
       ]);
-      this.loggerService.log(`Added account holder: ${entityId} for account: ${accountId} and tenant: ${tenantId} and CreDtTm: ${CreDtTm}`);
+      this.loggerService.log(
+        `Added account holder: ${entityId} for account: ${accountId} and tenant: ${tenantId} and CreDtTm: ${CreDtTm}`,
+        this.log_context,
+      );
     } catch (error) {
       this.handleDatabaseError(error, 'add account holder', {
         details: `entity ${entityId} -> account ${accountId}`,
@@ -120,7 +125,7 @@ export class DatabaseOperationsService {
 
     try {
       await this.databaseService.query(`INSERT INTO ${txtp} (document) VALUES ($1)`, [transaction.transaction]);
-      this.loggerService.log(`Saved transaction history with key: ${key}`);
+      this.loggerService.log(`Saved transaction history with key: ${key}`, this.log_context);
     } catch (error) {
       this.handleDatabaseError(error, 'save transaction history', {
         details: `key ${key}, table ${txtp}`,
@@ -144,7 +149,10 @@ export class DatabaseOperationsService {
         transactionDetails.destination,
         JSON.stringify(transactionDetails),
       ]);
-      this.loggerService.log(`Saved transaction relationship: ${transactionDetails.source} -> ${transactionDetails.destination}`);
+      this.loggerService.log(
+        `Saved transaction relationship: ${transactionDetails.source} -> ${transactionDetails.destination}`,
+        this.log_context,
+      );
     } catch (error) {
       this.handleDatabaseError(error, 'save transaction relationship', {
         details: `${transactionDetails.source} -> ${transactionDetails.destination}`,
@@ -185,12 +193,12 @@ export class DatabaseOperationsService {
           quarantineRecord.status,
         ],
       );
-      this.loggerService.log(`Saved failed record to quarantine with ID: ${quarantineRecord.id}`);
+      this.loggerService.log(`Saved failed record to quarantine with ID: ${quarantineRecord.id}`, this.log_context);
     } catch (error) {
       // Special handling for quarantine - don't throw on duplicates
       const errorMessage = String(error);
       if (errorMessage.includes('unique constraint')) {
-        this.loggerService.warn(`Duplicate quarantine record with correlation ID: ${correlationId}`);
+        this.loggerService.warn(`Duplicate quarantine record with correlation ID: ${correlationId}`, this.log_context);
         return; // Don't throw for quarantine duplicates
       }
 

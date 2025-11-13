@@ -15,6 +15,8 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
     private readonly logger: LoggerService,
   ) {}
 
+  private readonly LOG_CONTEXT = DatabaseService.name;
+
   async onModuleInit(): Promise<void> {
     const dbConfig = this.configService.get<DatabaseConfig>('database');
 
@@ -39,9 +41,9 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
     try {
       const client = await this.pool.connect();
       client.release();
-      this.logger.log('Database connection established successfully');
+      this.logger.log('Database connection established successfully', this.LOG_CONTEXT);
     } catch (error) {
-      this.logger.error('Failed to connect to database:', error);
+      this.logger.error('Failed to connect to database:', error, this.LOG_CONTEXT);
       throw error;
     }
   }
@@ -49,7 +51,7 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
   async onModuleDestroy(): Promise<void> {
     if (this.pool) {
       await this.pool.end();
-      this.logger.log('Database connection pool closed');
+      this.logger.log('Database connection pool closed', this.LOG_CONTEXT);
     }
   }
 
@@ -64,15 +66,19 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
     try {
       const result = await this.pool.query<T>(text, params);
       const duration = Date.now() - start;
-      this.logger.log('Executed query', JSON.stringify({ text, duration, rows: result.rowCount }));
+      this.logger.log('Executed query', JSON.stringify({ query: text, duration, returnedRows: result.rowCount }), this.LOG_CONTEXT);
       return result;
     } catch (error) {
       const duration = Date.now() - start;
-      this.logger.error('Query error', {
-        text,
-        duration,
-        error: error instanceof Error ? error.message : String(error),
-      });
+      this.logger.error(
+        'Query error',
+        {
+          text,
+          duration,
+          error: error instanceof Error ? error.message : String(error),
+        },
+        this.LOG_CONTEXT,
+      );
       throw error;
     }
   }
