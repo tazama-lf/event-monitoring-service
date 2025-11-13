@@ -651,7 +651,11 @@ describe('DemsEngineService', () => {
       mockDatabaseOperationsService.saveTransactionHistory.mockRejectedValue(error);
 
       await expect(service.saveTransactionDataAndNotify(mockTazamaPayload, 'pacs.002', 'test123')).rejects.toThrow();
-      expect(mockLoggerService.error).toHaveBeenCalledWith(expect.stringContaining('Failed to save transaction history'));
+      expect(mockLoggerService.error).toHaveBeenCalledWith(
+        expect.stringContaining('Failed to save transaction history'),
+        '',
+        'DemsEngineService',
+      );
     });
 
     it('should handle event director notification errors', async () => {
@@ -659,7 +663,11 @@ describe('DemsEngineService', () => {
       mockNatsService.notifyEventDirector.mockRejectedValue(error);
 
       await expect(service.saveTransactionDataAndNotify(mockTazamaPayload, 'pacs.002', 'test123')).rejects.toThrow();
-      expect(mockLoggerService.error).toHaveBeenCalledWith(expect.stringContaining('Failed to notify event-director'));
+      expect(mockLoggerService.error).toHaveBeenCalledWith(
+        expect.stringContaining('Failed to notify event-director'),
+        '',
+        'DemsEngineService',
+      );
     });
 
     it('should handle generic operation errors', async () => {
@@ -667,7 +675,11 @@ describe('DemsEngineService', () => {
       mockDatabaseOperationsService.saveTransactionHistory.mockRejectedValue(error);
 
       await expect(service.saveTransactionDataAndNotify(mockTazamaPayload, 'pacs.002', 'test123')).rejects.toThrow();
-      expect(mockLoggerService.error).toHaveBeenCalledWith(expect.stringContaining('Failed to complete transaction operations'));
+      expect(mockLoggerService.error).toHaveBeenCalledWith(
+        expect.stringContaining('Failed to complete transaction operations'),
+        '',
+        'DemsEngineService',
+      );
     });
   });
 

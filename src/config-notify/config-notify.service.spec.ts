@@ -73,7 +73,7 @@ describe('ConfigNotifyService', () => {
 
       expect(mockNatsService.registerConsumer).toHaveBeenCalled();
       expect(mockRedis.setJson).toHaveBeenCalled();
-      expect(mockLogger.log).toHaveBeenCalledWith('NATS consumer registered for config.notification');
+      expect(mockLogger.log).toHaveBeenCalledWith('NATS consumer registered for config.notification', 'ConfigNotifyService');
     });
 
     it('should throw error on failure', async () => {
@@ -97,7 +97,7 @@ describe('ConfigNotifyService', () => {
       await (service as any).handleNatsMessage(message);
 
       expect(mockRedis.setJson).toHaveBeenCalled();
-      expect(mockLogger.log).toHaveBeenCalledWith('Updated cache for key: /test');
+      expect(mockLogger.log).toHaveBeenCalledWith('Updated cache for key: /test', 'ConfigNotifyService');
     });
 
     it('should log warning when config not found', async () => {
@@ -112,19 +112,19 @@ describe('ConfigNotifyService', () => {
 
       await (service as any).handleNatsMessage(message);
 
-      expect(mockLogger.warn).toHaveBeenCalledWith('Config not found for ID: 456');
+      expect(mockLogger.warn).toHaveBeenCalledWith('Config not found for ID: 456', 'ConfigNotifyService');
     });
 
     it('should log error for invalid message', async () => {
       await (service as any).handleNatsMessage(null);
 
-      expect(mockLogger.error).toHaveBeenCalledWith('Invalid NATS message: must be an object');
+      expect(mockLogger.error).toHaveBeenCalledWith('Invalid NATS message: must be an object', 'ConfigNotifyService');
     });
 
     it('should log error for missing transactionID', async () => {
       await (service as any).handleNatsMessage({});
 
-      expect(mockLogger.error).toHaveBeenCalledWith('Invalid NATS message: transactionID is required');
+      expect(mockLogger.error).toHaveBeenCalledWith('Invalid NATS message: transactionID is required', 'ConfigNotifyService');
     });
 
     it('should log error on database error', async () => {
@@ -133,7 +133,7 @@ describe('ConfigNotifyService', () => {
 
       await (service as any).handleNatsMessage(message);
 
-      expect(mockLogger.error).toHaveBeenCalledWith('Error processing message: Error: DB error');
+      expect(mockLogger.error).toHaveBeenCalledWith('Error processing message: Error: DB error', 'ConfigNotifyService');
     });
   });
 
