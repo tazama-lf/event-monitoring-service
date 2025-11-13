@@ -9,6 +9,7 @@ import { AuthModule } from './auth/auth.module';
 import { DatabaseModule } from './database/database.module';
 import { ApmModule } from './apm/apm.module';
 import { validateEnvironment } from './config/env.validation';
+import { AppClusterService } from './app-cluster.service';
 
 @Module({
   imports: [
@@ -26,6 +27,6 @@ import { validateEnvironment } from './config/env.validation';
     AuthModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [AppService, AppClusterService],
 })
 export class AppModule {}

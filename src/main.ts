@@ -6,8 +6,9 @@ import { AppModule } from './app.module';
 import { ValidationPipe } from '@nestjs/common';
 import { ApmInterceptor } from './apm/apm.interceptor';
 import { ApmService } from './apm/apm.service';
-// import { AppClusterService } from './app-cluster.service';
+import { AppClusterService } from './app-cluster.service';
 import * as express from 'express';
+import { LoggerService } from '@tazama-lf/frms-coe-lib';
 config();
 
 const ERROR_EXIT_CODE = 1;
@@ -27,6 +28,9 @@ export async function bootstrap(): Promise<void> {
     }),
   );
 
+  const logger = app.get(LoggerService);
+  app.useLogger(logger);
+
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
@@ -36,21 +40,28 @@ export async function bootstrap(): Promise<void> {
   );
 
   const port = configService.get<number>('port', 3002);
+  const environment = configService.get<string>('nodeEnv', 'dev');
+  const processId = process.pid;
   try {
     await app.listen(port);
-    console.log(`Application is running on: http://localhost:${port}`);
+
+    logger.log(
+      `Application is UP | environment: ${environment === 'dev' ? 'development' : 'uat server'}`,
+      `port ${port}`,
+      `process ID ${processId}`,
+    );
   } catch (error) {
-    console.error('Failed to start the application:', error);
+    logger.error('Failed to start the application:', error);
     process.exit(ERROR_EXIT_CODE);
   }
 }
 
-bootstrap();
-// bootstrap().catch((error: unknown) => {
-//   const errorMessage = error instanceof Error ? error.message : String(error);
-//   process.stderr.write(`Application failed to start: ${errorMessage}\n`);
-//   process.exit(ERROR_EXIT_CODE);
-// });
+// Single instance mode (current)
+// bootstrap();
 
-// Use clustering to run multiple instances
-// AppClusterService.clusterize(bootstrap);
+// Clustered mode (uncomment to enable clustering)
+AppClusterService.clusterize(bootstrap).catch((error: unknown) => {
+  const errorMessage = error instanceof Error ? error.message : String(error);
+  process.stderr.write(`Application failed to start: ${errorMessage}\n`);
+  process.exit(ERROR_EXIT_CODE);
+});
