@@ -3,6 +3,12 @@ export function getValueByPath<T>(obj: any, path: string): T {
   let current: any = obj;
 
   for (const prop of properties) {
+    // Breaking down the regex /^\d+$/:
+
+    // ^ - Start of string
+    // \d+ - One or more digits (0-9)
+    // $ - End of string
+
     if (/^\d+$/.test(prop)) {
       current = current[parseInt(prop)];
     } else {
