@@ -339,7 +339,7 @@ export class DemsEngineService {
       }
     }
 
-    if (containsSaveTransactionRelationship !== null) {
+    if (containsSaveTransactionRelationship !== false) {
       console.log('Calling saveTransactionRelationship as part of configured functions');
 
       await this.databaseOperationsService.saveTransactionRelationship(transactionRelationship);
