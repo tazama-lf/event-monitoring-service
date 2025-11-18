@@ -17,6 +17,8 @@ export interface AppConfiguration {
     readonly password: string;
     readonly name: string;
     readonly ssl: boolean;
+    readonly min?: number;
+    readonly max?: number;
   };
   readonly redis: {
     readonly host: string;
@@ -105,6 +107,8 @@ export function validateEnvironment(config: Record<string, unknown>): AppConfigu
       password: (config.DB_PASSWORD as string) || 'password',
       name: (config.DB_NAME as string) || 'event_monitoring_dev',
       ssl: config.NODE_ENV === 'production',
+      min: config.DB_MIN_CONNECTIONS ? parseInt(config.DB_MIN_CONNECTIONS as string, 10) : undefined,
+      max: config.DB_MAX_CONNECTIONS ? parseInt(config.DB_MAX_CONNECTIONS as string, 10) : undefined,
     },
     redis: {
       host: config.REDIS_HOST as string,
