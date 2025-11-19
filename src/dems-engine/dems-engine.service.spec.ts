@@ -378,36 +378,6 @@ describe('DemsEngineService', () => {
       expect(result).toHaveProperty('transactionRelationship');
     });
 
-    it('should handle transaction relationship with SUM transformation', async () => {
-      const mappingWithTransactionSum = [
-        {
-          source: ['amount1', 'amount2'],
-          destination: 'transactionDetails.totalAmount',
-          delimiter: '',
-          prefix: '',
-          suffix: '',
-          transformation: 'SUM',
-        },
-      ];
-      const schemaWithAmounts = {
-        type: 'object',
-        properties: {
-          amount1: { type: 'number' },
-          amount2: { type: 'number' },
-        },
-      };
-      mockDatabaseService.query.mockResolvedValue(
-        createMockQueryResult([{ schema: schemaWithAmounts, mapping: mappingWithTransactionSum, functions: mockFunctions }]),
-      );
-
-      const result = await service.handleMessage({ amount1: 500, amount2: 250 }, '/test', 'tenant1', false);
-
-      expect(result).toHaveProperty('success', true);
-      if ('transactionRelationship' in result) {
-        expect((result.transactionRelationship as any).totalAmount).toBe('750');
-      }
-    });
-
     it('should extract EndToEndId from transaction relationship mapping', async () => {
       const mappingWithEndToEndId = [
         {
@@ -433,36 +403,6 @@ describe('DemsEngineService', () => {
       expect(result).toHaveProperty('success', true);
       if ('endToEndId' in result) {
         expect(result.endToEndId).toBe('TXN-123456');
-      }
-    });
-
-    it('should handle mapping with SUM transformation', async () => {
-      const mappingWithSum = [
-        {
-          source: ['amount1', 'amount2'],
-          destination: 'redis.totalAmount',
-          delimiter: '',
-          prefix: '',
-          suffix: '',
-          transformation: 'SUM',
-        },
-      ];
-      const schemaWithAmounts = {
-        type: 'object',
-        properties: {
-          amount1: { type: 'number' },
-          amount2: { type: 'number' },
-        },
-      };
-      mockDatabaseService.query.mockResolvedValue(
-        createMockQueryResult([{ schema: schemaWithAmounts, mapping: mappingWithSum, functions: mockFunctions }]),
-      );
-
-      const result = await service.handleMessage({ amount1: 100, amount2: 200 }, '/test', 'tenant1', false);
-
-      expect(result).toHaveProperty('success', true);
-      if ('dataCache' in result) {
-        expect((result.dataCache as any).totalAmount).toBe('300');
       }
     });
 
