@@ -192,16 +192,24 @@ export class DemsEngineService {
       TxSts: '',
     };
     let endToEndId = '';
+    this.loggerService.log(`Processing mappings for endpoint: ${endpoint}`, this.LOG_CONTEXT);
 
     if (configuredMapping) {
       try {
         for (const mapping of configuredMapping) {
           const sources = mapping.source;
-          const destination = typeof mapping.destination === 'string' ? mapping.destination.split('.')[1] : mapping.destination;
-          const type = typeof mapping.destination === 'string' ? mapping.destination.split('.')[0] : mapping.destination;
-          const separator = mapping.delimiter;
-          const transformation = mapping.transformation;
 
+          //usually a string but can be array in case of multiple sources(split usecase)
+          let destination = typeof mapping.destination === 'string' ? mapping.destination.split('.')[1] : mapping.destination;
+          const type = typeof mapping.destination === 'string' ? mapping.destination.split('.')[0] : mapping.destination;
+
+          // case: redis.instdAmt.amt or redis.instdAmt.ccy ---> [redis,instdAmt,amt]
+          // stringSize will be 3 in this case
+          const stringSize = typeof mapping.destination === 'string' ? mapping.destination.split('.').length : -1;
+
+          const separator = mapping.delimiter;
+
+          //constant value injection logic
           if (mapping.constantValue) {
             if (type === 'redis') {
               dataCache[destination] = mapping.constantValue;
@@ -212,6 +220,7 @@ export class DemsEngineService {
             continue;
           }
 
+          // handling multiple destinations for single source - split value usecase
           if (typeof destination !== 'string' || typeof type !== 'string') {
             const sourceValue = getValueByPath<string>(payload, mapping.source[0]);
             const splitValues = sourceValue.split(mapping.delimiter);
@@ -231,40 +240,39 @@ export class DemsEngineService {
           }
 
           let dataCacheValue = mapping.prefix ? mapping.prefix : '';
-          let sum = 0;
           let transactionRelationshipValue = mapping.prefix ? mapping.prefix : '';
 
+          // REAL LOGIC STARTS HERE
+          // Iterate through sources to build the value based on mapping - totally dynamic work
           for (let i = 0; i < sources.length; i++) {
             if (type === 'redis') {
-              const value = getValueByPath<string>(payload, sources[i]);
-              if (transformation == 'SUM') {
-                const numValue: number = getValueByPath<number>(payload, sources[i]);
-                sum += numValue;
-              } else {
-                dataCacheValue += value;
-              }
+              dataCacheValue += getValueByPath<string>(payload, sources[i]);
+
               if (i < sources.length - 1) {
                 dataCacheValue += separator;
               }
             }
             if (type === 'transactionDetails') {
-              const value = getValueByPath<string>(payload, sources[i]);
-              if (transformation == 'SUM') {
-                const numValue = getValueByPath<number>(payload, sources[i]);
-                sum += numValue;
-              } else {
-                transactionRelationshipValue += value;
-              }
+              transactionRelationshipValue += getValueByPath<string>(payload, sources[i]);
+
               if (i < sources.length - 1) {
                 transactionRelationshipValue += separator;
               }
             }
           }
 
+          // Post processing for both dataCache and transactionRelationship
           if (type === 'redis') {
             dataCacheValue += mapping.suffix ? mapping.suffix : '';
-            if (transformation == 'SUM') {
-              dataCache[destination] = sum.toString();
+
+            if (stringSize === 3) {
+              destination = mapping.destination.split('.')[2];
+              // Handle nested object case
+              const objectName: string = mapping.destination.split('.')[1]; // instdAmt or intrBkSttlmAmt
+              if (!dataCache[objectName]) {
+                dataCache[objectName] = {};
+              }
+              dataCache[objectName][destination] = dataCacheValue;
             } else {
               dataCache[destination] = dataCacheValue;
             }
@@ -272,11 +280,8 @@ export class DemsEngineService {
 
           if (type === 'transactionDetails') {
             transactionRelationshipValue += mapping.suffix ? mapping.suffix : '';
-            if (transformation == 'SUM') {
-              transactionRelationship[destination] = sum.toString();
-            } else {
-              transactionRelationship[destination] = transactionRelationshipValue;
-            }
+
+            transactionRelationship[destination] = transactionRelationshipValue;
 
             // Fix the case sensitivity issue
             if (destination === 'EndToEndId') {
@@ -287,7 +292,6 @@ export class DemsEngineService {
         }
       } catch (error) {
         this.loggerService.error(`Failed to process mapping data: ${String(error)}`);
-        // Return valid objects even on error
         return {
           dataCache,
           transactionRelationship: transactionRelationship,
@@ -317,7 +321,6 @@ export class DemsEngineService {
     configuredFunctions: any,
     transactionRelationship: TransactionDetails,
   ): Promise<void> {
-    console.log('Executing configured functions...', configuredFunctions);
     let containsSaveTransactionRelationship: boolean = false;
 
     if (configuredFunctions) {
@@ -327,21 +330,17 @@ export class DemsEngineService {
         let sources = row.params || [];
 
         if (functionToCall === 'saveTransactionRelationship') {
-          console.log('About to call saveTransactionRelationship with sources:', sources);
           containsSaveTransactionRelationship = true;
           continue;
         }
 
         sources = processSourceMapping(sources, configuredMapping, payload);
-        console.log(`Calling function ${functionToCall} with sources:`, sources);
 
         await this.databaseOperationsService[functionToCall](...Object.values(sources));
       }
     }
 
     if (containsSaveTransactionRelationship !== false) {
-      console.log('Calling saveTransactionRelationship as part of configured functions');
-
       await this.databaseOperationsService.saveTransactionRelationship(transactionRelationship);
     }
   }

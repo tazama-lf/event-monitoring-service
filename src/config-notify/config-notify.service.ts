@@ -47,6 +47,7 @@ export class ConfigNotifyService implements OnModuleInit {
       const configs = result.rows;
 
       for (const config of configs) {
+        this.logger.log(`Preloading cache for key: ${config.endpointPath}`, this.LOG_CONTEXT);
         await this.setCache(config);
       }
       this.logger.log(`Cache preloaded: ${configs.length} configurations`, this.LOG_CONTEXT);
