@@ -62,7 +62,7 @@ describe('ConfigNotifyService', () => {
   describe('onModuleInit', () => {
     it('should register consumer and preload cache', async () => {
       mockDatabaseService.query.mockResolvedValue({
-        rows: [{ endpointPath: '/test', schema: {}, mapping: {}, functions: {} }],
+        rows: [{ endpointPath: '/test', schema: {}, mapping: {}, functions: {}, publishing_status: 'active' }],
         rowCount: 1,
         command: 'SELECT',
         oid: 0,
@@ -87,7 +87,7 @@ describe('ConfigNotifyService', () => {
     it('should update cache when config found', async () => {
       const message = { transactionID: '123' };
       mockDatabaseService.query.mockResolvedValue({
-        rows: [{ endpointPath: '/test', schema: {}, mapping: {}, functions: {} }],
+        rows: [{ endpointPath: '/test', schema: {}, mapping: {}, functions: {}, publishing_status: 'active' }],
         rowCount: 1,
         command: 'SELECT',
         oid: 0,
@@ -97,7 +97,7 @@ describe('ConfigNotifyService', () => {
       await (service as any).handleNatsMessage(message);
 
       expect(mockRedis.setJson).toHaveBeenCalled();
-      expect(mockLogger.log).toHaveBeenCalledWith('Updated cache for key: /test', 'ConfigNotifyService');
+      expect(mockLogger.log).toHaveBeenCalledWith('Updated cache for key: /test --> publishing status: active', 'ConfigNotifyService');
     });
 
     it('should log warning when config not found', async () => {

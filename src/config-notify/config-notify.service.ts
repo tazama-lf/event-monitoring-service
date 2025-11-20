@@ -59,7 +59,7 @@ export class ConfigNotifyService implements OnModuleInit {
 
   private async handleNatsMessage(reqObj: unknown): Promise<void> {
     try {
-      this.logger.log(`Received NATS message: ${JSON.stringify(reqObj)}`, this.LOG_CONTEXT);
+      this.logger.log(`Received NATS message | DB record id: ${JSON.stringify(reqObj)}`, this.LOG_CONTEXT);
       if (!reqObj || typeof reqObj !== 'object') {
         this.logger.error('Invalid NATS message: must be an object', this.LOG_CONTEXT);
         return;
@@ -83,7 +83,10 @@ export class ConfigNotifyService implements OnModuleInit {
       if (result.rows && result.rows.length > 0) {
         const config = result.rows[0];
         await this.setCache(config);
-        this.logger.log(`Updated cache for key: ${config.endpointPath}`, this.LOG_CONTEXT);
+        this.logger.log(
+          `Updated cache for key: ${config.endpointPath} --> publishing status: ${config.publishing_status}`,
+          this.LOG_CONTEXT,
+        );
         this.logger.log(`Successfully processed transaction: ${message.transactionID}`, this.LOG_CONTEXT);
       } else {
         this.logger.warn(`Config not found for ID: ${message.transactionID}`, this.LOG_CONTEXT);
