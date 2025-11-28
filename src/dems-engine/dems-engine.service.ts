@@ -184,7 +184,7 @@ export class DemsEngineService {
       TenantId: '',
       MsgId: '',
       CreDtTm: '',
-      Amt: '',
+      Amt: -1,
       Ccy: '',
       EndToEndId: '',
       lat: '',
@@ -327,21 +327,38 @@ export class DemsEngineService {
       for (const row of configuredFunctions) {
         // prepare params (getPayloadByPath) --> and call each function one by one
         const functionToCall = row.functionName;
+        console.log('starting functionToCall:', functionToCall);
         let sources = row.params || [];
+        console.log('sources before processing:', sources);
 
-        if (functionToCall === 'saveTransactionRelationship') {
+        if (functionToCall === 'saveTransactionDetails') {
           containsSaveTransactionRelationship = true;
           continue;
         }
 
         sources = processSourceMapping(sources, configuredMapping, payload);
+        console.log('sources after processing:', sources);
 
-        await this.databaseOperationsService[functionToCall](...Object.values(sources));
+        try {
+          await this.databaseOperationsService[functionToCall](...Object.values(sources));
+          console.log(`Executed function: ${functionToCall} with params:`, sources);
+        } catch (error) {
+          const errorMessage = `Function '${functionToCall}' failed: ${String(error)}`;
+          this.loggerService.error(errorMessage, '', this.LOG_CONTEXT);
+          throw new Error(errorMessage);
+        }
       }
     }
 
     if (containsSaveTransactionRelationship !== false) {
-      await this.databaseOperationsService.saveTransactionRelationship(transactionRelationship);
+      console.log('Executing saveTransactionRelationship with:', transactionRelationship);
+      try {
+        await this.databaseOperationsService.saveTransactionRelationship(transactionRelationship);
+      } catch (error) {
+        const errorMessage = `Function 'saveTransactionRelationship' failed: ${String(error)}`;
+        this.loggerService.error(errorMessage, '', this.LOG_CONTEXT);
+        throw new Error(errorMessage);
+      }
     }
   }
 
@@ -482,7 +499,7 @@ export class DemsEngineService {
       try {
         await this.executeConfiguredFunctions(enhancedRequest, configuredMapping, configuredFunctions, transactionRelationship);
       } catch (error) {
-        return this.buildErrorResponse('compare functions with mapping', [`Function execution failed: ${String(error)}`]);
+        return this.buildErrorResponse('the configured functions', [`Function execution failed: ${String(error)}`]);
       }
 
       const tazamaPayload = this.buildTazamaPayload(enhancedRequest, transactionType, tenantId, dataCache);
