@@ -16,7 +16,7 @@
 
 ![tazama-context-event-monitoring-service](dynamic-event-monitoring-flow-diagram.svg)
 
-The Event Monitoring Service serves as the primary entry point for incoming transaction data in the Tazama Transaction Monitoring system. It is responsible for receiving, validating, transforming, and preparing transaction messages before forwarding them to the Event Director for evaluation. The service acts as a critical data ingestion and preparation layer that ensures all incoming transactions are properly formatted and enriched with necessary metadata.
+The Event Monitoring Service serves as the primary entry point for dynamic incoming transaction data in the Tazama Transaction Monitoring system. It is responsible for receiving, validating, transforming, and preparing transaction messages before forwarding them to the Event Director for evaluation. The service acts as a critical data ingestion and preparation layer that ensures all incoming transactions are properly formatted and enriched with necessary metadata.
 
 The Event Monitoring Service handles multiple data formats (JSON and XML), performs schema validation, executes data transformations through configurable mappings, and maintains transaction history and relationships. It provides a robust foundation for the transaction monitoring pipeline by ensuring data quality and consistency before transactions enter the evaluation phase.
 
@@ -71,7 +71,7 @@ The service retrieves the appropriate schema and mapping configuration for the i
 The schema and mapping lookup process follows a caching strategy:
 
 - First, the service checks Redis cache for the configuration
-- If not found in cache, it queries the database for active configurations
+- If not found in cache, it queries the database for active configurations (Tazama Connection Studio service persists data in the DB)
 - Retrieved configurations are cached for future requests to improve performance
 
 The configuration includes:
