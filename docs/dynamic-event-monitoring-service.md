@@ -1,7 +1,7 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 
-- [The Event Monitoring Service](#the-event-monitoring-service)
-  - [Event Monitoring Service Context](#event-monitoring-service-context)
+- [The Dynamic Event Monitoring Service](#event-monitoring-service)
+  - [Dynamic Event Monitoring Service Context](#event-monitoring-service-context)
     - [1. Receive Transaction](#1-receive-transaction)
       - [Payload:](#payload)
     - [1.1. Find Schema and Mapping](#11-find-schema-and-mapping)
@@ -14,7 +14,7 @@
 
 # The Event Monitoring Service
 
-![tazama-context-event-monitoring-service](event-monitoring-flow-diagram.svg)
+![tazama-context-event-monitoring-service](dynamic-event-monitoring-flow-diagram.svg)
 
 The Event Monitoring Service serves as the primary entry point for incoming transaction data in the Tazama Transaction Monitoring system. It is responsible for receiving, validating, transforming, and preparing transaction messages before forwarding them to the Event Director for evaluation. The service acts as a critical data ingestion and preparation layer that ensures all incoming transactions are properly formatted and enriched with necessary metadata.
 
