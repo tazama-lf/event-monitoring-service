@@ -1,12 +1,12 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { BadRequestException } from '@nestjs/common';
 import { Request } from 'express';
-import { DemsEngineController } from './dems-engine.controller';
-import { DemsEngineService } from './dems-engine.service';
+import { DemsEngineController } from '../../src/dems-engine/dems-engine.controller';
+import { DemsEngineService } from '../../src/dems-engine/dems-engine.service';
 import { LoggerService } from '@tazama-lf/frms-coe-lib';
-import { TazamaAuthGuard } from '../auth/tazama-auth.guard';
-import { AuthenticatedUser } from '../auth/auth.types';
-import { MessageHandlerResponse } from '../interfaces/iMessagerHandlerResponse';
+import { TazamaAuthGuard } from '../../src/auth/tazama-auth.guard';
+import { AuthenticatedUser } from '../../src/auth/auth.types';
+import { MessageHandlerResponse } from '../../src/interfaces/iMessagerHandlerResponse';
 
 describe('DemsEngineController', () => {
   let controller: DemsEngineController;

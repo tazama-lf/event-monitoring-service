@@ -1,9 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import { LoggerService, RedisService } from '@tazama-lf/frms-coe-lib';
-import { ConfigNotifyService } from './config-notify.service';
-import { DatabaseService } from '../database/database.service';
-import { NatsService } from '../nats/nats.service';
+import { ConfigNotifyService } from '../../src/config-notify/config-notify.service';
+import { DatabaseService } from '../../src/database/database.service';
+import { NatsService } from '../../src/nats/nats.service';
 
 describe('ConfigNotifyService', () => {
   let service: ConfigNotifyService;

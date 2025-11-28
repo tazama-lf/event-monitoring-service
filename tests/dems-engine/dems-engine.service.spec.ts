@@ -1,10 +1,10 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import { LoggerService, RedisService } from '@tazama-lf/frms-coe-lib';
-import { DemsEngineService } from './dems-engine.service';
-import { NatsService } from '../nats/nats.service';
-import { DatabaseOperationsService } from '../commons';
-import { DatabaseService } from '../database/database.service';
+import { DemsEngineService } from '../../src/dems-engine/dems-engine.service';
+import { NatsService } from '../../src/nats/nats.service';
+import { DatabaseOperationsService } from '../../src/commons';
+import { DatabaseService } from '../../src/database/database.service';
 
 jest.mock('xml2js', () => ({
   parseString: jest.fn(),

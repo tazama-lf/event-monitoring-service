@@ -90,18 +90,20 @@
       "json",
       "ts"
     ],
-    "rootDir": "src",
+    "rootDir": ".",
     "testRegex": ".*\\.spec\\.ts$",
     "transform": {
       "^.+\\.(t|j)s$": "ts-jest"
     },
     "collectCoverageFrom": [
-      "**/*.(t|j)s"
+      "src/config-notify/config-notify.service.ts",
+      "src/dems-engine/dems-engine.controller.ts",
+      "src/dems-engine/dems-engine.service.ts"
     ],
-    "coverageDirectory": "../coverage",
+    "coverageDirectory": "coverage",
     "testEnvironment": "node",
     "setupFiles": [
-      "../jest.setup.js"
+      "./jest.setup.js"
     ]
   },
   "lint-staged": {
