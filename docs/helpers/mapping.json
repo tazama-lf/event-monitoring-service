@@ -1,0 +1,118 @@
+[
+  {
+    "source": [
+      "TenantId",
+      "CstmrCdtTrfInitn.PmtInf.CdtTrfTxInf.Cdtr.Id.PrvtId.Othr.0.Id",
+      "CstmrCdtTrfInitn.PmtInf.CdtTrfTxInf.Cdtr.Id.PrvtId.Othr.0.SchmeNm.Prtry"
+    ],
+    "delimiter": "",
+    "destination": "redis.cdtrId",
+    "transformation": "CONCAT"
+  },
+  {
+    "source": [
+      "TenantId",
+      "CstmrCdtTrfInitn.PmtInf.Dbtr.Id.PrvtId.Othr.0.Id",
+      "CstmrCdtTrfInitn.PmtInf.Dbtr.Id.PrvtId.Othr.0.SchmeNm.Prtry"
+    ],
+    "delimiter": "",
+    "destination": "redis.dbtrId",
+    "transformation": "CONCAT"
+  },
+  {
+    "source": [
+      "TenantId",
+      "CstmrCdtTrfInitn.PmtInf.CdtTrfTxInf.CdtrAcct.Id.Othr.0.Id",
+      "CstmrCdtTrfInitn.PmtInf.CdtTrfTxInf.CdtrAcct.Id.Othr.0.SchmeNm.Prtry",
+      "CstmrCdtTrfInitn.PmtInf.CdtTrfTxInf.CdtrAgt.FinInstnId.ClrSysMmbId.MmbId"
+    ],
+    "delimiter": "",
+    "destination": "redis.cdtrAcctId",
+    "transformation": "CONCAT"
+  },
+  {
+    "source": [
+      "TenantId",
+      "CstmrCdtTrfInitn.PmtInf.DbtrAcct.Id.Othr.0.Id",
+      "CstmrCdtTrfInitn.PmtInf.DbtrAcct.Id.Othr.0.SchmeNm.Prtry",
+      "CstmrCdtTrfInitn.PmtInf.DbtrAgt.FinInstnId.ClrSysMmbId.MmbId"
+    ],
+    "delimiter": "",
+    "destination": "redis.dbtrAcctId",
+    "transformation": "CONCAT"
+  },
+  {
+    "prefix": "",
+    "source": [
+      "TenantId",
+      "CstmrCdtTrfInitn.PmtInf.DbtrAcct.Id.Othr.0.Id",
+      "CstmrCdtTrfInitn.PmtInf.DbtrAcct.Id.Othr.0.SchmeNm.Prtry",
+      "CstmrCdtTrfInitn.PmtInf.DbtrAgt.FinInstnId.ClrSysMmbId.MmbId"
+    ],
+    "delimiter": "",
+    "destination": "transactionDetails.source",
+    "transformation": "CONCAT"
+  },
+  {
+    "prefix": "",
+    "source": [
+      "TenantId",
+      "CstmrCdtTrfInitn.PmtInf.CdtTrfTxInf.CdtrAcct.Id.Othr.0.Id",
+      "CstmrCdtTrfInitn.PmtInf.CdtTrfTxInf.CdtrAcct.Id.Othr.0.SchmeNm.Prtry",
+      "CstmrCdtTrfInitn.PmtInf.CdtTrfTxInf.CdtrAgt.FinInstnId.ClrSysMmbId.MmbId"
+    ],
+    "delimiter": "",
+    "destination": "transactionDetails.destination",
+    "transformation": "CONCAT"
+  },
+  {
+    "source": ["CstmrCdtTrfInitn.PmtInf.CdtTrfTxInf.Amt.InstdAmt.Amt.Amt"],
+    "destination": "transactionDetails.Amt",
+    "transformation": "NONE"
+  },
+  {
+    "source": ["CstmrCdtTrfInitn.PmtInf.CdtTrfTxInf.Amt.InstdAmt.Amt.Ccy"],
+    "destination": "transactionDetails.Ccy",
+    "transformation": "NONE"
+  },
+  {
+    "source": ["CstmrCdtTrfInitn.GrpHdr.CreDtTm"],
+    "destination": "transactionDetails.CreDtTm",
+    "transformation": "NONE"
+  },
+  {
+    "source": ["CstmrCdtTrfInitn.PmtInf.CdtTrfTxInf.PmtId.EndToEndId"],
+    "destination": "transactionDetails.EndToEndId",
+    "transformation": "NONE"
+  },
+  {
+    "source": ["CstmrCdtTrfInitn.SplmtryData.Envlp.Doc.InitgPty.Glctn.Lat"],
+    "destination": "transactionDetails.lat",
+    "transformation": "NONE"
+  },
+  {
+    "source": ["CstmrCdtTrfInitn.SplmtryData.Envlp.Doc.InitgPty.Glctn.Long"],
+    "destination": "transactionDetails.long",
+    "transformation": "NONE"
+  },
+  {
+    "source": ["CstmrCdtTrfInitn.GrpHdr.MsgId"],
+    "destination": "transactionDetails.MsgId",
+    "transformation": "NONE"
+  },
+  {
+    "source": ["CstmrCdtTrfInitn.PmtInf.PmtInfId"],
+    "destination": "transactionDetails.TxSts",
+    "transformation": "NONE"
+  },
+  {
+    "source": ["TenantId"],
+    "destination": "transactionDetails.TenantId",
+    "transformation": "NONE"
+  },
+  {
+    "source": ["TxTp"],
+    "destination": "transactionDetails.TxTp",
+    "transformation": "NONE"
+  }
+]
