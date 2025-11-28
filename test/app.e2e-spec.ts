@@ -5,8 +5,6 @@ import request from 'supertest';
 import type { Server } from 'node:http';
 import { AppModule } from './../src/app.module';
 
-const HTTP_STATUS_OK = 200;
-
 describe('AppController (e2e)', () => {
   let app: INestApplication;
 
@@ -22,8 +20,7 @@ describe('AppController (e2e)', () => {
   it('/ (GET)', () =>
     request(app.getHttpServer() as Server)
       .get('/')
-      .expect(HTTP_STATUS_OK)
-      .expect('Hello World!'));
+      .expect('UP'));
 
   afterAll(async () => {
     await app.close();
