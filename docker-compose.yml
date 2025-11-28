@@ -1,17 +1,17 @@
 services:
-  # postgres:
-  #   image: postgres:15
-  #   container_name: event-monitoring-postgres
-  #   environment:
-  #     POSTGRES_DB: tcs
-  #     POSTGRES_USER: postgres
-  #     POSTGRES_PASSWORD: postgres
-  #     POSTGRES_HOST_AUTH_METHOD: trust
-  #   ports:
-  #     - '5432:5432'
-  #   volumes:
-  #     - postgres_data:/var/lib/postgresql/data
-  #     - ./init-scripts:/docker-entrypoint-initdb.d
+  event-monitoring-service:
+    container_name: event-monitoring-service
+    build:
+      context: .
+      args:
+        GH_TOKEN: ${GH_TOKEN}
+    ports:
+      - '3002:3002'
+    environment:
+      - NODE_ENV=development
+    depends_on:
+      - redis
+      - nats
 
   redis:
     image: redis:7-alpine
