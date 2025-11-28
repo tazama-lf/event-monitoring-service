@@ -60,7 +60,9 @@ describe('DemsEngineController', () => {
       schema: { type: 'object' },
       mapping: { test: 'mapping' },
       functions: { test: 'function' },
+      publishing_status: 'active',
     },
+    publishing_status: 'active',
   };
 
   const mockErrorResult = {
