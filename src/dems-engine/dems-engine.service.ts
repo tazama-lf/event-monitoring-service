@@ -465,6 +465,7 @@ export class DemsEngineService {
     }
 
     try {
+      // refer to /docs/helpers for example schema and mapping configuration
       const result = await this.findSchemaAndMapping(endpoint);
       if (!result) {
         return this.buildErrorResponse('Schema not found for the specified endpoint', ['No schema exists for this endpoint']);
@@ -494,9 +495,11 @@ export class DemsEngineService {
       // this is required as per event-director payload structure
       const enhancedRequest = { ...payload, TenantId: tenantId, TxTp: transactionType };
 
+      // refer to /docs/helpers for example mapping configuration
       const { dataCache, transactionRelationship, endToEndId } = await this.processMappings(enhancedRequest, configuredMapping, endpoint);
 
       try {
+        // refer to /docs/helpers for example functions configuration
         await this.executeConfiguredFunctions(enhancedRequest, configuredMapping, configuredFunctions, transactionRelationship);
       } catch (error) {
         return this.buildErrorResponse('the configured functions', [`Function execution failed: ${String(error)}`]);
