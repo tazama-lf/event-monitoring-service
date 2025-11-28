@@ -3,18 +3,8 @@ import { ConfigService } from '@nestjs/config';
 import { LoggerService, RedisService } from '@tazama-lf/frms-coe-lib';
 import { DatabaseService } from '../database/database.service';
 import { NatsService } from '../nats/nats.service';
-
-interface NatsMessage {
-  transactionID: string; // This will be the config.id from database
-}
-
-interface CacheData {
-  endpointPath: string;
-  schema: object;
-  mapping: object;
-  functions: object;
-  publishing_status: string;
-}
+import { NatsMessage } from '../interfaces/iNatsMessage';
+import { CacheData } from '../interfaces/iCacheData';
 
 @Injectable()
 export class ConfigNotifyService implements OnModuleInit {
