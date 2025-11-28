@@ -1,0 +1,102 @@
+<svg width="1300" height="250" xmlns="http://www.w3.org/2000/svg">
+  <!-- Define gradients and styles -->
+  <defs>
+    <linearGradient id="bgGradient1" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#B8D4D4;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#9BC4C4;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="bgGradient2" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#6BA5A5;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#508B8B;stop-opacity:1" />
+    </linearGradient>
+    <filter id="shadow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="3"/>
+      <feOffset dx="2" dy="2" result="offsetblur"/>
+      <feComponentTransfer>
+        <feFuncA type="linear" slope="0.3"/>
+      </feComponentTransfer>
+      <feMerge> 
+        <feMergeNode/>
+        <feMergeNode in="SourceGraphic"/> 
+      </feMerge>
+    </filter>
+  </defs>
+  
+  <!-- Box 1 - Event Monitoring Service -->
+  <g transform="translate(30, 30)">
+    <!-- Outer rounded rectangle -->
+    <rect x="0" y="0" width="200" height="180" rx="30" ry="30" fill="url(#bgGradient1)" filter="url(#shadow)"/>
+    <!-- Inner rounded rectangle -->
+    <rect x="15" y="15" width="170" height="150" rx="20" ry="20" fill="white" stroke="#7FB5B5" stroke-width="3"/>
+    <!-- Text -->
+    <text x="100" y="75" text-anchor="middle" font-family="Arial, sans-serif" font-size="18" font-weight="bold" fill="#2C5454">Event</text>
+    <text x="100" y="95" text-anchor="middle" font-family="Arial, sans-serif" font-size="18" font-weight="bold" fill="#2C5454">Monitoring</text>
+    <text x="100" y="115" text-anchor="middle" font-family="Arial, sans-serif" font-size="18" font-weight="bold" fill="#2C5454">Service</text>
+  </g>
+  
+  <!-- Arrow 1 -->
+  <g transform="translate(230, 85)">
+    <polygon points="0,0 60,35 0,70" fill="#9BC4C4" opacity="0.7"/>
+  </g>
+  
+  <!-- Box 2 - Event Director -->
+  <g transform="translate(300, 30)">
+    <!-- Outer rounded rectangle -->
+    <rect x="0" y="0" width="200" height="180" rx="30" ry="30" fill="url(#bgGradient2)" filter="url(#shadow)"/>
+    <!-- Inner rounded rectangle -->
+    <rect x="15" y="15" width="170" height="150" rx="20" ry="20" fill="white" stroke="#508B8B" stroke-width="3"/>
+    <!-- Text -->
+    <text x="100" y="85" text-anchor="middle" font-family="Arial, sans-serif" font-size="20" font-weight="bold" fill="#2C5454">Event</text>
+    <text x="100" y="110" text-anchor="middle" font-family="Arial, sans-serif" font-size="20" font-weight="bold" fill="#2C5454">Director</text>
+  </g>
+  
+  <!-- Arrow 2 -->
+  <g transform="translate(500, 85)">
+    <polygon points="0,0 60,35 0,70" fill="#9BC4C4" opacity="0.7"/>
+  </g>
+  
+  <!-- Box 3 - Rule Processors -->
+  <g transform="translate(570, 30)">
+    <!-- Outer rounded rectangle -->
+    <rect x="0" y="0" width="200" height="180" rx="30" ry="30" fill="url(#bgGradient1)" filter="url(#shadow)"/>
+    <!-- Inner rounded rectangle -->
+    <rect x="15" y="15" width="170" height="150" rx="20" ry="20" fill="white" stroke="#7FB5B5" stroke-width="3"/>
+    <!-- Text -->
+    <text x="100" y="85" text-anchor="middle" font-family="Arial, sans-serif" font-size="20" font-weight="bold" fill="#2C5454">Rule</text>
+    <text x="100" y="110" text-anchor="middle" font-family="Arial, sans-serif" font-size="20" font-weight="bold" fill="#2C5454">Processors</text>
+  </g>
+  
+  <!-- Arrow 3 -->
+  <g transform="translate(770, 85)">
+    <polygon points="0,0 60,35 0,70" fill="#9BC4C4" opacity="0.7"/>
+  </g>
+  
+  <!-- Box 4 - Topology Processor(s) -->
+  <g transform="translate(840, 30)">
+    <!-- Outer rounded rectangle -->
+    <rect x="0" y="0" width="200" height="180" rx="30" ry="30" fill="url(#bgGradient1)" filter="url(#shadow)"/>
+    <!-- Inner rounded rectangle -->
+    <rect x="15" y="15" width="170" height="150" rx="20" ry="20" fill="white" stroke="#7FB5B5" stroke-width="3"/>
+    <!-- Text -->
+    <text x="100" y="85" text-anchor="middle" font-family="Arial, sans-serif" font-size="20" font-weight="bold" fill="#2C5454">Topology</text>
+    <text x="100" y="110" text-anchor="middle" font-family="Arial, sans-serif" font-size="20" font-weight="bold" fill="#2C5454">Processor(s)</text>
+  </g>
+  
+  <!-- Arrow 4 -->
+  <g transform="translate(1040, 85)">
+    <polygon points="0,0 60,35 0,70" fill="#9BC4C4" opacity="0.7"/>
+  </g>
+  
+  <!-- Box 5 - Transaction Aggregation and Decisioning -->
+  <g transform="translate(1110, 30)">
+    <!-- Outer rounded rectangle -->
+    <rect x="0" y="0" width="200" height="180" rx="30" ry="30" fill="url(#bgGradient1)" filter="url(#shadow)"/>
+    <!-- Inner rounded rectangle -->
+    <rect x="15" y="15" width="170" height="150" rx="20" ry="20" fill="white" stroke="#7FB5B5" stroke-width="3"/>
+    <!-- Text -->
+    <text x="100" y="70" text-anchor="middle" font-family="Arial, sans-serif" font-size="18" font-weight="bold" fill="#2C5454">Transaction</text>
+    <text x="100" y="90" text-anchor="middle" font-family="Arial, sans-serif" font-size="18" font-weight="bold" fill="#2C5454">Aggregation</text>
+    <text x="100" y="110" text-anchor="middle" font-family="Arial, sans-serif" font-size="18" font-weight="bold" fill="#2C5454">and</text>
+    <text x="100" y="130" text-anchor="middle" font-family="Arial, sans-serif" font-size="18" font-weight="bold" fill="#2C5454">Decisioning</text>
+  </g>
+</svg>
