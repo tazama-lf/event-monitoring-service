@@ -113,8 +113,6 @@ The configuration includes:
 }
 ```
 
-_Note: The above is a simplified excerpt. The full schema includes complete definitions for all nested properties including payment information, debtor/creditor details, amounts, and supplementary data fields. See the complete schema in `docs/helpers/sampleJson.json`._
-
 ### 1.2. Validate Payload
 
 Using the retrieved schema configuration, the service validates the incoming payload structure to ensure data integrity and completeness. The validation process:
@@ -214,8 +212,6 @@ The mapping process populates two key data structures:
   }
 ]
 ```
-
-_Note: The above is a simplified excerpt showing key mapping patterns. The full mapping configuration includes all fields for debtor/creditor identification, account details, amounts, timestamps, and geolocation data. See the complete mapping in `docs/helpers/mapping.json`._
 
 ### 1.4. Execute Configured Functions
 
