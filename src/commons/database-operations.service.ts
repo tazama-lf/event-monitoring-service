@@ -134,8 +134,6 @@ export class DatabaseOperationsService {
   }
 
   async saveTransactionRelationship(transactionDetails: TransactionDetails): Promise<void> {
-    console.log('Saving transaction relationship:', transactionDetails);
-
     if (!transactionDetails.source || !transactionDetails.destination) {
       this.loggerService.error(
         `Missing required fields in transaction relationship: from=${transactionDetails.source}, to=${transactionDetails.destination}`,

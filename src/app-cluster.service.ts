@@ -3,6 +3,7 @@ import * as os from 'node:os';
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
+import { LoggerService } from '@tazama-lf/frms-coe-lib';
 import { AppModule } from './app.module';
 
 /**
@@ -24,7 +25,12 @@ import { AppModule } from './app.module';
  */
 @Injectable()
 export class AppClusterService {
-  constructor(private readonly configService: ConfigService) {}
+  private readonly LOG_CONTEXT = AppClusterService.name;
+
+  constructor(
+    private readonly configService: ConfigService,
+    private readonly logger: LoggerService,
+  ) {}
 
   /**
    * Static method to initialize clustering with proper configuration
@@ -34,6 +40,7 @@ export class AppClusterService {
     // Create temporary app to access configuration
     const tempApp = await NestFactory.create(AppModule, { logger: false });
     const configService = tempApp.get(ConfigService);
+    const loggerService = tempApp.get(LoggerService);
 
     const maxCpu = configService.get<number>('maxCpu', os.cpus().length);
     const numCPUs = Math.min(maxCpu, os.cpus().length);
@@ -42,23 +49,21 @@ export class AppClusterService {
 
     // If MAX_CPU is 1, run as single process without clustering
     if (numCPUs <= 1) {
-      console.log(`Running in single process mode (maxCpu: ${maxCpu})`);
       await callback();
       return;
     }
 
-    // Only use clustering for MAX_CPU > 1
     if (cluster.default.isPrimary) {
-      console.log(`Master server started on ${process.pid} with ${numCPUs} workers (maxCpu: ${maxCpu})`);
+      loggerService.log(`Master server started on ${process.pid} with ${numCPUs} workers (maxCpu: ${maxCpu})`, 'AppClusterService');
       for (let i = 0; i < numCPUs; i++) {
         cluster.default.fork();
       }
       cluster.default.on('exit', (worker) => {
-        console.log(`Worker ${worker.process.pid} died. Restarting`);
+        loggerService.log(`Worker ${worker.process.pid} died. Restarting`, 'AppClusterService');
         // cluster.default.fork();
       });
     } else {
-      console.log(`Cluster worker started on ${process.pid}`);
+      loggerService.log(`Cluster worker started on ${process.pid}`, 'AppClusterService');
       await callback();
     }
   }
@@ -72,23 +77,23 @@ export class AppClusterService {
 
     // If MAX_CPU is 1, run as single process without clustering
     if (numCPUs <= 1) {
-      console.log(`Running in single process mode (maxCpu: ${maxCpu})`);
+      this.logger.log(`Running in single process mode (maxCpu: ${maxCpu})`, this.LOG_CONTEXT);
       await callback();
       return;
     }
 
     // Only use clustering for MAX_CPU > 1
     if (cluster.default.isPrimary) {
-      console.log(`Master server started on ${process.pid} with ${numCPUs} workers (maxCpu: ${maxCpu})`);
+      this.logger.log(`Master server started on ${process.pid} with ${numCPUs} workers (maxCpu: ${maxCpu})`, this.LOG_CONTEXT);
       for (let i = 0; i < numCPUs; i++) {
         cluster.default.fork();
       }
       cluster.default.on('exit', (worker) => {
-        console.log(`Worker ${worker.process.pid} died. Restarting`);
+        this.logger.log(`Worker ${worker.process.pid} died. Restarting`, this.LOG_CONTEXT);
         // cluster.default.fork();
       });
     } else {
-      console.log(`Cluster worker started on ${process.pid}`);
+      this.logger.log(`Cluster worker started on ${process.pid}`, this.LOG_CONTEXT);
       await callback();
     }
   }

@@ -327,9 +327,7 @@ export class DemsEngineService {
       for (const row of configuredFunctions) {
         // prepare params (getPayloadByPath) --> and call each function one by one
         const functionToCall = row.functionName;
-        console.log('starting functionToCall:', functionToCall);
         let sources = row.params || [];
-        console.log('sources before processing:', sources);
 
         if (functionToCall === 'saveTransactionDetails') {
           containsSaveTransactionRelationship = true;
@@ -337,11 +335,9 @@ export class DemsEngineService {
         }
 
         sources = processSourceMapping(sources, configuredMapping, payload);
-        console.log('sources after processing:', sources);
 
         try {
           await this.databaseOperationsService[functionToCall](...Object.values(sources));
-          console.log(`Executed function: ${functionToCall} with params:`, sources);
         } catch (error) {
           const errorMessage = `Function '${functionToCall}' failed: ${String(error)}`;
           this.loggerService.error(errorMessage, '', this.LOG_CONTEXT);
@@ -351,7 +347,6 @@ export class DemsEngineService {
     }
 
     if (containsSaveTransactionRelationship !== false) {
-      console.log('Executing saveTransactionRelationship with:', transactionRelationship);
       try {
         await this.databaseOperationsService.saveTransactionRelationship(transactionRelationship);
       } catch (error) {
