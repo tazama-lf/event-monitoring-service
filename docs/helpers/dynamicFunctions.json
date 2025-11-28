@@ -1,0 +1,33 @@
+[
+  {
+    "params": ["redis.dbtrAcctId", "transactionDetails.TenantId"],
+    "functionName": "addAccount"
+  },
+  {
+    "params": ["redis.cdtrAcctId", "transactionDetails.TenantId"],
+    "functionName": "addAccount"
+  },
+  {
+    "columns": [
+      {
+        "name": "_key",
+        "type": "string",
+        "param": "car.vin",
+        "isPrimaryKey": "true"
+      },
+      {
+        "name": "data",
+        "type": "jsonb",
+        "param": "car",
+        "datasource": "payload" // can be payload or dataModel
+      },
+      {
+        "name": "tenantId",
+        "type": "string",
+        "param": "transactionDetails.TenantId"
+      }
+    ],
+    "tableName": "CarInfo",
+    "functionName": "addDatamodelTable"
+  }
+]
