@@ -49,7 +49,7 @@ export default defineConfig([
       '@typescript-eslint/prefer-optional-chain': 'warn',
       '@typescript-eslint/restrict-template-expressions': 'error',
       '@typescript-eslint/strict-boolean-expressions': 'off',
-      '@typescript-eslint/max-params': 'off',
+      '@typescript-eslint/max-params': ['error', { max: 6 }],
       '@typescript-eslint/no-unnecessary-condition': 'off',
       '@typescript-eslint/prefer-nullish-coalescing': 'off',
       '@typescript-eslint/require-await': 'off',
