@@ -450,7 +450,6 @@ export class DemsEngineService {
         valueProcessors: [createSchemaAwareNumberProcessor(stringFields)], // Use custom processor
       };
 
-      // eslint-disable-next-line promise/avoid-new -- parseString callback needs Promise wrapper
       transformedPayload = await new Promise((resolve, reject) => {
         parseString(payload, options, (err, result) => {
           if (err) {
