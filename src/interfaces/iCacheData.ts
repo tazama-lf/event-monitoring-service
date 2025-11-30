@@ -5,4 +5,4 @@ interface CacheData {
   functions: object;
   publishing_status: string;
 }
-export { CacheData };
+export type { CacheData };

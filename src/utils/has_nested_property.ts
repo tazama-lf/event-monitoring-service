@@ -1,4 +1,4 @@
-export function getValueByPath<T>(obj: any, path: string): T {
+export function getValueByPath(obj: any, path: string): any {
   const properties = path.split('.');
   let current: any = obj;
 

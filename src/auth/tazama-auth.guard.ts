@@ -11,9 +11,9 @@ export class TazamaAuthGuard implements CanActivate {
 
   private readonly LOG_CONTEXT = `${TazamaAuthGuard.name}.canActivate`;
 
-  constructor(private reflector: Reflector) {}
+  constructor(private readonly reflector: Reflector) {}
 
-  async canActivate(context: ExecutionContext): Promise<boolean> {
+  canActivate(context: ExecutionContext): boolean {
     // Get required claims from decorator
     const requiredClaims = this.reflector.getAllAndOverride<string[]>(CLAIMS_KEY, [context.getHandler(), context.getClass()]);
 
@@ -26,20 +26,24 @@ export class TazamaAuthGuard implements CanActivate {
       throw new UnauthorizedException('No Bearer token provided');
     }
 
+    const MIN_CLAIMS_COUNT = 0;
+    const EXPECTED_TOKEN_PARTS = 2;
+    const TOKEN_INDEX = 1;
+
     // Check if we have either type of claims requirement
-    if (!requiredClaims || requiredClaims.length === 0) {
+    if (requiredClaims === null || requiredClaims.length === MIN_CLAIMS_COUNT) {
       this.logger.warn('No required claims specified for protected route', this.LOG_CONTEXT);
       throw new UnauthorizedException('No required claims specified');
     }
 
     try {
       const tokenParts = authHeader.split(' ');
-      if (tokenParts.length !== 2) {
+      if (tokenParts.length !== EXPECTED_TOKEN_PARTS) {
         this.logger.warn('Malformed authorization header', this.LOG_CONTEXT);
         throw new UnauthorizedException('Malformed authorization header');
       }
 
-      const token = tokenParts[1];
+      const [, token] = tokenParts;
       // Determine which claims to validate
       const claimsToValidate = requiredClaims;
 
@@ -50,7 +54,7 @@ export class TazamaAuthGuard implements CanActivate {
       let validClaims: string[] = [];
       let invalidClaims: string[] = [];
 
-      if (requiredClaims && requiredClaims.length > 0) {
+      if (requiredClaims.length > MIN_CLAIMS_COUNT) {
         // ALL required claims must be present
         const hasAllClaims = requiredClaims.every((claim) => validated[claim]);
         validClaims = requiredClaims.filter((claim) => validated[claim]);

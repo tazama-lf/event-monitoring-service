@@ -1,6 +1,6 @@
-import { CacheData } from './iCacheData';
-import { TazamaPayload } from './iTazamaPayload';
-import { TransactionDetails } from './iTransactionRelationship';
+import type { CacheData } from './iCacheData';
+import type { TazamaPayload } from './iTazamaPayload';
+import type { TransactionDetails } from './iTransactionRelationship';
 
 export interface ProcessingResult {
   success: boolean;

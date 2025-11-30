@@ -1,4 +1,4 @@
-import { TransactionDetails } from './iTransactionRelationship';
+import type { TransactionDetails } from './iTransactionRelationship';
 
 export interface MessageHandlerResponse {
   message: string;

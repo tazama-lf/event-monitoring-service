@@ -12,7 +12,7 @@ import { ApmSpan } from '../apm/apm.decorators';
 import { parseString, ParserOptions } from 'xml2js';
 import { returnArrayFieldsFromSchema, replaceObjectsWithArrays, createSchemaAwareNumberProcessor } from '../utils/xml2js.utils';
 import { processSourceMapping } from '../utils/mapping-sources.utils';
-import { randomUUID } from 'crypto';
+import { randomUUID } from 'node:crypto';
 import { TransactionDetails } from '../interfaces/iTransactionRelationship';
 import { ErrorResponse } from '../interfaces/iErrorResponse';
 import { ProcessingResult } from '../interfaces/iProcessingResult';
@@ -42,7 +42,7 @@ export class DemsEngineService {
   async findSchemaAndMapping(endpoint: string): Promise<FindSchemaAndMappingResult> {
     this.loggerService.log(`Looking up schema for endpoint: ${endpoint}`);
 
-    const cacheKey = `${endpoint}`;
+    const cacheKey = endpoint;
     const cachedSchema = await this.redisService.getJson(cacheKey);
 
     if (cachedSchema) {
@@ -63,7 +63,7 @@ export class DemsEngineService {
         } catch (error) {
           this.loggerService.error(`Failed to parse cached schema for endpoint ${endpoint}: ${String(error)}`);
         }
-      } else if (typeof cachedSchema === 'object' && cachedSchema !== null) {
+      } else if (typeof cachedSchema === 'object') {
         // If cachedSchema is already an object, use it directly
         const schemaObj = cachedSchema as any;
         return [schemaObj.schema, schemaObj.mapping, schemaObj.functions] as [any, any, any];
@@ -77,9 +77,10 @@ export class DemsEngineService {
       "SELECT schema, mapping, functions, publishing_status FROM config WHERE endpoint_path = $1 and publishing_status = 'active'",
       [endpoint],
     );
-    const record = result.rows[0];
+    const MIN_ROWS = 0;
+    const [record] = result.rows;
 
-    if (record) {
+    if (result.rows.length > MIN_ROWS) {
       this.loggerService.log(`Found schema for endpoint: ${endpoint}`);
       const data = {
         schema: record.schema,
@@ -146,20 +147,21 @@ export class DemsEngineService {
   private formatValidationErrors(): string[] {
     return (
       this.ajv.errors?.map((error) => {
-        const path = error.instancePath || 'root';
-        const message = error.message || 'validation failed';
+        const path = error.instancePath ?? 'root';
+        const message = error.message ?? 'validation failed';
 
         // Format the error message to be more human-readable
         if (error.keyword === 'required') {
-          return `${path}: Missing required property '${error.params?.missingProperty}'`;
-        } else if (error.keyword === 'additionalProperties') {
-          return `${path}: Unexpected property '${error.params?.additionalProperty}' not defined in schema`;
-        } else if (error.keyword === 'type') {
-          return `${path}: Should be a ${error.params?.type}`;
-        } else {
-          return `--> ${path}: ${message}`;
+          return `${path}: Missing required property '${error.params.missingProperty}'`;
         }
-      }) || []
+        if (error.keyword === 'additionalProperties') {
+          return `${path}: Unexpected property '${error.params.additionalProperty}' not defined in schema`;
+        }
+        if (error.keyword === 'type') {
+          return `${path}: Should be a ${error.params.type}`;
+        }
+        return `--> ${path}: ${message}`;
+      }) ?? []
     );
   }
 
@@ -222,7 +224,7 @@ export class DemsEngineService {
 
           // handling multiple destinations for single source - split value usecase
           if (typeof destination !== 'string' || typeof type !== 'string') {
-            const sourceValue = getValueByPath<string>(payload, mapping.source[0]);
+            const sourceValue = getValueByPath(payload, mapping.source[0]);
             const splitValues = sourceValue.split(mapping.delimiter);
 
             for (let j = 0; j < mapping.destination.length; j++) {
@@ -246,14 +248,14 @@ export class DemsEngineService {
           // Iterate through sources to build the value based on mapping - totally dynamic work
           for (let i = 0; i < sources.length; i++) {
             if (type === 'redis') {
-              dataCacheValue += getValueByPath<string>(payload, sources[i]);
+              dataCacheValue += getValueByPath(payload, sources[i]);
 
               if (i < sources.length - 1) {
                 dataCacheValue += separator;
               }
             }
             if (type === 'transactionDetails') {
-              transactionRelationshipValue += getValueByPath<string>(payload, sources[i]);
+              transactionRelationshipValue += getValueByPath(payload, sources[i]);
 
               if (i < sources.length - 1) {
                 transactionRelationshipValue += separator;
@@ -269,9 +271,7 @@ export class DemsEngineService {
               destination = mapping.destination.split('.')[2];
               // Handle nested object case
               const objectName: string = mapping.destination.split('.')[1]; // instdAmt or intrBkSttlmAmt
-              if (!dataCache[objectName]) {
-                dataCache[objectName] = {};
-              }
+              dataCache[objectName] ||= {};
               dataCache[objectName][destination] = dataCacheValue;
             } else {
               dataCache[destination] = dataCacheValue;
@@ -294,7 +294,7 @@ export class DemsEngineService {
         this.loggerService.error(`Failed to process mapping data: ${String(error)}`);
         return {
           dataCache,
-          transactionRelationship: transactionRelationship,
+          transactionRelationship,
           endToEndId,
         };
       }
@@ -304,7 +304,7 @@ export class DemsEngineService {
 
     return {
       dataCache,
-      transactionRelationship: transactionRelationship,
+      transactionRelationship,
       endToEndId,
     };
   }
@@ -321,7 +321,7 @@ export class DemsEngineService {
     configuredFunctions: any,
     transactionRelationship: TransactionDetails,
   ): Promise<void> {
-    let containsSaveTransactionRelationship: boolean = false;
+    let containsSaveTransactionRelationship = false;
 
     if (configuredFunctions) {
       for (const row of configuredFunctions) {
@@ -341,18 +341,18 @@ export class DemsEngineService {
         } catch (error) {
           const errorMessage = `Function '${functionToCall}' failed: ${String(error)}`;
           this.loggerService.error(errorMessage, '', this.LOG_CONTEXT);
-          throw new Error(errorMessage);
+          throw new Error(errorMessage, { cause: error });
         }
       }
     }
 
-    if (containsSaveTransactionRelationship !== false) {
+    if (containsSaveTransactionRelationship) {
       try {
         await this.databaseOperationsService.saveTransactionRelationship(transactionRelationship);
       } catch (error) {
         const errorMessage = `Function 'saveTransactionRelationship' failed: ${String(error)}`;
         this.loggerService.error(errorMessage, '', this.LOG_CONTEXT);
-        throw new Error(errorMessage);
+        throw new Error(errorMessage, { cause: error });
       }
     }
   }
@@ -366,6 +366,7 @@ export class DemsEngineService {
    * @returns The formatted Tazama payload
    */
   private buildTazamaPayload(payload: any, transactionType: string, tenantId: string, dataCache: any): TazamaPayload {
+    this.loggerService.log(`Building Tazama payload for transaction type: ${transactionType}, tenant: ${tenantId}`, this.LOG_CONTEXT);
     return {
       transaction: payload,
       TxTp: transactionType,
@@ -417,6 +418,7 @@ export class DemsEngineService {
    * @returns Formatted error response
    */
   private buildErrorResponse(message: string, differences: string[], schema?: any): ErrorResponse {
+    this.loggerService.warn(`Building error response: ${message}`, this.LOG_CONTEXT);
     return {
       isMatch: false,
       message,
@@ -448,6 +450,7 @@ export class DemsEngineService {
         valueProcessors: [createSchemaAwareNumberProcessor(stringFields)], // Use custom processor
       };
 
+      // eslint-disable-next-line promise/avoid-new -- parseString callback needs Promise wrapper
       transformedPayload = await new Promise((resolve, reject) => {
         parseString(payload, options, (err, result) => {
           if (err) {
@@ -479,10 +482,11 @@ export class DemsEngineService {
 
       const validationResult = await this.validatePayload(payload, configuredSchema, endpoint, tenantId);
       if (!validationResult.isValid) {
-        const errorMessage = validationResult.differences?.[0]?.includes('AJV validation error')
+        const MIN_DIFFERENCES_INDEX = 0;
+        const errorMessage = validationResult.differences?.[MIN_DIFFERENCES_INDEX]?.includes('AJV validation error')
           ? 'Error during schemaa validation'
           : 'Payload structure does not match the schema';
-        return this.buildErrorResponse(errorMessage, validationResult.differences || [], configuredSchema);
+        return this.buildErrorResponse(errorMessage, validationResult.differences ?? [], configuredSchema);
       }
 
       const transactionType = extractTransactionType(endpoint);

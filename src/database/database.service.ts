@@ -88,6 +88,6 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
    * @returns Database client
    */
   async getClient(): Promise<PoolClient> {
-    return this.pool.connect();
+    return await this.pool.connect();
   }
 }

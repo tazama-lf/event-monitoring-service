@@ -28,7 +28,7 @@ export class DemsEngineController {
     @User() user: AuthenticatedUser,
     @Req() req: Request,
   ): Promise<MessageHandlerResponse> {
-    if (isValidEndpointFormat(endpoint) === false) {
+    if (!isValidEndpointFormat(endpoint)) {
       throw new BadRequestException({
         message: 'Invalid endpoint format. Endpoint must be a non-empty string containing commas.',
       });

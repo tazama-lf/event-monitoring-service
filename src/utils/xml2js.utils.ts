@@ -1,6 +1,6 @@
-import { LoggerService } from '@tazama-lf/frms-coe-lib';
-import { Request } from 'express';
-import { ReturnArrayFieldsFromSchema } from '../interfaces/iXml2js.interfaces';
+import type { LoggerService } from '@tazama-lf/frms-coe-lib';
+import type { Request } from 'express';
+import type { ReturnArrayFieldsFromSchema } from '../interfaces/iXml2js.interfaces';
 
 /**
  * Utility functions for XML2JS processing and schema-based transformations
@@ -12,7 +12,7 @@ import { ReturnArrayFieldsFromSchema } from '../interfaces/iXml2js.interfaces';
  * @param loggerService Logger service for error logging
  * @returns Object containing arrays of field paths for arrays and strings
  */
-export async function returnArrayFieldsFromSchema(schema: any, loggerService?: LoggerService): Promise<ReturnArrayFieldsFromSchema> {
+export function returnArrayFieldsFromSchema(schema: any, loggerService?: LoggerService): ReturnArrayFieldsFromSchema {
   try {
     // Handle null/undefined schema
     if (!schema) {
@@ -26,7 +26,7 @@ export async function returnArrayFieldsFromSchema(schema: any, loggerService?: L
     const stringFields: string[] = [];
     const visited = new Set(); // Circular reference detection
 
-    const traverseSchema = (obj: any, path: string = '') => {
+    const traverseSchema = (obj: any, path = ''): void => {
       if (!obj || typeof obj !== 'object') {
         return;
       }
@@ -71,8 +71,8 @@ export async function returnArrayFieldsFromSchema(schema: any, loggerService?: L
           }
 
           // Handle anyOf, oneOf, allOf schemas
-          if (property.anyOf || property.oneOf || property.allOf) {
-            const schemaVariants = property.anyOf || property.oneOf || property.allOf;
+          if (property.anyOf ?? property.oneOf ?? property.allOf) {
+            const schemaVariants = property.anyOf ?? property.oneOf ?? property.allOf;
             schemaVariants.forEach((variant: any) => {
               if (variant && variant.type === 'object' && variant.properties) {
                 traverseSchema(variant, currentPath);
@@ -83,8 +83,8 @@ export async function returnArrayFieldsFromSchema(schema: any, loggerService?: L
       }
 
       // Handle root level anyOf, oneOf, allOf
-      if (obj.anyOf || obj.oneOf || obj.allOf) {
-        const schemaVariants = obj.anyOf || obj.oneOf || obj.allOf;
+      if (obj.anyOf ?? obj.oneOf ?? obj.allOf) {
+        const schemaVariants = obj.anyOf ?? obj.oneOf ?? obj.allOf;
         schemaVariants.forEach((variant: any) => {
           if (variant?.properties) {
             traverseSchema(variant, path);
@@ -100,7 +100,7 @@ export async function returnArrayFieldsFromSchema(schema: any, loggerService?: L
   } catch (error) {
     if (loggerService) {
       loggerService.error(
-        `Error in returnArrayFieldsFromSchema: ${String(error)}. Schema path or field causing issue: ${(error as Error).stack || 'Unknown'}`,
+        `Error in returnArrayFieldsFromSchema: ${String(error)}. Schema path or field causing issue: ${(error as Error).stack ?? 'Unknown'}`,
       );
     }
     throw error;
@@ -269,7 +269,7 @@ export function createSchemaAwareNumberProcessor(stringFields: string[]) {
 export function isXmlContentType(req: Request, loggerService?: LoggerService): boolean {
   try {
     // Handle null/undefined request by throwing
-    if (req === null || req === undefined) {
+    if (req === null) {
       throw new Error('Request cannot be null or undefined');
     }
 

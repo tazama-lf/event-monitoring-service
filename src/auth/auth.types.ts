@@ -1,4 +1,4 @@
-import { TazamaToken, ClaimValidationResult } from '@tazama-lf/auth-lib';
+import type { TazamaToken, ClaimValidationResult } from '@tazama-lf/auth-lib';
 
 export interface AuthenticatedUser {
   token: TazamaToken;

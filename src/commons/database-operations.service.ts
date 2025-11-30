@@ -1,7 +1,7 @@
 import { Injectable, BadRequestException, InternalServerErrorException, ConflictException } from '@nestjs/common';
 import { LoggerService } from '@tazama-lf/frms-coe-lib';
 import { DatabaseService } from '../database/database.service';
-import { randomUUID } from 'crypto';
+import { randomUUID } from 'node:crypto';
 import { ErrorPattern } from '../interfaces/iErrorPattern';
 import { QuarantineStatus } from '../enums/quarantineStatus.enum';
 import { TazamaPayload } from '../interfaces/iTazamaPayload';
@@ -20,14 +20,14 @@ export class DatabaseOperationsService {
       pattern: 'unique constraint',
       exception: ConflictException,
       log: 'warn',
-      getMessage: (context: string, additionalInfo?: Record<string, string>) => `Duplicate ${context}: ${additionalInfo?.details || ''}`,
+      getMessage: (context: string, additionalInfo?: Record<string, string>) => `Duplicate ${context}: ${additionalInfo?.details ?? ''}`,
     },
     {
       pattern: 'foreign key constraint',
       exception: BadRequestException,
       log: 'error',
       getMessage: (context: string, additionalInfo?: Record<string, string>) =>
-        `Invalid reference in ${context}: ${additionalInfo?.details || ''}`,
+        `Invalid reference in ${context}: ${additionalInfo?.details ?? ''}`,
     },
     {
       pattern: 'invalid input syntax',
@@ -81,7 +81,8 @@ export class DatabaseOperationsService {
 
   async addAccount(accountId: string, tenantId: string): Promise<void> {
     try {
-      await this.databaseService.query('INSERT INTO account (id, tenantid) VALUES ($1, $2)', [accountId, tenantId]);
+      const AccountQuery = 'INSERT INTO account (id, tenantid) VALUES ($1, $2)';
+      await this.databaseService.query(AccountQuery, [accountId, tenantId]);
       this.loggerService.log(`Added account: ${accountId} for tenant: ${tenantId}`, this.log_context);
     } catch (error) {
       this.handleDatabaseError(error, 'add account', {
@@ -170,7 +171,7 @@ export class DatabaseOperationsService {
         error: JSON.stringify({
           code: 'VALIDATION_ERROR',
           message: 'Payload validation failed',
-          differences: differences,
+          differences,
           timestamp: new Date().toISOString(),
         }),
         raw_payload: JSON.stringify(payload),

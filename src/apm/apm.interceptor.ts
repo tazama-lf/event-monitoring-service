@@ -16,7 +16,7 @@ export class ApmInterceptor implements NestInterceptor {
     const response = context.switchToHttp().getResponse<Response>();
 
     // Create transaction name based on HTTP method and route
-    const routePath = request.route?.path || request.url;
+    const routePath = request.route?.path ?? request.url;
     const transactionName = `${request.method} ${routePath}`;
 
     const transaction: Transaction | null = this.apmService.startTransaction(transactionName);
@@ -26,7 +26,7 @@ export class ApmInterceptor implements NestInterceptor {
       transaction.addLabels({
         'http.method': request.method,
         'http.url': request.url,
-        'user.agent': request.get('user-agent') || 'unknown',
+        'user.agent': request.get('user-agent') ?? 'unknown',
       });
     }
 

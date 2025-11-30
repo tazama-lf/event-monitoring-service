@@ -70,8 +70,9 @@ export class ConfigNotifyService implements OnModuleInit {
         [message.transactionID],
       );
 
-      if (result.rows && result.rows.length > 0) {
-        const config = result.rows[0];
+      const MIN_ROWS_LENGTH = 0;
+      if (result.rows !== undefined && result.rows.length > MIN_ROWS_LENGTH) {
+        const [config] = result.rows;
         await this.setCache(config);
         this.logger.log(
           `Updated cache for key: ${config.endpointPath} --> publishing status: ${config.publishing_status}`,

@@ -30,11 +30,12 @@ export function ApmSpan(spanName: string) {
       let apmService: ApmService | undefined;
 
       // Check if the class has apmService as a property
-      if (this && typeof this === 'object' && 'apmService' in this) {
-        apmService = (this as any).apmService;
+      if (typeof this === 'object' && this !== null && 'apmService' in this) {
+        const { apmService: service } = this as any;
+        apmService = service;
       }
 
-      if (!apmService) {
+      if (apmService === undefined) {
         // Fallback: execute without APM instrumentation
         return originalMethod.apply(this, args);
       }
