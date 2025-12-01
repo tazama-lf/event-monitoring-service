@@ -147,7 +147,7 @@ export class DemsEngineService {
   private formatValidationErrors(): string[] {
     return (
       this.ajv.errors?.map((error) => {
-        const path = error.instancePath ?? 'root';
+        const path = error.instancePath || 'root';
         const message = error.message ?? 'validation failed';
 
         // Format the error message to be more human-readable
@@ -173,6 +173,7 @@ export class DemsEngineService {
    * @returns Object containing dataCache, transactionRelationship, and endToEndId
    */
   @ApmSpan('dems-process-mappings')
+  // eslint-disable-next-line @typescript-eslint/require-await -- async is needed for ApmSpan decorator
   private async processMappings(
     payload: any,
     configuredMapping: any,
@@ -241,8 +242,8 @@ export class DemsEngineService {
             continue;
           }
 
-          let dataCacheValue = mapping.prefix ? mapping.prefix : '';
-          let transactionRelationshipValue = mapping.prefix ? mapping.prefix : '';
+          let dataCacheValue = mapping.prefix ?? '';
+          let transactionRelationshipValue = mapping.prefix ?? '';
 
           // REAL LOGIC STARTS HERE
           // Iterate through sources to build the value based on mapping - totally dynamic work
@@ -265,13 +266,13 @@ export class DemsEngineService {
 
           // Post processing for both dataCache and transactionRelationship
           if (type === 'redis') {
-            dataCacheValue += mapping.suffix ? mapping.suffix : '';
+            dataCacheValue += mapping.suffix ?? '';
 
             if (stringSize === 3) {
               destination = mapping.destination.split('.')[2];
               // Handle nested object case
               const objectName: string = mapping.destination.split('.')[1]; // instdAmt or intrBkSttlmAmt
-              dataCache[objectName] ||= {};
+              dataCache[objectName] ??= {};
               dataCache[objectName][destination] = dataCacheValue;
             } else {
               dataCache[destination] = dataCacheValue;
@@ -279,7 +280,7 @@ export class DemsEngineService {
           }
 
           if (type === 'transactionDetails') {
-            transactionRelationshipValue += mapping.suffix ? mapping.suffix : '';
+            transactionRelationshipValue += mapping.suffix ?? '';
 
             transactionRelationship[destination] = transactionRelationshipValue;
 
@@ -302,6 +303,9 @@ export class DemsEngineService {
       this.loggerService.log(`No mapping configured for endpoint: ${endpoint}`);
     }
 
+    this.loggerService.log(`Completed processing mappings for endpoint: ${endpoint}`, this.LOG_CONTEXT);
+    this.loggerService.log(`Transaction Relationship: ${JSON.stringify(transactionRelationship)}`, this.LOG_CONTEXT);
+
     return {
       dataCache,
       transactionRelationship,
@@ -322,12 +326,16 @@ export class DemsEngineService {
     transactionRelationship: TransactionDetails,
   ): Promise<void> {
     let containsSaveTransactionRelationship = false;
+    this.loggerService.error(
+      `starting to execute configured functions based on mapping configuration ${JSON.stringify(transactionRelationship)}`,
+      this.LOG_CONTEXT,
+    );
 
     if (configuredFunctions) {
       for (const row of configuredFunctions) {
         // prepare params (getPayloadByPath) --> and call each function one by one
         const functionToCall = row.functionName;
-        let sources = row.params || [];
+        let sources = row.params ?? [];
 
         if (functionToCall === 'saveTransactionDetails') {
           containsSaveTransactionRelationship = true;
@@ -346,11 +354,14 @@ export class DemsEngineService {
       }
     }
 
+    this.loggerService.error('aik step pehle bas - Executing configured function: saveTransactionRelationship', this.LOG_CONTEXT);
+    this.loggerService.error(`Transaction Relationship to save: ${JSON.stringify(transactionRelationship)}`, this.LOG_CONTEXT);
+
     if (containsSaveTransactionRelationship) {
       try {
         await this.databaseOperationsService.saveTransactionRelationship(transactionRelationship);
       } catch (error) {
-        const errorMessage = `Function 'saveTransactionRelationship' failed: ${String(error)}`;
+        const errorMessage = `Function 'saveTransactionDetails' failed: ${String(error)}`;
         this.loggerService.error(errorMessage, '', this.LOG_CONTEXT);
         throw new Error(errorMessage, { cause: error });
       }
@@ -438,7 +449,7 @@ export class DemsEngineService {
       }
 
       const [configuredSchema] = schemaResult;
-      const { stringFields } = await returnArrayFieldsFromSchema(configuredSchema);
+      const { stringFields } = returnArrayFieldsFromSchema(configuredSchema);
 
       const options: ParserOptions = {
         explicitArray: false, // Don't wrap single values in arrays
@@ -450,6 +461,7 @@ export class DemsEngineService {
         valueProcessors: [createSchemaAwareNumberProcessor(stringFields)], // Use custom processor
       };
 
+      // eslint-disable-next-line promise/avoid-new -- we need to wrap xml2js parseString in a promise
       transformedPayload = await new Promise((resolve, reject) => {
         parseString(payload, options, (err, result) => {
           if (err) {
@@ -472,7 +484,7 @@ export class DemsEngineService {
 
       if (isPayloadXml) {
         // below are all the array fields and string fields in the schema for XML case
-        const { arrayFields } = await returnArrayFieldsFromSchema(configuredSchema);
+        const { arrayFields } = returnArrayFieldsFromSchema(configuredSchema);
 
         // Convert the transformed payload to ensure array fields are properly formatted
         // Note: We don't need string conversion here anymore since the parser handles it
@@ -494,7 +506,14 @@ export class DemsEngineService {
       const enhancedRequest = { ...payload, TenantId: tenantId, TxTp: transactionType };
 
       // refer to /docs/helpers for example mapping configuration
-      const { dataCache, transactionRelationship, endToEndId } = await this.processMappings(enhancedRequest, configuredMapping, endpoint);
+      const responseFromProcessMappings = await this.processMappings(enhancedRequest, configuredMapping, endpoint);
+      this.loggerService.log(`response from process mapping dikhao: ${JSON.stringify(responseFromProcessMappings)}`, this.LOG_CONTEXT);
+      const { dataCache, transactionRelationship, endToEndId } = responseFromProcessMappings;
+      this.loggerService.log('Successfully processed mappings for ED. all ok');
+      this.loggerService.log(
+        `at handle message seeing transactionRRelationship: ${JSON.stringify(transactionRelationship)}`,
+        this.LOG_CONTEXT,
+      );
 
       try {
         // refer to /docs/helpers for example functions configuration

@@ -30,7 +30,7 @@ export function ApmSpan(spanName: string) {
       let apmService: ApmService | undefined;
 
       // Check if the class has apmService as a property
-      if (typeof this === 'object' && this !== null && 'apmService' in this) {
+      if ('apmService' in this) {
         const { apmService: service } = this as any;
         apmService = service;
       }

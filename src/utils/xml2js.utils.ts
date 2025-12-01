@@ -268,11 +268,6 @@ export function createSchemaAwareNumberProcessor(stringFields: string[]) {
 
 export function isXmlContentType(req: Request, loggerService?: LoggerService): boolean {
   try {
-    // Handle null/undefined request by throwing
-    if (req === null) {
-      throw new Error('Request cannot be null or undefined');
-    }
-
     return req.headers['content-type'] === 'application/xml';
   } catch (error) {
     if (loggerService) {

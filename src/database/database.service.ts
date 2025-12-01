@@ -49,6 +49,7 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
   }
 
   async onModuleDestroy(): Promise<void> {
+    //eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- pool may be undefined if initialization failed
     if (this.pool) {
       await this.pool.end();
       this.logger.log('Database connection pool closed', this.LOG_CONTEXT);

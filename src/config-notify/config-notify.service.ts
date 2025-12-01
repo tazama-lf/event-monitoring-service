@@ -71,7 +71,7 @@ export class ConfigNotifyService implements OnModuleInit {
       );
 
       const MIN_ROWS_LENGTH = 0;
-      if (result.rows !== undefined && result.rows.length > MIN_ROWS_LENGTH) {
+      if (result.rows.length > MIN_ROWS_LENGTH) {
         const [config] = result.rows;
         await this.setCache(config);
         this.logger.log(

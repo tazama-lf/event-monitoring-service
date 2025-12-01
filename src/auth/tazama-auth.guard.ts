@@ -28,10 +28,9 @@ export class TazamaAuthGuard implements CanActivate {
 
     const MIN_CLAIMS_COUNT = 0;
     const EXPECTED_TOKEN_PARTS = 2;
-    const TOKEN_INDEX = 1;
 
     // Check if we have either type of claims requirement
-    if (requiredClaims === null || requiredClaims.length === MIN_CLAIMS_COUNT) {
+    if (requiredClaims.length === MIN_CLAIMS_COUNT) {
       this.logger.warn('No required claims specified for protected route', this.LOG_CONTEXT);
       throw new UnauthorizedException('No required claims specified');
     }

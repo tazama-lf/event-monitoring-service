@@ -9,7 +9,7 @@ import { defineConfig, globalIgnores } from 'eslint/config';
 
 export default defineConfig([
   eslintConfigPrettier,
-  globalIgnores(['**/coverage/**', '**/build/**', '**/node_modules/**', '**/__tests__/**', '*.ts']),
+  globalIgnores(['**/coverage/**', '**/build/**', '**/node_modules/**', '**/tests/**', '*.ts']),
   {
     files: ['**/*.ts'],
     plugins: {
@@ -50,18 +50,11 @@ export default defineConfig([
       '@typescript-eslint/restrict-template-expressions': 'error',
       '@typescript-eslint/strict-boolean-expressions': 'off',
       '@typescript-eslint/max-params': ['error', { max: 6 }],
-      '@typescript-eslint/no-unnecessary-condition': 'off',
-      '@typescript-eslint/prefer-nullish-coalescing': 'off',
-      '@typescript-eslint/require-await': 'off',
-      '@typescript-eslint/await-thenable': 'off',
-      '@typescript-eslint/no-unused-vars': 'warn',
       '@stylistic/quotes': ['error', 'single'],
       'complexity': ['warn', { max: 15 }],
-      'max-depth': 'off',
-      'new-cap': 'off',
+      'max-depth': ['error', { max: 6 }],
       'no-console': 'error',
       'no-unneeded-ternary': 'off',
-      'promise/avoid-new': 'off',
       /* eslint-comments are bundled with eslint-config-love but they are using the unmaintained plugin. Replaced with @eslint-community/eslint-plugin-eslint-comments */
       'eslint-comments/require-description': 'off',
       'eslint-comments/disable-enable-pair': 'off',

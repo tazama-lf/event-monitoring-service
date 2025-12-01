@@ -71,7 +71,8 @@ export class DatabaseOperationsService {
       if (matches) {
         const message = errorPattern.getMessage(context, additionalInfo);
         this.loggerService[errorPattern.log](`${context}: ${message} - ${errorMessage}`);
-        throw new errorPattern.exception(message);
+        const ExceptionConstructor = errorPattern.exception;
+        throw new ExceptionConstructor(message);
       }
     }
 
@@ -135,9 +136,10 @@ export class DatabaseOperationsService {
   }
 
   async saveTransactionRelationship(transactionDetails: TransactionDetails): Promise<void> {
+    this.loggerService.error(`Saving okoko transaction relationship: ${JSON.stringify(transactionDetails)}`, this.log_context);
     if (!transactionDetails.source || !transactionDetails.destination) {
       this.loggerService.error(
-        `Missing required fields in transaction relationship: from=${transactionDetails.source}, to=${transactionDetails.destination}`,
+        `Missing 1 required fields in transaction relationship: source=${transactionDetails.source}, destination=${transactionDetails.destination}`,
       );
       throw new BadRequestException('Transaction relationship must have both source and destination');
     }
@@ -163,7 +165,7 @@ export class DatabaseOperationsService {
     try {
       const quarantineRecord = {
         id: randomUUID(),
-        correlation_id: correlationId || null,
+        correlation_id: correlationId ?? null,
         tenant_id: tenantId,
         endpoint_path: endpoint,
         config_id: null,
