@@ -528,7 +528,7 @@ export class DemsEngineService {
       return {
         success: true,
         configuredSchema,
-        tazamaPayload: isPayloadXml ? transformedPayload : tazamaPayload,
+        tazamaPayload,
         transactionRelationship,
         dataCache,
         transactionType,
