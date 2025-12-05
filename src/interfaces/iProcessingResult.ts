@@ -6,6 +6,7 @@ export interface ProcessingResult {
   success: boolean;
   configuredSchema: any;
   tazamaPayload: TazamaPayload;
+  dynamicMapping?: any;
   transactionRelationship: TransactionDetails;
   dataCache: CacheData;
   transactionType: string;

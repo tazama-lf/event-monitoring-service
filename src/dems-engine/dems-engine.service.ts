@@ -178,7 +178,8 @@ export class DemsEngineService {
     payload: any,
     configuredMapping: any,
     endpoint: string,
-  ): Promise<{ dataCache: any; transactionRelationship: TransactionDetails; endToEndId: string }> {
+  ): Promise<{ dataCache: any; transactionRelationship: TransactionDetails; endToEndId: string; dynamicMapping?: any }> {
+    // static object creation logic
     const dataCache: any = {};
     const transactionRelationship: TransactionDetails = {
       source: '',
@@ -194,10 +195,36 @@ export class DemsEngineService {
       long: '',
       TxSts: '',
     };
+
+    // dynamic object creation logic
+    const dynamicMapping: any = {};
+
     let endToEndId = '';
     this.loggerService.log(`Processing mappings for endpoint: ${endpoint}`, this.LOG_CONTEXT);
 
+    //     [
+    //   {
+    //     "columns": [
+    //       {
+    //         "name": "_key",
+    //         "type": "string",
+    //         "param": "car.vin",
+    //         "datasource": "dataModel"
+    //       },
+    //       {
+    //         "name": "data",
+    //         "type": "jsonb",
+    //         "param": "car",
+    //         "datasource": "payload"
+    //       }
+    //     ],
+    //     "tableName": "tenantid_car",
+    //     "functionName": "addDataModelTable"
+    //   }
+    // ]
+
     if (configuredMapping) {
+      this.loggerService.log('configuredMapping is: ', JSON.stringify(configuredMapping));
       try {
         for (const mapping of configuredMapping) {
           const sources = mapping.source;
@@ -211,6 +238,31 @@ export class DemsEngineService {
           const stringSize = typeof mapping.destination === 'string' ? mapping.destination.split('.').length : -1;
 
           const separator = mapping.delimiter;
+
+          // dynamic mapping logic based on datasource(datamodel ya payload)
+          if (type !== 'redis' && type !== 'transactionDetails') {
+            // append to dynamic mapping object
+            const ObjectName: string = mapping.destination.split('.')[0]; // e.g., Toyota
+            const PropertyName: string = mapping.destination.split('.')[1]; // e.g., model
+            const nestedPropertyName: string = mapping.destination.split('.')[2]; // e.g., name (if any)
+
+            if (mapping.datasource === 'dataModel') {
+              this.loggerService.log('dataModel case for dynamic mapping source: ', mapping.source[0]);
+              this.loggerService.log('dataModel case for dynamic mapping value: ', getValueByPath(payload, mapping.source[0]));
+
+              dynamicMapping[ObjectName] ??= {};
+              if (nestedPropertyName) {
+                dynamicMapping[ObjectName][PropertyName] ??= {};
+                dynamicMapping[ObjectName][PropertyName][nestedPropertyName] = getValueByPath(payload, mapping.source[0]);
+              } else {
+                dynamicMapping[ObjectName][PropertyName] = getValueByPath(payload, mapping.source[0]);
+              }
+            }
+
+            this.loggerService.log('dynamicMapping object is now: ', JSON.stringify(dynamicMapping));
+
+            continue;
+          }
 
           //constant value injection logic
           if (mapping.constantValue) {
@@ -297,6 +349,7 @@ export class DemsEngineService {
           dataCache,
           transactionRelationship,
           endToEndId,
+          dynamicMapping,
         };
       }
     } else {
@@ -310,6 +363,7 @@ export class DemsEngineService {
       dataCache,
       transactionRelationship,
       endToEndId,
+      dynamicMapping,
     };
   }
 
@@ -339,6 +393,17 @@ export class DemsEngineService {
 
         if (functionToCall === 'saveTransactionDetails') {
           containsSaveTransactionRelationship = true;
+          continue;
+        }
+
+        if (functionToCall === 'addDataModelTable') {
+          // dynamically build the table name using TenantId and param from mapping
+          const tenantId = getValueByPath(payload, 'TenantId');
+          const tableNameParam = row.tableName.split('_')[1]; // e.g., 'car' from 'tenantid_car'
+          const tableName = `${tenantId.toLowerCase()}_${tableNameParam.toLowerCase()}`;
+
+          this.loggerService.log(`Dynamically constructed table name: ${tableName} for function: ${functionToCall}`);
+
           continue;
         }
 
@@ -533,6 +598,7 @@ export class DemsEngineService {
         dataCache,
         transactionType,
         endToEndId,
+        dynamicMapping: responseFromProcessMappings.dynamicMapping,
       };
     } catch (error) {
       this.loggerService.error(`Unexpected error in handleMessage: ${String(error)}`);
