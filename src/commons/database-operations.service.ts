@@ -208,4 +208,22 @@ export class DatabaseOperationsService {
       });
     }
   }
+
+  async addDataModelTable(tableName: string, primaryKey: string, data: any): Promise<void> {
+    try {
+      const insertIntoDynamicTable = `
+      INSERT INTO ${tableName} (
+       _key,
+        data)
+       VALUES ($1, $2)
+      on conflict (_key) do update set data = EXCLUDED.data`;
+      await this.databaseService.query(insertIntoDynamicTable, [primaryKey, data]);
+
+      this.loggerService.log(`Inserted data into the data model table: ${tableName} `, this.log_context);
+    } catch (error) {
+      this.handleDatabaseError(error, 'add data model table', {
+        details: `table ${tableName} `,
+      });
+    }
+  }
 }
