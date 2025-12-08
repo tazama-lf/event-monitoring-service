@@ -24,33 +24,25 @@ The Event Monitoring Service handles multiple data formats (JSON and XML), perfo
 
 ```mermaid
 sequenceDiagram
-  participant client as External Client
-  participant ems as Event Monitoring Service
-  participant cache as Redis Cache
-  participant db as Database
-  participant nats as NATS Service
-  participant ed as Event Director
+    participant Client as Client/Service
+    participant DEMS as Event Monitoring Service
+    participant Redis as Redis Cache
+    participant DB as PostgreSQL
+    participant NATS as NATS
+    participant ED as Event Director
 
-  client->>ems: 1. Receive transaction
-  ems->>ems: 1.1 Find schema and mapping
-  ems->>cache: Check schema cache
-  alt Cache miss
-    ems->>db: Query schema and mapping
-    ems->>cache: Cache schema and mapping
-  end
-  ems->>ems: 1.2 Validate payload
-  alt XML payload
-    ems->>ems: Transform XML to JSON
-  end
-  ems->>ems: 1.3 Process mappings
-  ems->>ems: 1.4 Execute configured functions
-  ems->>db: Save transaction relationships
-  ems->>ems: 1.5 Build Tazama payload
-  ems->>ems: 2. Save transaction data and notify
-  ems->>db: Save transaction history
-  ems->>nats: Forward to Event Director
-  nats->>ed: Route transaction for evaluation
-  ems->>client: Return success response
+    Client ->> DEMS: 1. POST /dems-engine/{endpoint}
+    DEMS ->> DEMS: 2. Validate JWT token
+    DEMS ->> Redis: 3. Fetch schema from cache
+    DEMS ->> DEMS: 4. Validate transaction data
+    alt Validation Failed
+        DEMS ->> Client: ERR: Validation errors
+    end
+    DEMS ->> DEMS: 5. Transform XML/JSON data
+    DEMS ->> DB: 6. Store transaction relationship
+    DEMS ->> NATS: 7. Publish event to Event Director
+    NATS ->> ED: 8. Route to Event Director
+    DEMS ->> Client: 9. Success response
 ```
 
 ### 1. Receive Transaction
