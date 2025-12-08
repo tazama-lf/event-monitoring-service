@@ -26,6 +26,7 @@ export function ApmSpan(spanName: string) {
     const originalMethod = descriptor.value;
 
     descriptor.value = async function (...args: any[]) {
+      // Note: This decorator converts the method to async.
       // Try to get ApmService from the current instance
       let apmService: ApmService | undefined;
 
