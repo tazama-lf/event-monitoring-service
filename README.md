@@ -1,9 +1,5 @@
 # Event Monitoring Service
 
-<div align="center">
-<img alt="GitHub Actions Workflow Status" src="https://img.shields.io/github/actions/workflow/status/tazama-lf/event-monitoring-service/node.js.yml">
-</div>
-
 ## Overview
 
 High-performance middleware for the Tazama FRMS that receives, validates, and routes financial transaction requests to the Event Director.
@@ -23,24 +19,24 @@ git clone https://github.com/tazama-lf/event-monitoring-service
 cd event-monitoring-service
 ```
 
-You then need to configure your environment: a [sample](.env.template) configuration file has been provided and you may adapt that to your environment. Copy it to `.env` and modify as needed:
+You then need to configure your environment: a [sample](.env.sample) configuration file has been provided and you may adapt that to your environment. Copy it to `.env` and modify as needed:
 
 ```sh
-cp .env.example .env
+cp .env.sample .env
 ```
 
 #### Prerequisites
 
 - Node.js 20+
 - PostgreSQL 15+
-- Redis 7+
+- Valkey 7+
 - NATS Server 2.10+
 
 #### Build and Start
 
 ```sh
 npm install
-docker-compose up -d redis nats postgres
+docker-compose up -d redis nats postgres (do not worry if full-stack-docker is running)
 npm run start:dev
 ```
 
@@ -50,7 +46,7 @@ The service will be available at `http://localhost:3002`
 
 | Variable    | Purpose                 | Example       |
 | ----------- | ----------------------- | ------------- |
-| `PORT`      | Port to serve on        | `3002`        |
+| `APP_PORT`  | Port to serve on        | `3002`        |
 | `NODE_ENV`  | Application environment | `development` |
 | `LOG_LEVEL` | Logging verbosity       | `info`        |
 
