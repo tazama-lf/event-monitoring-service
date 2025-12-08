@@ -70,8 +70,7 @@ export class ConfigNotifyService implements OnModuleInit {
         [message.transactionID],
       );
 
-      const MIN_ROWS_LENGTH = 0;
-      if (result.rows.length > MIN_ROWS_LENGTH) {
+      if (result.rows.length) {
         const [config] = result.rows;
         await this.setCache(config);
         this.logger.log(
