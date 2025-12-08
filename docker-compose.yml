@@ -10,17 +10,30 @@ services:
     environment:
       - NODE_ENV=development
     depends_on:
-      - redis
+      - postgres
+      - valkey
       - nats
 
-  redis:
-    image: redis:7-alpine
-    container_name: event-monitoring-redis
-    command: redis-server --requirepass redis-password
+  postgres:
+    image: postgres:15-alpine
+    container_name: event-monitoring-postgres
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=tcs
+    ports:
+      - '5432:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  valkey:
+    image: valkey/valkey:7-alpine
+    container_name: event-monitoring-valkey
+    command: valkey-server --requirepass redis-password
     ports:
       - '6379:6379'
     volumes:
-      - redis_data:/data
+      - valkey_data:/data
 
   nats:
     image: nats:2.10-alpine
@@ -32,4 +45,4 @@ services:
 
 volumes:
   postgres_data:
-  redis_data:
+  valkey_data:
