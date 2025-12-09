@@ -178,7 +178,8 @@ export class DemsEngineService {
     payload: any,
     configuredMapping: any,
     endpoint: string,
-  ): Promise<{ dataCache: any; transactionRelationship: TransactionDetails; endToEndId: string }> {
+  ): Promise<{ dataCache: any; transactionRelationship: TransactionDetails; endToEndId: string; dynamicMapping?: any }> {
+    // static object creation logic
     const dataCache: any = {};
     const transactionRelationship: TransactionDetails = {
       source: '',
@@ -194,10 +195,36 @@ export class DemsEngineService {
       long: '',
       TxSts: '',
     };
+
+    // dynamic object creation logic
+    const dynamicMapping: any = {};
+
     let endToEndId = '';
     this.loggerService.log(`Processing mappings for endpoint: ${endpoint}`, this.LOG_CONTEXT);
 
+    //     [
+    //   {
+    //     "columns": [
+    //       {
+    //         "name": "_key",
+    //         "type": "string",
+    //         "param": "car.vin",
+    //         "datasource": "dataModel"
+    //       },
+    //       {
+    //         "name": "data",
+    //         "type": "jsonb",
+    //         "param": "car",
+    //         "datasource": "payload"
+    //       }
+    //     ],
+    //     "tableName": "tenantid_car",
+    //     "functionName": "addDataModelTable"
+    //   }
+    // ]
+
     if (configuredMapping) {
+      this.loggerService.log('configuredMapping is: ', JSON.stringify(configuredMapping));
       try {
         for (const mapping of configuredMapping) {
           const sources = mapping.source;
@@ -211,6 +238,31 @@ export class DemsEngineService {
           const stringSize = typeof mapping.destination === 'string' ? mapping.destination.split('.').length : -1;
 
           const separator = mapping.delimiter;
+
+          // dynamic mapping logic based on datasource(datamodel ya payload)
+          if (type !== 'redis' && type !== 'transactionDetails') {
+            // append to dynamic mapping object
+            const ObjectName: string = mapping.destination.split('.')[0]; // e.g., Toyota
+            const PropertyName: string = mapping.destination.split('.')[1]; // e.g., model
+            const nestedPropertyName: string = mapping.destination.split('.')[2]; // e.g., name (if any)
+
+            // if (mapping.datasource === 'dataModel') {
+            this.loggerService.log('dataModel case for dynamic mapping source: ', mapping.source[0]);
+            this.loggerService.log('dataModel case for dynamic mapping value: ', getValueByPath(payload, mapping.source[0]));
+
+            dynamicMapping[ObjectName] ??= {};
+            if (nestedPropertyName) {
+              dynamicMapping[ObjectName][PropertyName] ??= {};
+              dynamicMapping[ObjectName][PropertyName][nestedPropertyName] = getValueByPath(payload, mapping.source[0]);
+            } else {
+              dynamicMapping[ObjectName][PropertyName] = getValueByPath(payload, mapping.source[0]);
+            }
+            // }
+
+            this.loggerService.log('dynamicMapping object is now: ', JSON.stringify(dynamicMapping));
+
+            continue;
+          }
 
           //constant value injection logic
           if (mapping.constantValue) {
@@ -254,8 +306,7 @@ export class DemsEngineService {
               if (i < sources.length - 1) {
                 dataCacheValue += separator;
               }
-            }
-            if (type === 'transactionDetails') {
+            } else if (type === 'transactionDetails') {
               transactionRelationshipValue += getValueByPath(payload, sources[i]);
 
               if (i < sources.length - 1) {
@@ -277,9 +328,7 @@ export class DemsEngineService {
             } else {
               dataCache[destination] = dataCacheValue;
             }
-          }
-
-          if (type === 'transactionDetails') {
+          } else if (type === 'transactionDetails') {
             transactionRelationshipValue += mapping.suffix ?? '';
 
             transactionRelationship[destination] = transactionRelationshipValue;
@@ -297,6 +346,7 @@ export class DemsEngineService {
           dataCache,
           transactionRelationship,
           endToEndId,
+          dynamicMapping,
         };
       }
     } else {
@@ -310,6 +360,7 @@ export class DemsEngineService {
       dataCache,
       transactionRelationship,
       endToEndId,
+      dynamicMapping,
     };
   }
 
@@ -324,6 +375,7 @@ export class DemsEngineService {
     configuredMapping: any,
     configuredFunctions: any,
     transactionRelationship: TransactionDetails,
+    dynamicMapping: any,
   ): Promise<void> {
     let containsSaveTransactionRelationship = false;
     this.loggerService.error(
@@ -342,6 +394,32 @@ export class DemsEngineService {
           continue;
         }
 
+        if (functionToCall === 'addDataModelTable') {
+          // dynamically build the table name using TenantId and param from mapping
+
+          const { tableName } = row;
+
+          this.loggerService.log(`table name: ${tableName} for function: ${functionToCall} `);
+          this.loggerService.log(`params are : ${JSON.stringify(row)}`);
+
+          // access the value from dynamicMapping object
+          const primaryKeyValue = getValueByPath(dynamicMapping, row.columns[0].param);
+
+          let dataValue;
+          // access the value conditionally from dynamicMapping or payload based on datasource
+          if (row.columns[1].datasource === 'dataModel') {
+            dataValue = getValueByPath(dynamicMapping, row.columns[1].param);
+          } else {
+            dataValue = getValueByPath(payload, row.columns[1].param);
+          }
+
+          this.loggerService.log(`the primary key value is : ${primaryKeyValue} and data value is : ${JSON.stringify(dataValue)}`);
+
+          // async addDataModelTable(tableName: string, primaryKey: string, data: any)
+          await this.databaseOperationsService[functionToCall](tableName, primaryKeyValue, dataValue);
+          continue;
+        }
+
         sources = processSourceMapping(sources, configuredMapping, payload);
 
         try {
@@ -353,9 +431,6 @@ export class DemsEngineService {
         }
       }
     }
-
-    this.loggerService.error('aik step pehle bas - Executing configured function: saveTransactionRelationship', this.LOG_CONTEXT);
-    this.loggerService.error(`Transaction Relationship to save: ${JSON.stringify(transactionRelationship)}`, this.LOG_CONTEXT);
 
     if (containsSaveTransactionRelationship) {
       try {
@@ -508,7 +583,7 @@ export class DemsEngineService {
       // refer to /docs/helpers for example mapping configuration
       const responseFromProcessMappings = await this.processMappings(enhancedRequest, configuredMapping, endpoint);
       this.loggerService.log(`response from process mapping dikhao: ${JSON.stringify(responseFromProcessMappings)}`, this.LOG_CONTEXT);
-      const { dataCache, transactionRelationship, endToEndId } = responseFromProcessMappings;
+      const { dataCache, transactionRelationship, endToEndId, dynamicMapping } = responseFromProcessMappings;
       this.loggerService.log('Successfully processed mappings for ED. all ok');
       this.loggerService.log(
         `at handle message seeing transactionRRelationship: ${JSON.stringify(transactionRelationship)}`,
@@ -517,7 +592,13 @@ export class DemsEngineService {
 
       try {
         // refer to /docs/helpers for example functions configuration
-        await this.executeConfiguredFunctions(enhancedRequest, configuredMapping, configuredFunctions, transactionRelationship);
+        await this.executeConfiguredFunctions(
+          enhancedRequest,
+          configuredMapping,
+          configuredFunctions,
+          transactionRelationship,
+          dynamicMapping,
+        );
       } catch (error) {
         return this.buildErrorResponse('the configured functions', [`Function execution failed: ${String(error)}`]);
       }
@@ -533,6 +614,7 @@ export class DemsEngineService {
         dataCache,
         transactionType,
         endToEndId,
+        dynamicMapping: responseFromProcessMappings.dynamicMapping,
       };
     } catch (error) {
       this.loggerService.error(`Unexpected error in handleMessage: ${String(error)}`);

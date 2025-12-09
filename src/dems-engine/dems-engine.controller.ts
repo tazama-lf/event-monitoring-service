@@ -64,13 +64,13 @@ export class DemsEngineController {
       });
     }
 
-    this.logger.log(' transaction relationship', JSON.stringify(result.transactionRelationship), this.LOG_CONTEXT);
-    this.logger.log('data cache', JSON.stringify(result.dataCache), this.LOG_CONTEXT);
+    this.logger.log('Dynamic Mapping in Controller: ', result.dynamicMapping);
 
     return {
       message: 'Everything is OK!',
       isMatch: true,
       transactionRelationship: result.transactionRelationship,
+      dynamicMapping: result.dynamicMapping,
       schema: result.configuredSchema,
       payload: result.tazamaPayload,
     };
