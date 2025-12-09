@@ -111,7 +111,7 @@ describe('DemsEngineController', () => {
   });
 
   describe('messageHandler', () => {
-    const validEndpoint = 'test,endpoint,path';
+    const validEndpoint = 'test-tenant,endpoint,path';
     const validPayload = { name: 'John Doe', age: 30 };
 
     it('should successfully process valid JSON request', async () => {
@@ -120,7 +120,12 @@ describe('DemsEngineController', () => {
 
       const result = await controller.messageHandler(validEndpoint, validPayload, mockUser, mockRequest as Request);
 
-      expect(mockDemsEngineService.handleMessage).toHaveBeenCalledWith(validPayload, '/test/endpoint/path', mockUser.token.tenantId, false);
+      expect(mockDemsEngineService.handleMessage).toHaveBeenCalledWith(
+        validPayload,
+        '/test-tenant/endpoint/path',
+        mockUser.token.tenantId,
+        false,
+      );
       expect(mockDemsEngineService.saveTransactionDataAndNotify).toHaveBeenCalled();
       expect(result.isMatch).toBe(true);
       expect(result.message).toBe('Everything is OK!');
@@ -133,7 +138,12 @@ describe('DemsEngineController', () => {
 
       await controller.messageHandler(validEndpoint, validPayload, mockUser, xmlRequest as Request);
 
-      expect(mockDemsEngineService.handleMessage).toHaveBeenCalledWith(validPayload, '/test/endpoint/path', mockUser.token.tenantId, true);
+      expect(mockDemsEngineService.handleMessage).toHaveBeenCalledWith(
+        validPayload,
+        '/test-tenant/endpoint/path',
+        mockUser.token.tenantId,
+        true,
+      );
     });
 
     it('should throw BadRequestException for invalid endpoint format', async () => {

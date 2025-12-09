@@ -40,6 +40,16 @@ export class DemsEngineController {
       this.LOG_CONTEXT,
     );
 
+    // check the tenant_id from JWT token with the tenant_id in the URL
+    const tenantIdFromUrl = endpoint.split(',')[0];
+    if (user.token.tenantId !== tenantIdFromUrl) {
+      this.logger.error(
+        `Tenant ID mismatch: JWT tenantId ${user.token.tenantId} does not match URL tenantId ${tenantIdFromUrl}`,
+        this.LOG_CONTEXT,
+      );
+      throw new BadRequestException('Tenant ID mismatch between JWT and endpoint URL');
+    }
+
     const isPayloadXml = isXmlContentType(req);
 
     const result = await this.demsEngineService.handleMessage(payload, transformedEndpoint, user.token.tenantId, isPayloadXml);
