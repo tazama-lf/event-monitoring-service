@@ -1,6 +1,6 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 
-- [The Dynamic Event Monitoring Service](#event-monitoring-service)
+- [The Dynamic Event Monitoring Service](#the-event-monitoring-service)
   - [Dynamic Event Monitoring Service Context](#event-monitoring-service-context)
     - [1. Receive Transaction](#1-receive-transaction)
       - [Payload:](#payload)
