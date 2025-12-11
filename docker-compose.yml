@@ -3,8 +3,8 @@ services:
     container_name: event-monitoring-service
     build:
       context: .
-      args:
-        GH_TOKEN: ${GH_TOKEN}
+      secrets:
+        - gh_token
     ports:
       - '3002:3002'
     environment:
@@ -43,6 +43,10 @@ services:
       - '4222:4222'
       - '8222:8222'
     command: ['nats-server', '--jetstream', '--http_port', '8222']
+
+secrets:
+  gh_token:
+    environment: GH_TOKEN
 
 volumes:
   postgres_data:
