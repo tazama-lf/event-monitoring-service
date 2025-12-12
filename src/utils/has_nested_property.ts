@@ -1,5 +1,9 @@
 export function getValueByPath(obj: any, path: string): any {
   const properties = path.split('.');
+  if (obj === null || obj === undefined) {
+    throw new Error(`Property '${path}' not found`);
+  }
+
   let current: any = obj;
 
   for (const prop of properties) {
@@ -10,7 +14,8 @@ export function getValueByPath(obj: any, path: string): any {
     // $ - End of string
 
     if (/^\d+$/.test(prop)) {
-      current = current[parseInt(prop)];
+      const index = Number(prop);
+      current = current?.[index];
     } else {
       current = current?.[prop];
     }
