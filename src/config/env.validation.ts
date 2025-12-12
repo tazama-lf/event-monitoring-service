@@ -148,7 +148,7 @@ export function validateEnvironment(config: Record<string, unknown>): AppConfigu
       port: redisPort,
       password: config.REDIS_PASSWORD as string,
       db: parseInt(config.REDIS_DB as string, 10) || 0,
-      isCluster: config.REDIS_IS_CLUSTER as boolean,
+      isCluster: config.REDIS_IS_CLUSTER === 'true' || config.REDIS_IS_CLUSTER === true,
     },
     nats: {
       serverUrl: config.SERVER_URL as string,
