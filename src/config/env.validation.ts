@@ -96,6 +96,15 @@ export function validateEnvironment(config: Record<string, unknown>): AppConfigu
     throw new Error('Environment variable REDIS_PORT must be a valid port number between 1 and 65535');
   }
 
+  // Validate required APP_PORT
+  if (!config.APP_PORT) {
+    throw new Error('Environment variable APP_PORT is required');
+  }
+  const appPort = parseInt(config.APP_PORT as string, 10);
+  if (isNaN(appPort) || appPort < 1 || appPort > 65535) {
+    throw new Error('Environment variable APP_PORT must be a valid port number between 1 and 65535');
+  }
+
   // Validate database connection pool settings
   const dbMinConnections = config.DB_MIN_CONNECTIONS ? parseInt(config.DB_MIN_CONNECTIONS as string, 10) : 2;
   const dbMaxConnections = config.DB_MAX_CONNECTIONS ? parseInt(config.DB_MAX_CONNECTIONS as string, 10) : 20;
@@ -120,7 +129,7 @@ export function validateEnvironment(config: Record<string, unknown>): AppConfigu
     functionName: (config.FUNCTION_NAME as string) || 'event-monitoring-service',
     nodeEnv: (config.NODE_ENV as string) || 'development',
     maxCpu: parseInt(config.MAX_CPU as string, 10) || 1,
-    port: parseInt(config.APP_PORT as string, 10),
+    port: appPort,
     configurationDatabaseUrl: config.CONFIGURATION_DATABASE_URL as string,
     database: {
       host: (config.DB_HOST as string) || ('localhost' as string),
