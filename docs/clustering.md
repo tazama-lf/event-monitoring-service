@@ -39,32 +39,32 @@ For example:
 
 ## Usage
 
-### Production Mode (Clustered)
+### Automatic Clustering Based on Environment
 
-To enable clustering, modify the `main.ts` file:
+The service **automatically** enables clustering based on the `NODE_ENV` environment variable:
 
-```typescript
-// Comment out single instance mode
-// bootstrap();
+- **Production** (`NODE_ENV=production`): Clustering is **enabled** automatically
+- **Development** (any other value): Single instance mode for easier debugging
 
-// Enable clustered mode
-AppClusterService.clusterize(bootstrap).catch((error: unknown) => {
-  const errorMessage = error instanceof Error ? error.message : String(error);
-  process.stderr.write(`Application failed to start: ${errorMessage}\n`);
-  process.exit(ERROR_EXIT_CODE);
-});
+No code changes are required! Simply set your environment variables:
+
+```bash
+# Production - enables clustering
+NODE_ENV=production
+MAX_CPU=4
+
+# Development - single instance
+NODE_ENV=development
+MAX_CPU=1  # or any value, clustering won't activate
 ```
 
-### Development Mode (Single Instance)
+### Manual Override
 
-For development, keep the single instance mode:
+If you need to force clustering in non-production environments (e.g., for testing), you can modify `main.ts`:
 
 ```typescript
-// Single instance mode (development)
-bootstrap();
-
-// Keep clustered mode commented out
-// AppClusterService.clusterize(bootstrap)...
+// Force clustering regardless of NODE_ENV
+const isProduction = true; // or process.env.FORCE_CLUSTERING === 'true'
 ```
 
 ## Implementation Details

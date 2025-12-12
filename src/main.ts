@@ -56,12 +56,20 @@ export async function bootstrap(): Promise<void> {
   }
 }
 
-// Single instance mode (current)
-// bootstrap();
+const isProduction = process.env.NODE_ENV === 'production';
 
-// Clustered mode (uncomment to enable clustering)
-AppClusterService.clusterize(bootstrap).catch((error: unknown) => {
-  const errorMessage = error instanceof Error ? error.message : String(error);
-  process.stderr.write(`Application failed to start: ${errorMessage}\n`);
-  process.exit(ERROR_EXIT_CODE);
-});
+if (isProduction) {
+  // use clustering for better performance
+  AppClusterService.clusterize(bootstrap).catch((error: unknown) => {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    process.stderr.write(`Application failed to start: ${errorMessage}\n`);
+    process.exit(ERROR_EXIT_CODE);
+  });
+} else {
+  // use single instance for easier debugging
+  bootstrap().catch((error: unknown) => {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    process.stderr.write(`Application failed to start: ${errorMessage}\n`);
+    process.exit(ERROR_EXIT_CODE);
+  });
+}

@@ -13,12 +13,18 @@ import { AppModule } from './app.module';
  * number of worker processes to spawn. The actual number of workers will be
  * the minimum of MAX_CPU and the actual CPU count available on the system.
  *
+ * Clustering is automatically enabled based on NODE_ENV:
+ * - NODE_ENV=production: Clustering enabled (if MAX_CPU > 1)
+ * - NODE_ENV=development (or other): Single instance mode
+ *
  * Environment Variables:
+ * - NODE_ENV: Determines clustering behavior (production = clustered)
  * - MAX_CPU: Maximum number of CPU cores/workers to use (defaults to 1)
  *
  *
  * @example
  * // In .env file
+ * NODE_ENV=production
  * MAX_CPU=4
  *
  * // This will create maximum 4 workers, or fewer if system has less than 4 CPUs
