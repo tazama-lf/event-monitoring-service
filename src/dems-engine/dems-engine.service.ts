@@ -425,7 +425,11 @@ export class DemsEngineService {
         }
 
         const ALLOWED_DB_FUNCTIONS = ['addAccount', 'addEntity', 'addAccountHolder', 'saveTransactionHistory'];
-        sources = processSourceMapping(sources, configuredMapping, payload);
+
+        // process only when it exists.
+        if (configuredMapping.length > 0) {
+          sources = processSourceMapping(sources, configuredMapping, payload);
+        }
 
         if (!ALLOWED_DB_FUNCTIONS.includes(functionToCall)) {
           throw new Error(`Function '${functionToCall}' is not in the allowed functions list`);
