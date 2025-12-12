@@ -5,7 +5,13 @@ import { ApmService } from './apm.service';
 import type { Span } from 'elastic-apm-node';
 
 /**
- * Decorator for method instrumentation with APM spans
+ * Decorator for async method instrumentation with APM spans
+ *
+ * ⚠️ WARNING: This decorator only works with async methods!
+ * It converts the decorated method to return a Promise.
+ * For synchronous methods, use @ApmSpanSync decorator instead,
+ * or extend ApmInstrumented and use withSpanSync().
+ *
  * Usage: @ApmSpan('operation-name')
  *
  * @param spanName - Name of the APM span
@@ -15,7 +21,7 @@ import type { Span } from 'elastic-apm-node';
  * ```typescript
  * class MyService {
  *   @ApmSpan('database-query')
- *   async findUser(id: string) {
+ *   async findUser(id: string) {  // Must be async!
  *     // Your method implementation
  *   }
  * }
@@ -45,6 +51,70 @@ export function ApmSpan(spanName: string) {
 
       try {
         const result = await originalMethod.apply(this, args);
+
+        if (span) {
+          span.setOutcome('success');
+          span.end();
+        }
+
+        return result;
+      } catch (error) {
+        if (span) {
+          span.setOutcome('failure');
+          span.end();
+        }
+        throw error;
+      }
+    };
+
+    return descriptor;
+  };
+}
+
+/**
+ * Decorator for synchronous method instrumentation with APM spans
+ *
+ * Use this decorator for synchronous methods that don't return Promises.
+ * For async methods, use @ApmSpan decorator instead.
+ *
+ * Usage: @ApmSpanSync('operation-name')
+ *
+ * @param spanName - Name of the APM span
+ * @returns Method decorator
+ *
+ * @example
+ * ```typescript
+ * class MyService {
+ *   @ApmSpanSync('calculate-sum')
+ *   calculateSum(a: number, b: number): number {
+ *     return a + b;
+ *   }
+ * }
+ * ```
+ */
+export function ApmSpanSync(spanName: string) {
+  return function (target: any, propertyKey: string, descriptor: PropertyDescriptor) {
+    const originalMethod = descriptor.value;
+
+    descriptor.value = function (...args: any[]) {
+      // Try to get ApmService from the current instance
+      let apmService: ApmService | undefined;
+
+      // Check if the class has apmService as a property
+      if ('apmService' in this) {
+        const { apmService: service } = this as any;
+        apmService = service;
+      }
+
+      if (apmService === undefined) {
+        // Fallback: execute without APM instrumentation
+        return originalMethod.apply(this, args);
+      }
+
+      const span: Span | null = apmService.startSpan(spanName);
+
+      try {
+        const result = originalMethod.apply(this, args);
 
         if (span) {
           span.setOutcome('success');
