@@ -130,8 +130,8 @@ Each worker process:
 **Solution**:
 
 - Ensure `.env` file exists and contains `MAX_CPU=<number>`
-- Verify `ConfigModule.forRoot()` is configured in `app.module.ts`
-- Check that `validateEnvironment` function is set as validator
+- Verify environment variables are loaded (check `process.env.MAX_CPU`)
+- Restart the application after changing `.env` file
 
 #### 2. Too Many Workers
 
