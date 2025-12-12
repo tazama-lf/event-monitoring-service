@@ -251,7 +251,9 @@ describe('DemsEngineService', () => {
         createMockQueryResult([{ schema: xmlSchema, mapping: mockMapping, functions: mockFunctions, publishing_status: 'active' }]),
       );
 
-      await expect(service.handleMessage('<invalid-xml>', '/test', 'tenant1', true)).rejects.toThrow('XML parse error');
+      const result = await service.handleMessage('<invalid-xml>', '/test', 'tenant1', true);
+      expect(result).toHaveProperty('isMatch', false);
+      expect(result).toHaveProperty('message', 'Unexpected error occurred while processing message');
       expect(parseString).toHaveBeenCalled();
     });
 

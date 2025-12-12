@@ -66,6 +66,10 @@ export class DemsEngineService {
       } else if (typeof cachedSchema === 'object') {
         // If cachedSchema is already an object, use it directly
         const schemaObj = cachedSchema as any;
+        if (schemaObj.publishing_status && schemaObj.publishing_status !== 'active') {
+          this.loggerService.log(`Cached schema for endpoint: ${endpoint} is not active`);
+          return null;
+        }
         return [schemaObj.schema, schemaObj.mapping, schemaObj.functions] as [any, any, any];
       }
     }
@@ -378,7 +382,7 @@ export class DemsEngineService {
     dynamicMapping: any,
   ): Promise<void> {
     let containsSaveTransactionRelationship = false;
-    this.loggerService.error(
+    this.loggerService.log(
       `starting to execute configured functions based on mapping configuration ${JSON.stringify(transactionRelationship)}`,
       this.LOG_CONTEXT,
     );
@@ -420,7 +424,12 @@ export class DemsEngineService {
           continue;
         }
 
+        const ALLOWED_DB_FUNCTIONS = ['addAccount', 'addEntity', 'addAccountHolder', 'saveTransactionHistory'];
         sources = processSourceMapping(sources, configuredMapping, payload);
+
+        if (!ALLOWED_DB_FUNCTIONS.includes(functionToCall)) {
+          throw new Error(`Function '${functionToCall}' is not in the allowed functions list`);
+        }
 
         try {
           await this.databaseOperationsService[functionToCall](...Object.values(sources));
@@ -517,37 +526,6 @@ export class DemsEngineService {
   async handleMessage(payload: any, endpoint: string, tenantId: string, isPayloadXml: boolean): Promise<ErrorResponse | ProcessingResult> {
     let transformedPayload: any; //contains the XML --> JSON converted payload
 
-    if (isPayloadXml) {
-      const schemaResult = await this.findSchemaAndMapping(endpoint);
-      if (!schemaResult) {
-        return this.buildErrorResponse('Schema not found for the specified endpoint', ['No schema exists for this endpoint']);
-      }
-
-      const [configuredSchema] = schemaResult;
-      const { stringFields } = returnArrayFieldsFromSchema(configuredSchema);
-
-      const options: ParserOptions = {
-        explicitArray: false, // Don't wrap single values in arrays
-        ignoreAttrs: false, // Include attributes
-        mergeAttrs: true, // Merge attributes with element content
-        explicitRoot: true, // Don't include root wrapper
-        explicitChildren: true,
-        normalize: true,
-        valueProcessors: [createSchemaAwareNumberProcessor(stringFields)], // Use custom processor
-      };
-
-      // eslint-disable-next-line promise/avoid-new -- we need to wrap xml2js parseString in a promise
-      transformedPayload = await new Promise((resolve, reject) => {
-        parseString(payload, options, (err, result) => {
-          if (err) {
-            reject(err);
-          } else {
-            resolve(result);
-          }
-        });
-      });
-    }
-
     try {
       // refer to /docs/helpers for example schema and mapping configuration
       const result = await this.findSchemaAndMapping(endpoint);
@@ -558,8 +536,28 @@ export class DemsEngineService {
       const [configuredSchema, configuredMapping, configuredFunctions] = result;
 
       if (isPayloadXml) {
-        // below are all the array fields and string fields in the schema for XML case
-        const { arrayFields } = returnArrayFieldsFromSchema(configuredSchema);
+        const { stringFields, arrayFields } = returnArrayFieldsFromSchema(configuredSchema);
+
+        const options: ParserOptions = {
+          explicitArray: false, // Don't wrap single values in arrays
+          ignoreAttrs: false, // Include attributes
+          mergeAttrs: true, // Merge attributes with element content
+          explicitRoot: true, // Don't include root wrapper
+          explicitChildren: true,
+          normalize: true,
+          valueProcessors: [createSchemaAwareNumberProcessor(stringFields)], // Use custom processor
+        };
+
+        // eslint-disable-next-line promise/avoid-new -- we need to wrap xml2js parseString in a promise
+        transformedPayload = await new Promise((resolve, reject) => {
+          parseString(payload, options, (err, result) => {
+            if (err) {
+              reject(err);
+            } else {
+              resolve(result);
+            }
+          });
+        });
 
         // Convert the transformed payload to ensure array fields are properly formatted
         // Note: We don't need string conversion here anymore since the parser handles it
@@ -570,7 +568,7 @@ export class DemsEngineService {
       if (!validationResult.isValid) {
         const MIN_DIFFERENCES_INDEX = 0;
         const errorMessage = validationResult.differences?.[MIN_DIFFERENCES_INDEX]?.includes('AJV validation error')
-          ? 'Error during schemaa validation'
+          ? 'Error during schema validation'
           : 'Payload structure does not match the schema';
         return this.buildErrorResponse(errorMessage, validationResult.differences ?? [], configuredSchema);
       }
