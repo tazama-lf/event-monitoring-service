@@ -73,34 +73,4 @@ export class AppClusterService {
       await callback();
     }
   }
-
-  /**
-   * Instance method for clustering (when ConfigService is already available)
-   */
-  async clusterizeInstance(callback: () => Promise<void>): Promise<void> {
-    const maxCpu = this.configService.get<number>('maxCpu', os.cpus().length);
-    const numCPUs = Math.min(maxCpu, os.cpus().length);
-
-    // If MAX_CPU is 1, run as single process without clustering
-    if (numCPUs <= 1) {
-      this.logger.log(`Running in single process mode (maxCpu: ${maxCpu})`, this.LOG_CONTEXT);
-      await callback();
-      return;
-    }
-
-    // Only use clustering for MAX_CPU > 1
-    if (cluster.default.isPrimary) {
-      this.logger.log(`Master server started on ${process.pid} with ${numCPUs} workers (maxCpu: ${maxCpu})`, this.LOG_CONTEXT);
-      for (let i = 0; i < numCPUs; i++) {
-        cluster.default.fork();
-      }
-      cluster.default.on('exit', (worker) => {
-        this.logger.log(`Worker ${worker.process.pid} died. Restarting`, this.LOG_CONTEXT);
-        // cluster.default.fork();
-      });
-    } else {
-      this.logger.log(`Cluster worker started on ${process.pid}`, this.LOG_CONTEXT);
-      await callback();
-    }
-  }
 }

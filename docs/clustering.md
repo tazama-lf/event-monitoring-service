@@ -71,28 +71,16 @@ const isProduction = true; // or process.env.FORCE_CLUSTERING === 'true'
 
 ### AppClusterService
 
-The `AppClusterService` provides two methods for clustering:
-
-#### 1. Static Method (Recommended)
+The `AppClusterService` provides the `clusterize()` static method for clustering:
 
 ```typescript
 AppClusterService.clusterize(bootstrap);
 ```
 
 - Creates a temporary NestJS application to access configuration
-- Reads `MAX_CPU` from environment variables
+- Reads `MAX_CPU` from environment variables via validated configuration
 - Spawns the appropriate number of worker processes
 - Handles worker process failures with automatic restart
-
-#### 2. Instance Method
-
-```typescript
-const clusterService = app.get(AppClusterService);
-await clusterService.clusterizeInstance(bootstrap);
-```
-
-- Used when you already have access to a NestJS application instance
-- Useful for advanced scenarios or custom bootstrapping logic
 
 ### Configuration Validation
 
