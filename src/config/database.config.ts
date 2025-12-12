@@ -8,7 +8,6 @@ export default registerAs('database', (): DatabaseConfig => {
   const config = validateEnvironment(process.env);
   const db = config.database;
 
-  const BASE_10 = 10;
   return {
     host: db.host,
     port: db.port,
@@ -16,9 +15,9 @@ export default registerAs('database', (): DatabaseConfig => {
     password: db.password,
     database: db.name,
     ssl: db.ssl,
-    connectionTimeoutMillis: parseInt(process.env.DB_CONNECTION_TIMEOUT_MILLIS ?? '10000', BASE_10),
-    idleTimeoutMillis: parseInt(process.env.DB_IDLE_TIMEOUT_MILLIS ?? '30000', BASE_10),
-    max: parseInt(process.env.DB_MAX_CONNECTIONS ?? '20', BASE_10),
-    min: parseInt(process.env.DB_MIN_CONNECTIONS ?? '2', BASE_10),
+    connectionTimeoutMillis: db.connectionTimeoutMillis,
+    idleTimeoutMillis: db.idleTimeoutMillis,
+    max: db.max,
+    min: db.min,
   };
 });

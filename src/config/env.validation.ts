@@ -17,8 +17,10 @@ export interface AppConfiguration {
     readonly password: string;
     readonly name: string;
     readonly ssl: boolean;
-    readonly min?: number;
-    readonly max?: number;
+    readonly min: number;
+    readonly max: number;
+    readonly connectionTimeoutMillis: number;
+    readonly idleTimeoutMillis: number;
   };
   readonly redis: {
     readonly host: string;
@@ -94,6 +96,26 @@ export function validateEnvironment(config: Record<string, unknown>): AppConfigu
     throw new Error('Environment variable REDIS_PORT must be a valid port number between 1 and 65535');
   }
 
+  // Validate database connection pool settings
+  const dbMinConnections = config.DB_MIN_CONNECTIONS ? parseInt(config.DB_MIN_CONNECTIONS as string, 10) : 2;
+  const dbMaxConnections = config.DB_MAX_CONNECTIONS ? parseInt(config.DB_MAX_CONNECTIONS as string, 10) : 20;
+  const dbConnectionTimeout = config.DB_CONNECTION_TIMEOUT_MILLIS ? parseInt(config.DB_CONNECTION_TIMEOUT_MILLIS as string, 10) : 10000;
+  const dbIdleTimeout = config.DB_IDLE_TIMEOUT_MILLIS ? parseInt(config.DB_IDLE_TIMEOUT_MILLIS as string, 10) : 30000;
+
+  // Validate connection pool values
+  if (dbMinConnections < 0) {
+    throw new Error('Environment variable DB_MIN_CONNECTIONS must be a non-negative number');
+  }
+  if (dbMaxConnections < dbMinConnections) {
+    throw new Error('Environment variable DB_MAX_CONNECTIONS must be greater than or equal to DB_MIN_CONNECTIONS');
+  }
+  if (dbConnectionTimeout <= 0) {
+    throw new Error('Environment variable DB_CONNECTION_TIMEOUT_MILLIS must be a positive number');
+  }
+  if (dbIdleTimeout <= 0) {
+    throw new Error('Environment variable DB_IDLE_TIMEOUT_MILLIS must be a positive number');
+  }
+
   return {
     functionName: (config.FUNCTION_NAME as string) || 'event-monitoring-service',
     nodeEnv: (config.NODE_ENV as string) || 'development',
@@ -107,8 +129,10 @@ export function validateEnvironment(config: Record<string, unknown>): AppConfigu
       password: (config.DB_PASSWORD as string) || 'password',
       name: (config.DB_NAME as string) || 'event_monitoring_dev',
       ssl: config.NODE_ENV === 'production',
-      min: config.DB_MIN_CONNECTIONS ? parseInt(config.DB_MIN_CONNECTIONS as string, 10) : undefined,
-      max: config.DB_MAX_CONNECTIONS ? parseInt(config.DB_MAX_CONNECTIONS as string, 10) : undefined,
+      min: dbMinConnections,
+      max: dbMaxConnections,
+      connectionTimeoutMillis: dbConnectionTimeout,
+      idleTimeoutMillis: dbIdleTimeout,
     },
     redis: {
       host: config.REDIS_HOST as string,
