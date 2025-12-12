@@ -70,7 +70,7 @@ export class DemsEngineController {
       this.logger.error(`Failed to save transaction data or notify: ${String(error)}`);
       throw new BadRequestException({
         message: 'Error saving transaction data or sending notification',
-        differences: [`Transaction processing failed: ${String(error)}`],
+        differences: ['Transaction processing failed. Please contact support if the issue persists.'],
       });
     }
 
