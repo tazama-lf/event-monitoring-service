@@ -170,5 +170,16 @@ describe('DemsEngineController', () => {
         BadRequestException,
       );
     });
+
+    it('should throw BadRequestException when tenant ID mismatch', async () => {
+      const mismatchedEndpoint = 'different-tenant,endpoint,path';
+
+      await expect(controller.messageHandler(mismatchedEndpoint, validPayload, mockUser, mockRequest as Request)).rejects.toThrow(
+        BadRequestException,
+      );
+
+      expect(mockLoggerService.error).toHaveBeenCalledWith(expect.stringContaining('Tenant ID mismatch'), 'DemsEngineController');
+      expect(mockDemsEngineService.handleMessage).not.toHaveBeenCalled();
+    });
   });
 });
