@@ -40,7 +40,7 @@ describe('ConfigNotifyService', () => {
           provide: ConfigService,
           useValue: {
             get: jest.fn((key, defaultValue) => {
-              if (key === 'CACHE_TTL') return 86400;
+              if (key === 'cache.timeToLive') return 86400;
               if (key === 'CONSUMER_STREAM') return 'config.notification';
               if (key === 'PRODUCER_STREAM') return 'dems.notification.response';
               return defaultValue;
