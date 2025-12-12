@@ -122,15 +122,31 @@ export class DatabaseOperationsService {
     }
   }
 
+  /**
+   * Validates table/column names to prevent SQL injection
+   * PostgreSQL identifiers must start with letter or underscore,
+   * followed by letters, digits, or underscores
+   */
+  private getSafeIdentifier(name: string): string {
+    if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(name)) {
+      this.loggerService.error(`Invalid identifier rejected: ${name}`, this.log_context);
+      throw new BadRequestException(`Invalid table or column name: ${name}`);
+    }
+    return name;
+  }
+
   async saveTransactionHistory(transaction: TazamaPayload, key: string): Promise<void> {
     const txtp = transaction.TxTp.replace('.', '').toLowerCase();
 
+    // Validate table name to prevent SQL injection
+    const safeTableName = this.getSafeIdentifier(txtp);
+
     try {
-      await this.databaseService.query(`INSERT INTO ${txtp} (document) VALUES ($1)`, [transaction.transaction]);
+      await this.databaseService.query(`INSERT INTO ${safeTableName} (document) VALUES ($1)`, [transaction.transaction]);
       this.loggerService.log(`Saved transaction history with key: ${key}`, this.log_context);
     } catch (error) {
       this.handleDatabaseError(error, 'save transaction history', {
-        details: `key ${key}, table ${txtp}`,
+        details: `key ${key}, table ${safeTableName}`,
       });
     }
   }
@@ -210,19 +226,21 @@ export class DatabaseOperationsService {
   }
 
   async addDataModelTable(tableName: string, primaryKey: string, data: any): Promise<void> {
+    // Validate table name to prevent SQL injection
+    const safeTableName = this.getSafeIdentifier(tableName);
     try {
       const insertIntoDynamicTable = `
-      INSERT INTO ${tableName} (
+      INSERT INTO ${safeTableName} (
        _key,
         data)
        VALUES ($1, $2)
       on conflict (_key) do update set data = EXCLUDED.data`;
       await this.databaseService.query(insertIntoDynamicTable, [primaryKey, data]);
 
-      this.loggerService.log(`Inserted data into the data model table: ${tableName} `, this.log_context);
+      this.loggerService.log(`Inserted data into the data model table: ${safeTableName}`, this.log_context);
     } catch (error) {
       this.handleDatabaseError(error, 'add data model table', {
-        details: `table ${tableName} `,
+        details: `table ${safeTableName}`,
       });
     }
   }
