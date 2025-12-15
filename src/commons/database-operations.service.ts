@@ -154,7 +154,10 @@ export class DatabaseOperationsService {
   }
 
   async saveTransactionRelationship(transactionDetails: TransactionDetails): Promise<void> {
-    this.loggerService.error(`Saving okoko transaction relationship: ${JSON.stringify(transactionDetails)}`, this.log_context);
+    this.loggerService.log(
+      `Saving transaction relationship: ${transactionDetails.source} -> ${transactionDetails.destination}`,
+      this.log_context,
+    );
     if (!transactionDetails.source || !transactionDetails.destination) {
       this.loggerService.error(
         `Missing 1 required fields in transaction relationship: source=${transactionDetails.source}, destination=${transactionDetails.destination}`,
