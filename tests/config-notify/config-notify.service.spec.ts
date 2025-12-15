@@ -118,22 +118,70 @@ describe('ConfigNotifyService', () => {
     it('should log error for invalid message', async () => {
       await (service as any).handleNatsMessage(null);
 
-      expect(mockLogger.error).toHaveBeenCalledWith('Invalid NATS message: must be an object', 'ConfigNotifyService');
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        'Invalid NATS message: expected JSON with non-empty transactionID',
+        'ConfigNotifyService',
+      );
     });
 
     it('should log error for missing transactionID', async () => {
       await (service as any).handleNatsMessage({});
 
-      expect(mockLogger.error).toHaveBeenCalledWith('Invalid NATS message: transactionID is required', 'ConfigNotifyService');
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        'Invalid NATS message: expected JSON with non-empty transactionID',
+        'ConfigNotifyService',
+      );
     });
 
     it('should log error on database error', async () => {
       const message = { transactionID: '789' };
-      mockDatabaseService.query.mockRejectedValue(new Error('DB error'));
+      const dbError = new Error('DB error');
+      mockDatabaseService.query.mockRejectedValue(dbError);
 
       await (service as any).handleNatsMessage(message);
 
-      expect(mockLogger.error).toHaveBeenCalledWith('Error processing message: Error: DB error', 'ConfigNotifyService');
+      expect(mockLogger.error).toHaveBeenCalledWith('Error processing message', dbError, 'ConfigNotifyService');
+    });
+
+    it('should handle string JSON payload', async () => {
+      const stringMessage = JSON.stringify({ transactionID: '999' });
+      mockDatabaseService.query.mockResolvedValue({
+        rows: [{ endpointPath: '/test', schema: {}, mapping: {}, functions: {}, publishing_status: 'active' }],
+        rowCount: 1,
+        command: 'SELECT',
+        oid: 0,
+        fields: [],
+      });
+
+      await (service as any).handleNatsMessage(stringMessage);
+
+      expect(mockRedis.setJson).toHaveBeenCalled();
+      expect(mockLogger.log).toHaveBeenCalledWith('Received NATS message for config id: 999', 'ConfigNotifyService');
+    });
+
+    it('should handle Buffer payload', async () => {
+      const bufferMessage = Buffer.from(JSON.stringify({ transactionID: '888' }), 'utf8');
+      mockDatabaseService.query.mockResolvedValue({
+        rows: [{ endpointPath: '/test', schema: {}, mapping: {}, functions: {}, publishing_status: 'active' }],
+        rowCount: 1,
+        command: 'SELECT',
+        oid: 0,
+        fields: [],
+      });
+
+      await (service as any).handleNatsMessage(bufferMessage);
+
+      expect(mockRedis.setJson).toHaveBeenCalled();
+      expect(mockLogger.log).toHaveBeenCalledWith('Received NATS message for config id: 888', 'ConfigNotifyService');
+    });
+
+    it('should reject invalid JSON string', async () => {
+      await (service as any).handleNatsMessage('invalid json');
+
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        'Invalid NATS message: expected JSON with non-empty transactionID',
+        'ConfigNotifyService',
+      );
     });
   });
 

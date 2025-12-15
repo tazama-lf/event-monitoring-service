@@ -8,6 +8,7 @@ import { CacheData } from '../interfaces/iCacheData';
 
 @Injectable()
 export class ConfigNotifyService implements OnModuleInit {
+  private static readonly DEFAULT_CACHE_TTL = 3600;
   private readonly cacheTtl: number;
   private readonly consumerStream: string;
 
@@ -18,7 +19,7 @@ export class ConfigNotifyService implements OnModuleInit {
     private readonly databaseService: DatabaseService,
     private readonly natsService: NatsService,
   ) {
-    this.cacheTtl = this.configService.get<number>('cache.timeToLive', 3600);
+    this.cacheTtl = this.configService.get<number>('cache.timeToLive', ConfigNotifyService.DEFAULT_CACHE_TTL);
     this.consumerStream = this.configService.get<string>('nats.consumerStream', 'dems.notify');
   }
 
@@ -49,21 +50,12 @@ export class ConfigNotifyService implements OnModuleInit {
 
   private async handleNatsMessage(reqObj: unknown): Promise<void> {
     try {
-      this.loggerService.log(`Received NATS message | DB record id: ${JSON.stringify(reqObj)}`, this.LOG_CONTEXT);
-      if (!reqObj || typeof reqObj !== 'object') {
-        this.loggerService.error('Invalid NATS message: must be an object', this.LOG_CONTEXT);
+      const message = ConfigNotifyService.normalizeNatsMessage(reqObj);
+      if (!message) {
+        this.loggerService.error('Invalid NATS message: expected JSON with non-empty transactionID', this.LOG_CONTEXT);
         return;
       }
-
-      const partialMessage = reqObj as Partial<NatsMessage>;
-
-      if (!partialMessage.transactionID || typeof partialMessage.transactionID !== 'string' || partialMessage.transactionID.trim() === '') {
-        this.loggerService.error('Invalid NATS message: transactionID is required', this.LOG_CONTEXT);
-        return;
-      }
-
-      // Now we know transactionID exists and is valid, safe to cast
-      const message = reqObj as NatsMessage;
+      this.loggerService.log(`Received NATS message for config id: ${message.transactionID}`, this.LOG_CONTEXT);
 
       const result = await this.databaseService.query<CacheData>(
         'SELECT endpoint_path AS "endpointPath", schema, mapping, functions, publishing_status FROM config WHERE id = $1',
@@ -82,8 +74,31 @@ export class ConfigNotifyService implements OnModuleInit {
         this.loggerService.warn(`Config not found for ID: ${message.transactionID}`, this.LOG_CONTEXT);
       }
     } catch (error) {
-      this.loggerService.error(`Error processing message: ${String(error)}`, this.LOG_CONTEXT);
+      this.loggerService.error('Error processing message', error as Error, this.LOG_CONTEXT);
     }
+  }
+
+  private static normalizeNatsMessage(input: unknown): NatsMessage | null {
+    let obj: unknown = input;
+
+    if (typeof input === 'string') {
+      try {
+        obj = JSON.parse(input);
+      } catch {
+        return null;
+      }
+    } else if (typeof Buffer !== 'undefined' && Buffer.isBuffer(input)) {
+      try {
+        obj = JSON.parse(input.toString('utf8'));
+      } catch {
+        return null;
+      }
+    }
+
+    if (!obj || typeof obj !== 'object') return null;
+    const { transactionID } = obj as { transactionID?: unknown };
+    if (typeof transactionID !== 'string' || transactionID.trim() === '') return null;
+    return { transactionID: transactionID.trim() };
   }
 
   public async setCache(config: CacheData): Promise<void> {
