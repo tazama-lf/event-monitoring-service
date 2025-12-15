@@ -19,7 +19,7 @@ export class ConfigNotifyService implements OnModuleInit {
     private readonly natsService: NatsService,
   ) {
     this.cacheTtl = this.configService.get<number>('cache.timeToLive', 3600);
-    this.consumerStream = this.configService.get<string>('CONSUMER_STREAM', 'dems.notify');
+    this.consumerStream = this.configService.get<string>('nats.consumerStream', 'dems.notify');
   }
 
   private readonly LOG_CONTEXT = ConfigNotifyService.name;
