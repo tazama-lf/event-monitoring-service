@@ -70,7 +70,9 @@ export class DatabaseOperationsService {
 
       if (matches) {
         const message = errorPattern.getMessage(context, additionalInfo);
-        this.loggerService[errorPattern.log](`${context}: ${message} - ${errorMessage}`);
+        const logMsg = `${context}: ${message} - ${errorMessage}`;
+        if (errorPattern.log === 'warn') this.loggerService.warn(logMsg, this.log_context);
+        else this.loggerService.error(logMsg, this.log_context);
         const ExceptionConstructor = errorPattern.exception;
         throw new ExceptionConstructor(message);
       }
