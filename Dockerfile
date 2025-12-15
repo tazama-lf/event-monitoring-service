@@ -65,7 +65,7 @@ ENV REDIS_DB=0
 ENV REDIS_IS_CLUSTER=false
 
 # NATS Configuration
-ENV SERVER_URL=0.0.0.0:4222
+ENV SERVER_URL=nats://localhost:4222
 ENV STARTUP_TYPE=nats
 ENV PRODUCER_STREAM=config.notification.response
 ENV CONSUMER_STREAM=dems.notify
