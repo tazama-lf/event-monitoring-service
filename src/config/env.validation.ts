@@ -52,6 +52,33 @@ export interface AppConfiguration {
  * @returns Validated and typed configuration
  */
 export function validateEnvironment(config: Record<string, unknown>): AppConfiguration {
+  /**
+   * Helper function to parse and validate integer environment variables
+   * @param name - Environment variable name
+   * @param value - Raw environment variable value
+   * @param opts - Parsing options (default, min, max)
+   * @returns Parsed and validated integer
+   */
+  const parseIntEnv = (name: string, value: unknown, opts: { default?: number; min?: number; max?: number } = {}): number => {
+    if (value === undefined || value === null || value === '') {
+      if (opts.default !== undefined) return opts.default;
+      throw new Error(`Environment variable ${name} is required`);
+    }
+    const str = typeof value === 'number' ? String(value) : typeof value === 'string' ? value.trim() : JSON.stringify(value);
+    if (!/^\d+$/.test(str)) {
+      throw new Error(`Environment variable ${name} must be an integer`);
+    }
+    const n = Number.parseInt(str, 10);
+    if (Number.isNaN(n)) throw new Error(`Environment variable ${name} must be an integer`);
+    if (opts.min !== undefined && n < opts.min) {
+      throw new Error(`Environment variable ${name} must be >= ${opts.min}`);
+    }
+    if (opts.max !== undefined && n > opts.max) {
+      throw new Error(`Environment variable ${name} must be <= ${opts.max}`);
+    }
+    return n;
+  };
+
   // Validate required environment variables
   if (!config.CONFIGURATION_DATABASE_URL) {
     throw new Error('Environment variable CONFIGURATION_DATABASE_URL is required');
@@ -77,58 +104,32 @@ export function validateEnvironment(config: Record<string, unknown>): AppConfigu
   }
 
   // Validate database configuration
-  const dbPort = parseInt(config.DB_PORT as string, 10) || 5432;
-
-  // Validate database port range
-  if (dbPort < 1 || dbPort > 65535) {
-    throw new Error('Environment variable DB_PORT must be between 1 and 65535');
-  }
+  const dbPort = parseIntEnv('DB_PORT', config.DB_PORT, { default: 5432, min: 1, max: 65535 });
 
   // Validate cache TTL if provided (using TTL instead of CACHE_TTL)
-  const cacheTtl = config.TTL as string;
-  if (cacheTtl && (isNaN(parseInt(cacheTtl, 10)) || parseInt(cacheTtl, 10) <= 0)) {
-    throw new Error('Environment variable TTL must be a positive number');
-  }
+  const cacheTtl = parseIntEnv('TTL', config.TTL, { default: 3600, min: 1 });
 
   // Validate Redis port
-  const redisPort = parseInt(config.REDIS_PORT as string, 10);
-  if (isNaN(redisPort) || redisPort < 1 || redisPort > 65535) {
-    throw new Error('Environment variable REDIS_PORT must be a valid port number between 1 and 65535');
-  }
+  const redisPort = parseIntEnv('REDIS_PORT', config.REDIS_PORT, { min: 1, max: 65535 });
 
   // Validate required APP_PORT
-  if (!config.APP_PORT) {
-    throw new Error('Environment variable APP_PORT is required');
-  }
-  const appPort = parseInt(config.APP_PORT as string, 10);
-  if (isNaN(appPort) || appPort < 1 || appPort > 65535) {
-    throw new Error('Environment variable APP_PORT must be a valid port number between 1 and 65535');
-  }
+  const appPort = parseIntEnv('APP_PORT', config.APP_PORT, { min: 1, max: 65535 });
 
   // Validate database connection pool settings
-  const dbMinConnections = config.DB_MIN_CONNECTIONS ? parseInt(config.DB_MIN_CONNECTIONS as string, 10) : 2;
-  const dbMaxConnections = config.DB_MAX_CONNECTIONS ? parseInt(config.DB_MAX_CONNECTIONS as string, 10) : 20;
-  const dbConnectionTimeout = config.DB_CONNECTION_TIMEOUT_MILLIS ? parseInt(config.DB_CONNECTION_TIMEOUT_MILLIS as string, 10) : 10000;
-  const dbIdleTimeout = config.DB_IDLE_TIMEOUT_MILLIS ? parseInt(config.DB_IDLE_TIMEOUT_MILLIS as string, 10) : 30000;
+  const dbMinConnections = parseIntEnv('DB_MIN_CONNECTIONS', config.DB_MIN_CONNECTIONS, { default: 2, min: 0 });
+  const dbMaxConnections = parseIntEnv('DB_MAX_CONNECTIONS', config.DB_MAX_CONNECTIONS, { default: 20, min: 0 });
+  const dbConnectionTimeout = parseIntEnv('DB_CONNECTION_TIMEOUT_MILLIS', config.DB_CONNECTION_TIMEOUT_MILLIS, { default: 10000, min: 1 });
+  const dbIdleTimeout = parseIntEnv('DB_IDLE_TIMEOUT_MILLIS', config.DB_IDLE_TIMEOUT_MILLIS, { default: 30000, min: 1 });
 
   // Validate connection pool values
-  if (dbMinConnections < 0) {
-    throw new Error('Environment variable DB_MIN_CONNECTIONS must be a non-negative number');
-  }
   if (dbMaxConnections < dbMinConnections) {
     throw new Error('Environment variable DB_MAX_CONNECTIONS must be greater than or equal to DB_MIN_CONNECTIONS');
-  }
-  if (dbConnectionTimeout <= 0) {
-    throw new Error('Environment variable DB_CONNECTION_TIMEOUT_MILLIS must be a positive number');
-  }
-  if (dbIdleTimeout <= 0) {
-    throw new Error('Environment variable DB_IDLE_TIMEOUT_MILLIS must be a positive number');
   }
 
   return {
     functionName: (config.FUNCTION_NAME as string) || 'event-monitoring-service',
     nodeEnv: (config.NODE_ENV as string) || 'development',
-    maxCpu: parseInt(config.MAX_CPU as string, 10) || 1,
+    maxCpu: parseIntEnv('MAX_CPU', config.MAX_CPU, { default: 1, min: 1 }),
     port: appPort,
     configurationDatabaseUrl: config.CONFIGURATION_DATABASE_URL as string,
     database: {
@@ -147,7 +148,7 @@ export function validateEnvironment(config: Record<string, unknown>): AppConfigu
       host: config.REDIS_HOST as string,
       port: redisPort,
       password: config.REDIS_PASSWORD as string,
-      db: parseInt(config.REDIS_DB as string, 10) || 0,
+      db: parseIntEnv('REDIS_DB', config.REDIS_DB, { default: 0, min: 0 }),
       isCluster: config.REDIS_IS_CLUSTER === 'true' || config.REDIS_IS_CLUSTER === true,
     },
     nats: {
@@ -158,7 +159,7 @@ export function validateEnvironment(config: Record<string, unknown>): AppConfigu
       streamSubject: (config.STREAM_SUBJECT as string) || 'config.notification',
     },
     cache: {
-      timeToLive: parseInt(config.TTL as string, 10) || 3600, // Using TTL instead of CACHE_TTL
+      timeToLive: cacheTtl,
     },
     auth: {
       tazamaAuthUrl: (config.TAZAMA_AUTH_URL as string) || '',
