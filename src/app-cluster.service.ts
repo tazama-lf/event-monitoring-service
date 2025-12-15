@@ -65,7 +65,7 @@ export class AppClusterService {
         cluster.default.fork();
       }
       cluster.default.on('exit', (worker) => {
-        loggerService.log(`Worker ${worker.process.pid} died. Restarting`, 'AppClusterService');
+        loggerService.log(`Worker ${worker.process.pid} exited; not restarting`, 'AppClusterService');
         // cluster.default.fork();
       });
     } else {
