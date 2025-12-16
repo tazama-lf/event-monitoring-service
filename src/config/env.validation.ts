@@ -103,6 +103,11 @@ export function validateEnvironment(config: Record<string, unknown>): AppConfigu
     throw new Error('Environment variable STARTUP_TYPE is required');
   }
 
+  // Validate required database credentials in production
+  if (config.NODE_ENV === 'production' && !config.DB_PASSWORD) {
+    throw new Error('Environment variable DB_PASSWORD is required in production');
+  }
+
   // Validate database configuration
   const dbPort = parseIntEnv('DB_PORT', config.DB_PORT, { default: 5432, min: 1, max: 65535 });
 
@@ -136,7 +141,7 @@ export function validateEnvironment(config: Record<string, unknown>): AppConfigu
       host: (config.DB_HOST as string) || ('localhost' as string),
       port: dbPort,
       user: (config.DB_USER as string) || 'postgres',
-      password: (config.DB_PASSWORD as string) || 'password',
+      password: (config.DB_PASSWORD as string) || 'CHANGEME',
       name: (config.DB_NAME as string) || 'event_monitoring_dev',
       ssl: config.NODE_ENV === 'production',
       min: dbMinConnections,
