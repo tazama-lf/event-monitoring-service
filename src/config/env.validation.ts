@@ -121,8 +121,8 @@ export function validateEnvironment(config: Record<string, unknown>): AppConfigu
   const appPort = parseIntEnv('APP_PORT', config.APP_PORT, { min: 1, max: 65535 });
 
   // Validate database connection pool settings
-  const dbMinConnections = parseIntEnv('DB_MIN_CONNECTIONS', config.DB_MIN_CONNECTIONS, { default: 2, min: 0 });
-  const dbMaxConnections = parseIntEnv('DB_MAX_CONNECTIONS', config.DB_MAX_CONNECTIONS, { default: 20, min: 0 });
+  const dbMinConnections = parseIntEnv('DB_MIN_CONNECTIONS', config.DB_MIN_CONNECTIONS, { default: 2, min: 1 });
+  const dbMaxConnections = parseIntEnv('DB_MAX_CONNECTIONS', config.DB_MAX_CONNECTIONS, { default: 20, min: 1 });
   const dbConnectionTimeout = parseIntEnv('DB_CONNECTION_TIMEOUT_MILLIS', config.DB_CONNECTION_TIMEOUT_MILLIS, { default: 10000, min: 1 });
   const dbIdleTimeout = parseIntEnv('DB_IDLE_TIMEOUT_MILLIS', config.DB_IDLE_TIMEOUT_MILLIS, { default: 30000, min: 1 });
 
