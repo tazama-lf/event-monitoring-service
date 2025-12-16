@@ -78,7 +78,7 @@ export class DatabaseOperationsService {
       }
     }
 
-    this.loggerService.error(`${context}: Unexpected error - ${errorMessage}`);
+    this.loggerService.error(`${context}: Unexpected error - ${errorMessage}`, this.log_context);
     throw new InternalServerErrorException(`Failed to ${context}`);
   }
 
@@ -161,6 +161,7 @@ export class DatabaseOperationsService {
     if (!transactionDetails.source || !transactionDetails.destination) {
       this.loggerService.error(
         `Missing 1 required fields in transaction relationship: source=${transactionDetails.source}, destination=${transactionDetails.destination}`,
+        this.log_context,
       );
       throw new BadRequestException('Transaction relationship must have both source and destination');
     }
