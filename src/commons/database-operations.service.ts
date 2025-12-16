@@ -138,7 +138,7 @@ export class DatabaseOperationsService {
   }
 
   async saveTransactionHistory(transaction: TazamaPayload, key: string): Promise<void> {
-    const txtp = transaction.TxTp.replace('.', '').toLowerCase();
+    const txtp = transaction.TxTp.replaceAll('.', '').toLowerCase();
 
     // Validate table name to prevent SQL injection
     const safeTableName = this.getSafeIdentifier(txtp);
