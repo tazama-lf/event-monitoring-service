@@ -78,7 +78,7 @@ export class DemsEngineService {
 
     this.loggerService.log(`Cache miss for endpoint: ${endpoint}. Querying database...`);
     const result = await this.databaseService.query(
-      "SELECT schema, mapping, functions, publishing_status FROM config WHERE endpoint_path = $1 and publishing_status = 'active'",
+      'SELECT schema, mapping, functions, publishing_status FROM config WHERE endpoint_path = $1 and publishing_status = \'active\'',
       [endpoint],
     );
     const MIN_ROWS = 0;
@@ -206,27 +206,6 @@ export class DemsEngineService {
     let endToEndId = '';
     this.loggerService.log(`Processing mappings for endpoint: ${endpoint}`, this.LOG_CONTEXT);
 
-    //     [
-    //   {
-    //     "columns": [
-    //       {
-    //         "name": "_key",
-    //         "type": "string",
-    //         "param": "car.vin",
-    //         "datasource": "dataModel"
-    //       },
-    //       {
-    //         "name": "data",
-    //         "type": "jsonb",
-    //         "param": "car",
-    //         "datasource": "payload"
-    //       }
-    //     ],
-    //     "tableName": "tenantid_car",
-    //     "functionName": "addDataModelTable"
-    //   }
-    // ]
-
     if (configuredMapping) {
       this.loggerService.log('configuredMapping is: ', JSON.stringify(configuredMapping));
       try {
@@ -323,19 +302,37 @@ export class DemsEngineService {
           if (type === 'redis') {
             dataCacheValue += mapping.suffix ?? '';
 
+            // Convert to appropriate type based on mapping.type field
+            let finalValue: any = dataCacheValue;
+            if (mapping.type === 'number') {
+              const numValue = Number(dataCacheValue);
+              if (!isNaN(numValue)) {
+                finalValue = numValue;
+              }
+            }
+
             if (stringSize === 3) {
               destination = mapping.destination.split('.')[2];
               // Handle nested object case
               const objectName: string = mapping.destination.split('.')[1]; // instdAmt or intrBkSttlmAmt
               dataCache[objectName] ??= {};
-              dataCache[objectName][destination] = dataCacheValue;
+              dataCache[objectName][destination] = finalValue;
             } else {
-              dataCache[destination] = dataCacheValue;
+              dataCache[destination] = finalValue;
             }
           } else if (type === 'transactionDetails') {
             transactionRelationshipValue += mapping.suffix ?? '';
 
-            transactionRelationship[destination] = transactionRelationshipValue;
+            // Convert to appropriate type for transaction details
+            let finalValue: any = transactionRelationshipValue;
+            if (mapping.type === 'number') {
+              const numValue = Number(transactionRelationshipValue);
+              if (!isNaN(numValue)) {
+                finalValue = numValue;
+              }
+            }
+
+            transactionRelationship[destination] = finalValue;
 
             // Fix the case sensitivity issue
             if (destination === 'EndToEndId') {
