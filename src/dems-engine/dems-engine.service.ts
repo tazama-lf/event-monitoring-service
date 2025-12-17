@@ -17,6 +17,9 @@ import { TransactionDetails } from '../interfaces/iTransactionRelationship';
 import { ErrorResponse } from '../interfaces/iErrorResponse';
 import { ProcessingResult } from '../interfaces/iProcessingResult';
 import { TazamaPayload } from '../interfaces/iTazamaPayload';
+import { formatValidationErrors } from '../utils/validation.utils';
+import { buildTazamaPayload, buildErrorResponse } from '../utils/payload-builder.utils';
+import { parseCachedSchema, prepareSchemaForCache } from '../utils/schema-cache.utils';
 type FindSchemaAndMappingResult = [any, any, any] | null;
 
 @Injectable()
@@ -47,38 +50,16 @@ export class DemsEngineService {
 
     if (cachedSchema) {
       this.loggerService.log(`Cache hit for endpoint: ${endpoint}`);
-
-      // Only parse if cachedSchema is a string
-      if (typeof cachedSchema === 'string') {
-        try {
-          const parsedSchema = JSON.parse(cachedSchema);
-
-          // return only if parsedSchema.publishing_status is 'active' (if present)
-          if (parsedSchema.publishing_status && parsedSchema.publishing_status !== 'active') {
-            this.loggerService.log(`Cached schema for endpoint: ${endpoint} is not active`);
-            return null;
-          }
-
-          return [parsedSchema.schema, parsedSchema.mapping, parsedSchema.functions] as [any, any, any];
-        } catch (error) {
-          this.loggerService.error(`Failed to parse cached schema for endpoint ${endpoint}: ${String(error)}`);
-        }
-      } else if (typeof cachedSchema === 'object') {
-        // If cachedSchema is already an object, use it directly
-        const schemaObj = cachedSchema as any;
-        if (schemaObj.publishing_status && schemaObj.publishing_status !== 'active') {
-          this.loggerService.log(`Cached schema for endpoint: ${endpoint} is not active`);
-          return null;
-        }
-        return [schemaObj.schema, schemaObj.mapping, schemaObj.functions] as [any, any, any];
+      const parsedResult = parseCachedSchema(cachedSchema, endpoint, this.loggerService);
+      if (parsedResult) {
+        return parsedResult;
       }
     }
 
     // not found in cache, query the database
-
     this.loggerService.log(`Cache miss for endpoint: ${endpoint}. Querying database...`);
     const result = await this.databaseService.query(
-      'SELECT schema, mapping, functions, publishing_status FROM config WHERE endpoint_path = $1 and publishing_status = \'active\'',
+      "SELECT schema, mapping, functions, publishing_status FROM config WHERE endpoint_path = $1 and publishing_status = 'active'",
       [endpoint],
     );
     const MIN_ROWS = 0;
@@ -86,12 +67,7 @@ export class DemsEngineService {
 
     if (result.rows.length > MIN_ROWS) {
       this.loggerService.log(`Found schema for endpoint: ${endpoint}`);
-      const data = {
-        schema: record.schema,
-        mapping: record.mapping,
-        functions: record.functions,
-        publishing_status: record.publishing_status,
-      };
+      const data = prepareSchemaForCache(record);
       await this.redisService.setJson(cacheKey, JSON.stringify(data), this.timeToLive);
 
       return [record.schema, record.mapping, record.functions] as [any, any, any];
@@ -128,7 +104,7 @@ export class DemsEngineService {
     }
 
     if (!isValid) {
-      const differences: string[] = this.formatValidationErrors();
+      const differences: string[] = formatValidationErrors(this.ajv.errors);
       this.loggerService.warn('Schema validation errors:');
       differences.forEach((difference, index) => {
         this.loggerService.warn(`  ${index + 1}. ${difference}`);
@@ -142,31 +118,6 @@ export class DemsEngineService {
 
     this.loggerService.log('Payload structure matches the schema perfectly!');
     return { isValid: true };
-  }
-
-  /**
-   * Formats AJV validation errors into human-readable messages
-   * @returns Array of formatted error messages
-   */
-  private formatValidationErrors(): string[] {
-    return (
-      this.ajv.errors?.map((error) => {
-        const path = error.instancePath || 'root';
-        const message = error.message ?? 'validation failed';
-
-        // Format the error message to be more human-readable
-        if (error.keyword === 'required') {
-          return `${path}: Missing required property '${error.params.missingProperty}'`;
-        }
-        if (error.keyword === 'additionalProperties') {
-          return `${path}: Unexpected property '${error.params.additionalProperty}' not defined in schema`;
-        }
-        if (error.keyword === 'type') {
-          return `${path}: Should be a ${error.params.type}`;
-        }
-        return `--> ${path}: ${message}`;
-      }) ?? []
-    );
   }
 
   /**
@@ -454,23 +405,6 @@ export class DemsEngineService {
   }
 
   /**
-   * Builds the Tazama payload object
-   * @param payload The original payload
-   * @param transactionType The extracted transaction type
-   * @param tenantId The extracted tenant ID
-   * @param dataCache The processed data cache
-   * @returns The formatted Tazama payload
-   */
-  private buildTazamaPayload(payload: any, transactionType: string, tenantId: string, dataCache: any): TazamaPayload {
-    this.loggerService.log(`Building Tazama payload for transaction type: ${transactionType}, tenant: ${tenantId}`, this.LOG_CONTEXT);
-    return {
-      transaction: payload,
-      TxTp: transactionType,
-      dataCache,
-    };
-  }
-
-  /**
    * Saves transaction data and sends notification to event director
    * @param tazamaPayload The Tazama payload to process
    * @param transactionType The transaction type
@@ -506,23 +440,6 @@ export class DemsEngineService {
     }
   }
 
-  /**
-   * Builds an error response object
-   * @param message The error message
-   * @param differences Array of validation differences
-   * @param schema Optional schema object
-   * @returns Formatted error response
-   */
-  private buildErrorResponse(message: string, differences: string[], schema?: any): ErrorResponse {
-    this.loggerService.warn(`Building error response: ${message}`, this.LOG_CONTEXT);
-    return {
-      isMatch: false,
-      message,
-      differences,
-      ...(schema && { schema }),
-    };
-  }
-
   @ApmSpan('dems-handle-message')
   async handleMessage(payload: any, endpoint: string, tenantId: string, isPayloadXml: boolean): Promise<ErrorResponse | ProcessingResult> {
     let transformedPayload: any; //contains the XML --> JSON converted payload
@@ -531,7 +448,8 @@ export class DemsEngineService {
       // refer to /docs/helpers for example schema and mapping configuration
       const result = await this.findSchemaAndMapping(endpoint);
       if (!result) {
-        return this.buildErrorResponse('Schema not found for the specified endpoint', ['No schema exists for this endpoint']);
+        this.loggerService.warn('Building error response: Schema not found for the specified endpoint', this.LOG_CONTEXT);
+        return buildErrorResponse('Schema not found for the specified endpoint', ['No schema exists for this endpoint']);
       }
 
       const [configuredSchema, configuredMapping, configuredFunctions] = result;
@@ -571,7 +489,8 @@ export class DemsEngineService {
         const errorMessage = validationResult.differences?.[MIN_DIFFERENCES_INDEX]?.includes('AJV validation error')
           ? 'Error during schema validation'
           : 'Payload structure does not match the schema';
-        return this.buildErrorResponse(errorMessage, validationResult.differences ?? [], configuredSchema);
+        this.loggerService.warn(`Building error response: ${errorMessage}`, this.LOG_CONTEXT);
+        return buildErrorResponse(errorMessage, validationResult.differences ?? [], configuredSchema);
       }
 
       const transactionType = extractTransactionType(endpoint);
@@ -599,10 +518,12 @@ export class DemsEngineService {
           dynamicMapping,
         );
       } catch (error) {
-        return this.buildErrorResponse('the configured functions', [`Function execution failed: ${String(error)}`]);
+        this.loggerService.warn('Building error response: the configured functions', this.LOG_CONTEXT);
+        return buildErrorResponse('the configured functions', [`Function execution failed: ${String(error)}`]);
       }
 
-      const tazamaPayload = this.buildTazamaPayload(enhancedRequest, transactionType, tenantId, dataCache);
+      this.loggerService.log(`Building Tazama payload for transaction type: ${transactionType}, tenant: ${tenantId}`, this.LOG_CONTEXT);
+      const tazamaPayload = buildTazamaPayload(enhancedRequest, transactionType, dataCache);
       this.loggerService.log('Successfully built Tazama payload for ED. all ok');
 
       return {
@@ -617,7 +538,8 @@ export class DemsEngineService {
       };
     } catch (error) {
       this.loggerService.error(`Unexpected error in handleMessage: ${String(error)}`);
-      return this.buildErrorResponse('Unexpected error occurred while processing message', [`Internal error: ${String(error)}`]);
+      this.loggerService.warn('Building error response: Unexpected error occurred while processing message', this.LOG_CONTEXT);
+      return buildErrorResponse('Unexpected error occurred while processing message', [`Internal error: ${String(error)}`]);
     }
   }
 }
