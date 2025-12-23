@@ -173,6 +173,25 @@ export class DemsEngineService {
 
           const separator = mapping.delimiter;
 
+          // handling multiple destinations for single source - split value usecase
+          if (typeof destination !== 'string' || typeof type !== 'string') {
+            const sourceValue = getValueByPath(payload, mapping.source[0]);
+            const splitValues = sourceValue.split(mapping.delimiter);
+
+            for (let j = 0; j < mapping.destination.length; j++) {
+              const dest = mapping.destination[j].split('.')[1];
+              const destType = mapping.destination[j].split('.')[0];
+
+              if (destType === 'redis') {
+                dataCache[dest] = splitValues[j];
+              }
+              if (destType === 'transactionDetails') {
+                transactionRelationship[dest] = splitValues[j];
+              }
+            }
+            continue;
+          }
+
           // dynamic mapping logic based on datasource(datamodel ya payload)
           if (type !== 'redis' && type !== 'transactionDetails') {
             // append to dynamic mapping object
@@ -209,25 +228,6 @@ export class DemsEngineService {
             continue;
           }
 
-          // handling multiple destinations for single source - split value usecase
-          if (typeof destination !== 'string' || typeof type !== 'string') {
-            const sourceValue = getValueByPath(payload, mapping.source[0]);
-            const splitValues = sourceValue.split(mapping.delimiter);
-
-            for (let j = 0; j < mapping.destination.length; j++) {
-              const dest = mapping.destination[j].split('.')[1];
-              const destType = mapping.destination[j].split('.')[0];
-
-              if (destType === 'redis') {
-                dataCache[dest] = splitValues[j];
-              }
-              if (destType === 'transactionDetails') {
-                transactionRelationship[dest] = splitValues[j];
-              }
-            }
-            continue;
-          }
-
           let dataCacheValue = mapping.prefix ?? '';
           let transactionRelationshipValue = mapping.prefix ?? '';
 
@@ -240,7 +240,7 @@ export class DemsEngineService {
               if (i < sources.length - 1) {
                 dataCacheValue += separator;
               }
-            } else if (type === 'transactionDetails') {
+            } else {
               transactionRelationshipValue += getValueByPath(payload, sources[i]);
 
               if (i < sources.length - 1) {
@@ -271,7 +271,7 @@ export class DemsEngineService {
             } else {
               dataCache[destination] = finalValue;
             }
-          } else if (type === 'transactionDetails') {
+          } else {
             transactionRelationshipValue += mapping.suffix ?? '';
 
             // Convert to appropriate type for transaction details
