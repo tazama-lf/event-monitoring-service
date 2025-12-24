@@ -16,6 +16,7 @@ import { handleConstantValue } from '../utils/constant-value.utils';
 import { handleDynamicMapping } from '../utils/dynamic-mapping.utils';
 import { handleSplitValue } from '../utils/split-value.utils';
 import { handlePostProcessing } from '../utils/post-processing.utils';
+import { handleConcatenation } from '../utils/concatenation.utils';
 import { randomUUID } from 'node:crypto';
 import { TransactionDetails } from '../interfaces/iTransactionRelationship';
 import { ErrorResponse } from '../interfaces/iErrorResponse';
@@ -193,23 +194,10 @@ export class DemsEngineService {
           let dataCacheValue = mapping.prefix ?? '';
           let transactionRelationshipValue = mapping.prefix ?? '';
 
-          // REAL LOGIC STARTS HERE
-          // Iterate through sources to build the value based on mapping - totally dynamic work
-          for (let i = 0; i < sources.length; i++) {
-            if (type === 'redis') {
-              dataCacheValue += getValueByPath(payload, sources[i]);
-
-              if (i < sources.length - 1) {
-                dataCacheValue += separator;
-              }
-            } else {
-              transactionRelationshipValue += getValueByPath(payload, sources[i]);
-
-              if (i < sources.length - 1) {
-                transactionRelationshipValue += separator;
-              }
-            }
-          }
+          // concatenation logic for multiple sources
+          const concatenationResult = handleConcatenation(sources, payload, type, mapping.prefix ?? '', separator);
+          dataCacheValue = concatenationResult.dataCacheValue;
+          transactionRelationshipValue = concatenationResult.transactionRelationshipValue;
 
           // Post processing for both dataCache and transactionRelationship
           const postProcessingEndToEndId = handlePostProcessing(
