@@ -13,14 +13,33 @@ export function handleSplitValue(mapping: any, payload: any, dataCache: any, tra
   const splitValues = sourceValue.split(mapping.delimiter);
 
   for (let j = 0; j < mapping.destination.length; j++) {
-    const dest = mapping.destination[j].split('.')[1];
-    const destType = mapping.destination[j].split('.')[0];
+    const destParts = mapping.destination[j].split('.');
+    const destType = destParts[0];
+    const dest = destParts[1];
+    const stringSize = destParts.length;
+
+    // Convert to appropriate type based on mapping.type field
+    let finalValue: any = splitValues[j];
+    if (mapping.type === 'number') {
+      const numValue = Number(splitValues[j]);
+      if (!isNaN(numValue)) {
+        finalValue = numValue;
+      }
+    }
 
     if (destType === 'redis') {
-      dataCache[dest] = splitValues[j];
+      if (stringSize === 3) {
+        // Handle nested object case
+        const objectName = destParts[1];
+        const nestedDest = destParts[2];
+        dataCache[objectName] ??= {};
+        dataCache[objectName][nestedDest] = finalValue;
+      } else {
+        dataCache[dest] = finalValue;
+      }
     }
     if (destType === 'transactionDetails') {
-      transactionRelationship[dest] = splitValues[j];
+      transactionRelationship[dest] = finalValue;
     }
   }
 }

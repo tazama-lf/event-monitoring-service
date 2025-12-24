@@ -8,11 +8,30 @@
  */
 export function handleConstantValue(mapping: any, dataCache: any, transactionRelationship: any, type: string, destination: string): void {
   if (mapping.constantValue) {
+    const stringSize = typeof mapping.destination === 'string' ? mapping.destination.split('.').length : -1;
+
+    // Convert to appropriate type based on mapping.type field
+    let finalValue: any = mapping.constantValue;
+    if (mapping.type === 'number') {
+      const numValue = Number(mapping.constantValue);
+      if (!isNaN(numValue)) {
+        finalValue = numValue;
+      }
+    }
+
     if (type === 'redis') {
-      dataCache[destination] = mapping.constantValue;
+      if (stringSize === 3) {
+        // Handle nested object case
+        const objectName: string = mapping.destination.split('.')[1];
+        const nestedDest: string = mapping.destination.split('.')[2];
+        dataCache[objectName] ??= {};
+        dataCache[objectName][nestedDest] = finalValue;
+      } else {
+        dataCache[destination] = finalValue;
+      }
     }
     if (type === 'transactionDetails') {
-      transactionRelationship[destination] = mapping.constantValue;
+      transactionRelationship[destination] = finalValue;
     }
   }
 }
