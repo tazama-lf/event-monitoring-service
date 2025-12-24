@@ -84,7 +84,7 @@ export class DatabaseOperationsService {
 
   async addAccount(accountId: string, tenantId: string): Promise<void> {
     try {
-      const AccountQuery = 'INSERT INTO account (id, tenantid) VALUES ($1, $2)';
+      const AccountQuery = 'INSERT INTO account (id, tenantid) VALUES ($1, $2) ON CONFLICT DO NOTHING';
       await this.databaseService.query(AccountQuery, [accountId, tenantId]);
       this.loggerService.log(`Added account: ${accountId} for tenant: ${tenantId}`, this.log_context);
     } catch (error) {
@@ -96,7 +96,11 @@ export class DatabaseOperationsService {
 
   async addEntity(entityId: string, tenantId: string, CreDtTm: string): Promise<void> {
     try {
-      await this.databaseService.query('INSERT INTO entity (id, tenantid, credttm) VALUES ($1, $2, $3)', [entityId, tenantId, CreDtTm]);
+      await this.databaseService.query('INSERT INTO entity (id, tenantid, credttm) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING', [
+        entityId,
+        tenantId,
+        CreDtTm,
+      ]);
       this.loggerService.log(`Added entity: ${entityId} for tenant: ${tenantId} and CreDtTm: ${CreDtTm}`, this.log_context);
     } catch (error) {
       this.handleDatabaseError(error, 'add entity', {
@@ -107,12 +111,10 @@ export class DatabaseOperationsService {
 
   async addAccountHolder(entityId: string, accountId: string, CreDtTm: string, tenantId: string): Promise<void> {
     try {
-      await this.databaseService.query('INSERT INTO account_holder (source, destination, credttm, tenantid) VALUES ($1, $2, $3, $4)', [
-        entityId,
-        accountId,
-        CreDtTm,
-        tenantId,
-      ]);
+      await this.databaseService.query(
+        'INSERT INTO account_holder (source, destination, credttm, tenantid) VALUES ($1, $2, $3, $4) ON CONFLICT DO NOTHING',
+        [entityId, accountId, CreDtTm, tenantId],
+      );
       this.loggerService.log(
         `Added account holder: ${entityId} for account: ${accountId} and tenant: ${tenantId} and CreDtTm: ${CreDtTm}`,
         this.log_context,
@@ -167,11 +169,10 @@ export class DatabaseOperationsService {
     }
 
     try {
-      await this.databaseService.query('INSERT INTO transaction (source, destination, transaction) VALUES ($1, $2, $3)', [
-        transactionDetails.source,
-        transactionDetails.destination,
-        JSON.stringify(transactionDetails),
-      ]);
+      await this.databaseService.query(
+        'INSERT INTO transaction (source, destination, transaction) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING',
+        [transactionDetails.source, transactionDetails.destination, JSON.stringify(transactionDetails)],
+      );
       this.loggerService.log(
         `Saved transaction relationship: ${transactionDetails.source} -> ${transactionDetails.destination}`,
         this.log_context,

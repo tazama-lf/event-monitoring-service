@@ -74,7 +74,7 @@ export function returnArrayFieldsFromSchema(schema: any, loggerService?: LoggerS
           if (property.anyOf ?? property.oneOf ?? property.allOf) {
             const schemaVariants = property.anyOf ?? property.oneOf ?? property.allOf;
             schemaVariants.forEach((variant: any) => {
-              if (variant && variant.type === 'object' && variant.properties) {
+              if (variant?.type === 'object' && variant.properties) {
                 traverseSchema(variant, currentPath);
               }
             });
@@ -176,7 +176,7 @@ export function convertNumberToStringAtPath(obj: any, path: string, loggerServic
     const targetFieldName = pathParts[pathParts.length - 1];
 
     // Check if the target field exists and is a number
-    if (current && current[targetFieldName] !== undefined && typeof current[targetFieldName] === 'number') {
+    if (current?.[targetFieldName] !== undefined && typeof current[targetFieldName] === 'number') {
       // Convert the number to a string
       current[targetFieldName] = String(current[targetFieldName]);
 

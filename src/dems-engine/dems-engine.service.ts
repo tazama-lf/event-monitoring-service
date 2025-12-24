@@ -12,6 +12,10 @@ import { ApmSpan } from '../apm/apm.decorators';
 import { parseString, ParserOptions } from 'xml2js';
 import { returnArrayFieldsFromSchema, replaceObjectsWithArrays, createSchemaAwareNumberProcessor } from '../utils/xml2js.utils';
 import { processSourceMapping } from '../utils/mapping-sources.utils';
+import { handleConstantValue } from '../utils/constant-value.utils';
+import { handleDynamicMapping } from '../utils/dynamic-mapping.utils';
+import { handleSplitValue } from '../utils/split-value.utils';
+import { handlePostProcessing } from '../utils/post-processing.utils';
 import { randomUUID } from 'node:crypto';
 import { TransactionDetails } from '../interfaces/iTransactionRelationship';
 import { ErrorResponse } from '../interfaces/iErrorResponse';
@@ -162,69 +166,27 @@ export class DemsEngineService {
       try {
         for (const mapping of configuredMapping) {
           const sources = mapping.source;
+          const separator = mapping.delimiter;
 
           //usually a string but can be array in case of multiple sources(split usecase)
-          let destination = typeof mapping.destination === 'string' ? mapping.destination.split('.')[1] : mapping.destination;
+          const destination = typeof mapping.destination === 'string' ? mapping.destination.split('.')[1] : mapping.destination;
           const type = typeof mapping.destination === 'string' ? mapping.destination.split('.')[0] : mapping.destination;
-
-          // case: redis.instdAmt.amt or redis.instdAmt.ccy ---> [redis,instdAmt,amt]
-          // stringSize will be 3 in this case
-          const stringSize = typeof mapping.destination === 'string' ? mapping.destination.split('.').length : -1;
-
-          const separator = mapping.delimiter;
 
           // handling multiple destinations for single source - split value usecase
           if (typeof destination !== 'string' || typeof type !== 'string') {
-            const sourceValue = getValueByPath(payload, mapping.source[0]);
-            const splitValues = sourceValue.split(mapping.delimiter);
-
-            for (let j = 0; j < mapping.destination.length; j++) {
-              const dest = mapping.destination[j].split('.')[1];
-              const destType = mapping.destination[j].split('.')[0];
-
-              if (destType === 'redis') {
-                dataCache[dest] = splitValues[j];
-              }
-              if (destType === 'transactionDetails') {
-                transactionRelationship[dest] = splitValues[j];
-              }
-            }
+            handleSplitValue(mapping, payload, dataCache, transactionRelationship);
             continue;
           }
 
           // dynamic mapping logic based on datasource(datamodel ya payload)
           if (type !== 'redis' && type !== 'transactionDetails') {
-            // append to dynamic mapping object
-            const ObjectName: string = mapping.destination.split('.')[0]; // e.g., Toyota
-            const PropertyName: string = mapping.destination.split('.')[1]; // e.g., model
-            const nestedPropertyName: string = mapping.destination.split('.')[2]; // e.g., name (if any)
-
-            // if (mapping.datasource === 'dataModel') {
-            this.loggerService.log('dataModel case for dynamic mapping source: ', mapping.source[0]);
-            this.loggerService.log('dataModel case for dynamic mapping value: ', getValueByPath(payload, mapping.source[0]));
-
-            dynamicMapping[ObjectName] ??= {};
-            if (nestedPropertyName) {
-              dynamicMapping[ObjectName][PropertyName] ??= {};
-              dynamicMapping[ObjectName][PropertyName][nestedPropertyName] = getValueByPath(payload, mapping.source[0]);
-            } else {
-              dynamicMapping[ObjectName][PropertyName] = getValueByPath(payload, mapping.source[0]);
-            }
-            // }
-
-            this.loggerService.log('dynamicMapping object is now: ', JSON.stringify(dynamicMapping));
-
+            handleDynamicMapping(mapping, payload, dynamicMapping, this.loggerService);
             continue;
           }
 
           //constant value injection logic
           if (mapping.constantValue) {
-            if (type === 'redis') {
-              dataCache[destination] = mapping.constantValue;
-            }
-            if (type === 'transactionDetails') {
-              transactionRelationship[destination] = mapping.constantValue;
-            }
+            handleConstantValue(mapping, dataCache, transactionRelationship, type, destination);
             continue;
           }
 
@@ -250,46 +212,15 @@ export class DemsEngineService {
           }
 
           // Post processing for both dataCache and transactionRelationship
-          if (type === 'redis') {
-            dataCacheValue += mapping.suffix ?? '';
-
-            // Convert to appropriate type based on mapping.type field
-            let finalValue: any = dataCacheValue;
-            if (mapping.type === 'number') {
-              const numValue = Number(dataCacheValue);
-              if (!isNaN(numValue)) {
-                finalValue = numValue;
-              }
-            }
-
-            if (stringSize === 3) {
-              destination = mapping.destination.split('.')[2];
-              // Handle nested object case
-              const objectName: string = mapping.destination.split('.')[1]; // instdAmt or intrBkSttlmAmt
-              dataCache[objectName] ??= {};
-              dataCache[objectName][destination] = finalValue;
-            } else {
-              dataCache[destination] = finalValue;
-            }
-          } else {
-            transactionRelationshipValue += mapping.suffix ?? '';
-
-            // Convert to appropriate type for transaction details
-            let finalValue: any = transactionRelationshipValue;
-            if (mapping.type === 'number') {
-              const numValue = Number(transactionRelationshipValue);
-              if (!isNaN(numValue)) {
-                finalValue = numValue;
-              }
-            }
-
-            transactionRelationship[destination] = finalValue;
-
-            // Fix the case sensitivity issue
-            if (destination === 'EndToEndId') {
-              // Changed from 'endToEndId' to 'EndToEndId'
-              endToEndId = transactionRelationshipValue;
-            }
+          const postProcessingEndToEndId = handlePostProcessing(
+            dataCacheValue,
+            transactionRelationshipValue,
+            mapping,
+            dataCache,
+            transactionRelationship,
+          );
+          if (postProcessingEndToEndId) {
+            endToEndId = postProcessingEndToEndId;
           }
         }
       } catch (error) {
