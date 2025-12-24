@@ -5,6 +5,7 @@ import { DemsEngineService } from '../../src/dems-engine/dems-engine.service';
 import { NatsService } from '../../src/nats/nats.service';
 import { DatabaseOperationsService } from '../../src/commons';
 import { DatabaseService } from '../../src/database/database.service';
+import { SaveTransactionHistoryError, NotifyEventDirectorError } from '../../src/errors/transaction-operation.errors';
 
 jest.mock('xml2js', () => ({
   parseString: jest.fn(),
@@ -616,25 +617,27 @@ describe('DemsEngineService', () => {
     });
 
     it('should handle transaction history save errors', async () => {
-      const error = new Error('Failed to save transaction history');
+      const originalError = new Error('Database error');
+      const error = new SaveTransactionHistoryError(originalError, 'pacs.002_test123');
       mockDatabaseOperationsService.saveTransactionHistory.mockRejectedValue(error);
 
       await expect(service.saveTransactionDataAndNotify(mockTazamaPayload, 'pacs.002', 'test123')).rejects.toThrow();
       expect(mockLoggerService.error).toHaveBeenCalledWith(
         expect.stringContaining('Failed to save transaction history'),
-        '',
+        expect.any(String),
         'DemsEngineService',
       );
     });
 
     it('should handle event director notification errors', async () => {
-      const error = new Error('Failed to notify event-director');
+      const originalError = new Error('NATS connection error');
+      const error = new NotifyEventDirectorError(originalError);
       mockNatsService.notifyEventDirector.mockRejectedValue(error);
 
       await expect(service.saveTransactionDataAndNotify(mockTazamaPayload, 'pacs.002', 'test123')).rejects.toThrow();
       expect(mockLoggerService.error).toHaveBeenCalledWith(
         expect.stringContaining('Failed to notify event-director'),
-        '',
+        expect.any(String),
         'DemsEngineService',
       );
     });
@@ -645,8 +648,8 @@ describe('DemsEngineService', () => {
 
       await expect(service.saveTransactionDataAndNotify(mockTazamaPayload, 'pacs.002', 'test123')).rejects.toThrow();
       expect(mockLoggerService.error).toHaveBeenCalledWith(
-        expect.stringContaining('Failed to complete transaction operations'),
-        '',
+        expect.stringContaining('Unexpected error in save transaction history'),
+        expect.any(String),
         'DemsEngineService',
       );
     });
