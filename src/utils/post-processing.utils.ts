@@ -2,6 +2,22 @@ import type { TransactionDetails } from '../interfaces/iTransactionRelationship'
 import { handleThirdLevelMapping } from './third-level-mapping.utils';
 
 /**
+ * Converts a value to the appropriate type based on mapping configuration
+ * @param value The string value to convert
+ * @param mapping The mapping configuration
+ * @returns The converted value (number if mapping.type is 'number' and convertible, otherwise original string)
+ */
+function convertToMappingType(value: string, mapping: any): any {
+  if (mapping.type === 'number') {
+    const numValue = Number(value);
+    if (!isNaN(numValue)) {
+      return numValue;
+    }
+  }
+  return value;
+}
+
+/**
  * Handles post processing for both dataCache and transactionRelationship
  * @param dataCacheValue The data cache value to process
  * @param transactionRelationshipValue The transaction relationship value to process
@@ -40,14 +56,7 @@ export function handlePostProcessing(
   if (type === 'redis') {
     dataCacheValue += mapping.suffix ?? '';
 
-    // Convert to appropriate type based on mapping.type field
-    let finalValue: any = dataCacheValue;
-    if (mapping.type === 'number') {
-      const numValue = Number(dataCacheValue);
-      if (!isNaN(numValue)) {
-        finalValue = numValue;
-      }
-    }
+    const finalValue = convertToMappingType(dataCacheValue, mapping);
 
     if (pathParts === 3) {
       handleThirdLevelMapping(mapping, finalValue, dataCache);
@@ -57,14 +66,7 @@ export function handlePostProcessing(
   } else {
     transactionRelationshipValue += mapping.suffix ?? '';
 
-    // Convert to appropriate type for transaction details
-    let finalValue: any = transactionRelationshipValue;
-    if (mapping.type === 'number') {
-      const numValue = Number(transactionRelationshipValue);
-      if (!isNaN(numValue)) {
-        finalValue = numValue;
-      }
-    }
+    const finalValue = convertToMappingType(transactionRelationshipValue, mapping);
 
     transactionRelationship[destination] = finalValue;
 
