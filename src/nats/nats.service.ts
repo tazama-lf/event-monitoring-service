@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { StartupFactory, type IStartupService } from '@tazama-lf/frms-coe-startup-lib';
 import { LoggerService } from '@tazama-lf/frms-coe-lib';
+import { NotifyEventDirectorError } from '../errors/transaction-operation.errors';
 
 type MessageHandler = (reqObj: unknown) => Promise<void>;
 
@@ -23,6 +24,11 @@ export class NatsService {
   }
 
   async notifyEventDirector(payload: object): Promise<void> {
-    await this.natsService.handleResponse(payload);
+    try {
+      await this.natsService.handleResponse(payload);
+    } catch (error) {
+      this.logger.error(`Failed to notify event director: ${String(error)}`, this.LOG_CONTEXT);
+      throw new NotifyEventDirectorError(error);
+    }
   }
 }

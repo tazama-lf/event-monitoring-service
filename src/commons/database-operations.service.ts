@@ -6,6 +6,7 @@ import { ErrorPattern } from '../interfaces/iErrorPattern';
 import { QuarantineStatus } from '../enums/quarantineStatus.enum';
 import { TazamaPayload } from '../interfaces/iTazamaPayload';
 import { TransactionDetails } from '../interfaces/iTransactionRelationship';
+import { SaveTransactionHistoryError, SaveTransactionRelationshipError } from '../errors/transaction-operation.errors';
 
 @Injectable()
 export class DatabaseOperationsService {
@@ -149,9 +150,14 @@ export class DatabaseOperationsService {
       await this.databaseService.query(`INSERT INTO ${safeTableName} (document) VALUES ($1)`, [transaction.transaction]);
       this.loggerService.log(`Saved transaction history with key: ${key}`, this.log_context);
     } catch (error) {
-      this.handleDatabaseError(error, 'save transaction history', {
-        details: `key ${key}, table ${safeTableName}`,
-      });
+      // Wrap in typed error before re-throwing
+      try {
+        this.handleDatabaseError(error, 'save transaction history', {
+          details: `key ${key}, table ${safeTableName}`,
+        });
+      } catch (dbError) {
+        throw new SaveTransactionHistoryError(dbError, key);
+      }
     }
   }
 
@@ -178,9 +184,15 @@ export class DatabaseOperationsService {
         this.log_context,
       );
     } catch (error) {
-      this.handleDatabaseError(error, 'save transaction relationship', {
-        details: `${transactionDetails.source} -> ${transactionDetails.destination}`,
-      });
+      // Wrap in typed error before re-throwing
+      const relationship = `${transactionDetails.source} -> ${transactionDetails.destination}`;
+      try {
+        this.handleDatabaseError(error, 'save transaction relationship', {
+          details: relationship,
+        });
+      } catch (dbError) {
+        throw new SaveTransactionRelationshipError(dbError, relationship);
+      }
     }
   }
 

@@ -25,6 +25,7 @@ import { TazamaPayload } from '../interfaces/iTazamaPayload';
 import { formatValidationErrors } from '../utils/validation.utils';
 import { buildTazamaPayload, buildErrorResponse } from '../utils/payload-builder.utils';
 import { parseCachedSchema, prepareSchemaForCache } from '../utils/schema-cache.utils';
+import { SaveTransactionHistoryError, NotifyEventDirectorError, TransactionOperationError } from '../errors/transaction-operation.errors';
 type FindSchemaAndMappingResult = [any, any, any] | null;
 
 @Injectable()
@@ -148,7 +149,7 @@ export class DemsEngineService {
       TenantId: '',
       MsgId: '',
       CreDtTm: '',
-      Amt: -1,
+      Amt: 0,
       Ccy: '',
       EndToEndId: '',
       lat: '',
@@ -260,6 +261,11 @@ export class DemsEngineService {
         const functionToCall = row.functionName;
         let sources = row.params ?? [];
 
+        const ALLOWED_DB_FUNCTIONS = ['addAccount', 'addEntity', 'addAccountHolder', 'saveTransactionHistory', 'addDataModelTable'];
+        if (!ALLOWED_DB_FUNCTIONS.includes(functionToCall)) {
+          throw new Error(`Function '${functionToCall}' is not in the allowed functions list`);
+        }
+
         if (functionToCall === 'saveTransactionDetails') {
           containsSaveTransactionRelationship = true;
           continue;
@@ -291,15 +297,9 @@ export class DemsEngineService {
           continue;
         }
 
-        const ALLOWED_DB_FUNCTIONS = ['addAccount', 'addEntity', 'addAccountHolder', 'saveTransactionHistory'];
-
         // process only when it exists.
         if (configuredMapping.length > 0) {
           sources = processSourceMapping(sources, configuredMapping, payload);
-        }
-
-        if (!ALLOWED_DB_FUNCTIONS.includes(functionToCall)) {
-          throw new Error(`Function '${functionToCall}' is not in the allowed functions list`);
         }
 
         try {
@@ -332,31 +332,46 @@ export class DemsEngineService {
    */
   @ApmSpan('dems-save-transaction-and-notify')
   async saveTransactionDataAndNotify(tazamaPayload: TazamaPayload, transactionType: string, endToEndId: string): Promise<void> {
-    try {
-      await Promise.all([
-        this.databaseOperationsService.saveTransactionHistory(tazamaPayload, `${transactionType}_${endToEndId}`),
-        // this.databaseOperationsService.saveTransactionRelationship(transactionRelationship),
-        this.natsService.notifyEventDirector(tazamaPayload),
-      ]);
+    // using Promise.allSettled, instead of promise.all, to execute operations and capture individual results
+    const results = await Promise.allSettled([
+      this.databaseOperationsService.saveTransactionHistory(tazamaPayload, `${transactionType}_${endToEndId}`),
+      this.natsService.notifyEventDirector(tazamaPayload),
+    ]);
 
-      this.loggerService.log('Successfully saved transaction history, transaction relationship, and notified event-director');
-    } catch (error) {
-      // Determine which operation failed for better error reporting
-      let errorMessage = 'Failed to complete transaction operations';
+    // Check for failures and categorize them by index and error type
+    const failures: string[] = [];
 
-      if (String(error).includes('saveTransactionHistory') || String(error).includes('transaction history')) {
-        errorMessage = `Failed to save transaction history: ${String(error)}`;
-      } else if (String(error).includes('saveTransactionRelationship') || String(error).includes('transaction relationship')) {
-        errorMessage = `Failed to save transaction relationship: ${String(error)}`;
-      } else if (String(error).includes('notifyEventDirector') || String(error).includes('event-director')) {
-        errorMessage = `Failed to notify event-director: ${String(error)}`;
-      } else {
-        errorMessage = `Failed to complete transaction operations: ${String(error)}`;
+    results.forEach((result, index) => {
+      if (result.status === 'rejected') {
+        const error = result.reason;
+
+        // Use instanceof checks for reliable error categorization
+        if (error instanceof SaveTransactionHistoryError) {
+          failures.push(`Failed to save transaction history: ${error.message}`);
+          this.loggerService.error(error.message, String(error.originalError), this.LOG_CONTEXT);
+        } else if (error instanceof NotifyEventDirectorError) {
+          failures.push(`Failed to notify event-director: ${error.message}`);
+          this.loggerService.error(error.message, String(error.originalError), this.LOG_CONTEXT);
+        } else if (error instanceof TransactionOperationError) {
+          // Catch any other typed transaction errors
+          failures.push(`Operation failed: ${error.message}`);
+          this.loggerService.error(error.message, String(error.originalError), this.LOG_CONTEXT);
+        } else {
+          // Fallback for unexpected error types - use index to identify operation
+          const operationName = index === 0 ? 'save transaction history' : 'notify event-director';
+          failures.push(`Failed to ${operationName}: ${String(error)}`);
+          this.loggerService.error(`Unexpected error in ${operationName}`, String(error), this.LOG_CONTEXT);
+        }
       }
+    });
 
-      this.loggerService.error(errorMessage, '', this.LOG_CONTEXT);
-      throw error;
+    // If any operations failed, throw an error with all failure details
+    if (failures.length > 0) {
+      const errorMessage = failures.join('; ');
+      throw new Error(errorMessage);
     }
+
+    this.loggerService.log('Successfully saved transaction history and notified event-director');
   }
 
   @ApmSpan('dems-handle-message')
@@ -419,13 +434,10 @@ export class DemsEngineService {
 
       // refer to /docs/helpers for example mapping configuration
       const responseFromProcessMappings = await this.processMappings(enhancedRequest, configuredMapping, endpoint);
-      this.loggerService.log(`response from process mapping dikhao: ${JSON.stringify(responseFromProcessMappings)}`, this.LOG_CONTEXT);
       const { dataCache, transactionRelationship, endToEndId, dynamicMapping } = responseFromProcessMappings;
       this.loggerService.log('Successfully processed mappings for ED. all ok');
-      this.loggerService.log(
-        `at handle message seeing transactionRRelationship: ${JSON.stringify(transactionRelationship)}`,
-        this.LOG_CONTEXT,
-      );
+      this.loggerService.log(`transactionRelationship: ${JSON.stringify(transactionRelationship)}`, this.LOG_CONTEXT);
+      this.loggerService.log('dataCache: ', JSON.stringify(dataCache), this.LOG_CONTEXT);
 
       try {
         // refer to /docs/helpers for example functions configuration
