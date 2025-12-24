@@ -1,4 +1,5 @@
 import type { TransactionDetails } from '../interfaces/iTransactionRelationship';
+import { handleThirdLevelMapping } from './third-level-mapping.utils';
 
 /**
  * Handles post processing for both dataCache and transactionRelationship
@@ -20,7 +21,7 @@ export function handlePostProcessing(
 
   const type = typeof mapping.destination === 'string' ? mapping.destination.split('.')[0] : mapping.destination;
   const stringSize = typeof mapping.destination === 'string' ? mapping.destination.split('.').length : -1;
-  let destination = typeof mapping.destination === 'string' ? mapping.destination.split('.')[1] : mapping.destination;
+  const destination = typeof mapping.destination === 'string' ? mapping.destination.split('.')[1] : mapping.destination;
 
   if (type === 'redis') {
     dataCacheValue += mapping.suffix ?? '';
@@ -35,11 +36,7 @@ export function handlePostProcessing(
     }
 
     if (stringSize === 3) {
-      destination = mapping.destination.split('.')[2];
-      // Handle nested object case
-      const objectName: string = mapping.destination.split('.')[1]; // instdAmt or intrBkSttlmAmt
-      dataCache[objectName] ??= {};
-      dataCache[objectName][destination] = finalValue;
+      handleThirdLevelMapping(mapping, finalValue, dataCache);
     } else {
       dataCache[destination] = finalValue;
     }
