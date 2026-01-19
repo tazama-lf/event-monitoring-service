@@ -26,7 +26,10 @@ export class TransactionOperationError extends Error {
 
     // Maintains proper stack trace for where our error was thrown (only available on V8)
 
-    Error.captureStackTrace(this, this.constructor); // value is always truthy thats why no if statement
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- Ensure code doesn't break on non-V8 environments
+    if (Error.captureStackTrace) {
+      Error.captureStackTrace(this, this.constructor);
+    } // value is always truthy thats why no if statement
   }
 }
 
