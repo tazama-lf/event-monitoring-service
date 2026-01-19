@@ -1,0 +1,68 @@
+{
+  "info": {
+    "_postman_id": "2b2a4f92-3798-4834-ac79-2fb51b70725e",
+    "name": "Authentication API",
+    "description": "Get yourself authenticated to access the Event Monitoring Service APIs. Use the login endpoint to obtain a JWT token, which is required for all subsequent API calls.",
+    "version": "1.0.0",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "46619338"
+  },
+  "item": [
+    {
+      "name": "Authentication",
+      "item": [
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    var response = pm.response.json();",
+                  "    pm.environment.set('bearer_token', response.token);",
+                  "    console.log('Token saved to environment:', response.token.substring(0, 20) + '...');",
+                  "}",
+                  "",
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response has token', function () {",
+                  "    pm.expect(pm.response.json()).to.have.property('token');",
+                  "});"
+                ],
+                "type": "text/javascript",
+                "packages": {},
+                "requests": {}
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "// {\n//     \"username\": \"{{username}}\",\n//     \"password\": \"{{password}}\"\n// }\n\n// for dems\n{\n    \"username\": \"ar\",\n    \"password\": \"ar\"\n}"
+            },
+            "url": {
+              "raw": "http://10.10.80.37:3000/auth/login",
+              "protocol": "http",
+              "host": ["10", "10", "80", "37"],
+              "port": "3000",
+              "path": ["auth", "login"]
+            },
+            "description": "Authenticate user and obtain JWT token.\n\n### Request Body\n- **username**: User login name\n- **password**: User password\n\n### Response\n- **token**: JWT access token\n- **message**: Success message\n- **expiresIn**: Token expiration time (optional)\n\n### Use Case\nRequired for all subsequent API calls. Token is automatically saved to environment variable."
+          },
+          "response": []
+        }
+      ],
+      "description": "Authentication endpoints for obtaining JWT tokens."
+    }
+  ]
+}
