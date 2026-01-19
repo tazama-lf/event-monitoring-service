@@ -62,7 +62,7 @@ The service retrieves the appropriate schema and mapping configuration for the i
 
 The schema and mapping lookup process follows a caching strategy:
 
-- First, the service checks Redis cache for the configuration
+- First, the service checks Valkey cache for the configuration
 - If not found in cache, it queries the database for active configurations (Tazama Connection Studio service persists data in the DB)
 - Retrieved configurations are cached for future requests to improve performance
 
