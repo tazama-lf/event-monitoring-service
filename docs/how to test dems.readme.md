@@ -22,7 +22,7 @@ Follow these steps to test the DEMS (Data Event Monitoring Service):
    - dems:write claim is required for testing write operations.
 
 6. Get a JWT Token:
-   - Use a tool like Postman or curl to make a POST request to the authentication endpoint of the auth-service to obtain a JWT token.
+   - Use a tool like Postman or curl to make a POST request to the authentication endpoint of the auth-service to obtain a JWT token - you may refer to the postman collection at the root level of this repository for the specific API.
    - Make sure the request includes valid user claims.
 
 7. Start up the DEMS service:
