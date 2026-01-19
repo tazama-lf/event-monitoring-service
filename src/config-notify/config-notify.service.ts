@@ -37,10 +37,12 @@ export class ConfigNotifyService implements OnModuleInit {
       );
       const configs = result.rows;
 
-      for (const config of configs) {
-        this.loggerService.log(`Preloading cache for key: ${config.endpointPath}`, this.LOG_CONTEXT);
-        await this.setCache(config);
-      }
+      await Promise.all(
+        configs.map(async (config) => {
+          this.loggerService.log(`Preloading cache for key: ${config.endpointPath}`, this.LOG_CONTEXT);
+          await this.setCache(config);
+        }),
+      );
       this.loggerService.log(`Cache preloaded: ${configs.length} configurations`, this.LOG_CONTEXT);
     } catch (error) {
       this.loggerService.error(`Failed to initialize ConfigNotifyService: ${String(error)}`, this.LOG_CONTEXT);
