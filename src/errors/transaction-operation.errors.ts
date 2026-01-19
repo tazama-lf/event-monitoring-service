@@ -29,7 +29,7 @@ export class TransactionOperationError extends Error {
     // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- Ensure code doesn't break on non-V8 environments
     if (Error.captureStackTrace) {
       Error.captureStackTrace(this, this.constructor);
-    } // value is always truthy thats why no if statement
+    }
   }
 }
 
