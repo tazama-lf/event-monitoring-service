@@ -243,7 +243,8 @@ export function createSchemaAwareNumberProcessor(stringFields: string[]) {
 
 export function isXmlContentType(req: Request, loggerService?: LoggerService): boolean {
   try {
-    return req.headers['content-type'] === 'application/xml';
+    const contentType = req.get('content-type') ?? req.get('Content-Type') ?? '';
+    return contentType === 'application/xml';
   } catch (error) {
     if (loggerService) {
       loggerService.error(`Error in isXmlContentType: ${String(error)}`);
