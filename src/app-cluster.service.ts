@@ -43,7 +43,6 @@ export class AppClusterService {
    * This method creates a temporary NestJS app to access configuration
    */
   static async clusterize(callback: () => Promise<void>): Promise<void> {
-    // Create temporary app to access configuration
     const tempApp = await NestFactory.create(AppModule, { logger: false });
     const configService = tempApp.get(ConfigService);
     const loggerService = tempApp.get(LoggerService);
@@ -53,7 +52,6 @@ export class AppClusterService {
 
     await tempApp.close();
 
-    // If MAX_CPU is 1, run as single process without clustering
     if (numCPUs <= 1) {
       await callback();
       return;
@@ -66,7 +64,6 @@ export class AppClusterService {
       }
       cluster.default.on('exit', (worker) => {
         loggerService.log(`Worker ${worker.process.pid} exited; not restarting`, 'AppClusterService');
-        // cluster.default.fork();
       });
     } else {
       loggerService.log(`Cluster worker started on ${process.pid}`, 'AppClusterService');
