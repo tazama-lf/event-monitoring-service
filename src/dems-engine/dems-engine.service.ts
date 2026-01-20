@@ -68,10 +68,8 @@ export class DemsEngineService {
       "SELECT schema, mapping, functions, publishing_status FROM config WHERE endpoint_path = $1 and publishing_status = 'active'",
       [endpoint],
     );
-    const MIN_ROWS = 0;
     const [record] = result.rows;
-
-    if (result.rows.length > MIN_ROWS) {
+    if (result.rows.length) {
       this.loggerService.log(`Found schema for endpoint: ${endpoint}`);
       const data = prepareSchemaForCache(record);
       await this.redisService.setJson(cacheKey, JSON.stringify(data), this.timeToLive);
