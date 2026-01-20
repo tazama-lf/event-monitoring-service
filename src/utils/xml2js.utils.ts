@@ -43,34 +43,28 @@ export function returnArrayFieldsFromSchema(schema: any, loggerService?: LoggerS
           const currentPath = path ? `${path}.${key}` : key;
           const property = value as any;
 
-          // Ensure property exists before accessing its type
           if (!property || typeof property !== 'object') {
             continue;
           }
 
-          // Check if this property is an array
           if (property.type === 'array') {
             arrayFields.push(currentPath);
           }
 
-          // Check if this property is a string
           if (property.type === 'string') {
             stringFields.push(currentPath);
           }
 
-          // Recursively check nested objects
           if (property.type === 'object' && property.properties) {
             traverseSchema(property, currentPath);
           }
 
-          // Handle array items that might contain objects
           if (property.type === 'array' && property.items) {
             if (property.items.type === 'object' && property.items.properties) {
               traverseSchema(property.items, currentPath);
             }
           }
 
-          // Handle anyOf, oneOf, allOf schemas
           if (property.anyOf ?? property.oneOf ?? property.allOf) {
             const schemaVariants = property.anyOf ?? property.oneOf ?? property.allOf;
             schemaVariants.forEach((variant: any) => {
@@ -82,7 +76,6 @@ export function returnArrayFieldsFromSchema(schema: any, loggerService?: LoggerS
         }
       }
 
-      // Handle root level anyOf, oneOf, allOf
       if (obj.anyOf ?? obj.oneOf ?? obj.allOf) {
         const schemaVariants = obj.anyOf ?? obj.oneOf ?? obj.allOf;
         schemaVariants.forEach((variant: any) => {
@@ -118,20 +111,16 @@ export function returnArrayFieldsFromSchema(schema: any, loggerService?: LoggerS
  */
 export function replaceObjectsWithArrays(payload: any, arrayFields: string[], stringFields: string[], loggerService?: LoggerService): any {
   try {
-    // Handle null/undefined payload by throwing
     if (payload === null || payload === undefined) {
       throw new Error('Payload cannot be null or undefined');
     }
 
-    // Create a deep copy to avoid mutating the original payload
     const modifiedPayload = structuredClone(payload);
 
-    // Handle array conversions
     arrayFields.forEach((fieldPath) => {
       convertObjectToArrayAtPath(modifiedPayload, fieldPath, loggerService);
     });
 
-    // Handle number to string conversions
     stringFields.forEach((fieldPath) => {
       convertNumberToStringAtPath(modifiedPayload, fieldPath, loggerService);
     });
@@ -155,7 +144,6 @@ export function replaceObjectsWithArrays(payload: any, arrayFields: string[], st
  */
 export function convertNumberToStringAtPath(obj: any, path: string, loggerService?: LoggerService): void {
   try {
-    // Handle null/undefined objects by throwing
     if (obj === null || obj === undefined) {
       throw new Error('Object cannot be null or undefined');
     }
@@ -163,21 +151,17 @@ export function convertNumberToStringAtPath(obj: any, path: string, loggerServic
     const pathParts = path.split('.');
     let current = obj;
 
-    // Navigate to the parent of the target field
     for (let i = 0; i < pathParts.length - 1; i++) {
       if (current && typeof current === 'object' && !Array.isArray(current) && current[pathParts[i]]) {
         current = current[pathParts[i]];
       } else {
-        // Path doesn't exist in the payload, skip this conversion
         return;
       }
     }
 
     const targetFieldName = pathParts[pathParts.length - 1];
 
-    // Check if the target field exists and is a number
     if (current?.[targetFieldName] !== undefined && typeof current[targetFieldName] === 'number') {
-      // Convert the number to a string
       current[targetFieldName] = String(current[targetFieldName]);
 
       if (loggerService) {
@@ -200,7 +184,6 @@ export function convertNumberToStringAtPath(obj: any, path: string, loggerServic
  */
 export function convertObjectToArrayAtPath(obj: any, path: string, loggerService?: LoggerService): void {
   try {
-    // Handle null/undefined objects by throwing
     if (obj === null || obj === undefined) {
       throw new Error('Object cannot be null or undefined');
     }
@@ -208,21 +191,17 @@ export function convertObjectToArrayAtPath(obj: any, path: string, loggerService
     const pathParts = path.split('.');
     let current = obj;
 
-    // Navigate to the parent of the target field
     for (let i = 0; i < pathParts.length - 1; i++) {
       if (current && typeof current === 'object' && !Array.isArray(current) && current[pathParts[i]]) {
         current = current[pathParts[i]];
       } else {
-        // Path doesn't exist in the payload, skip this conversion
         return;
       }
     }
 
     const targetFieldName = pathParts[pathParts.length - 1];
 
-    // Check if the target field exists and is an object (not already an array)
     if (current?.[targetFieldName] && typeof current[targetFieldName] === 'object' && !Array.isArray(current[targetFieldName])) {
-      // Convert the object to an array containing that object
       current[targetFieldName] = [current[targetFieldName]];
 
       if (loggerService) {
@@ -249,15 +228,11 @@ export function createSchemaAwareNumberProcessor(stringFields: string[]) {
     const fullPath = path ? `${path}.${name}` : name;
     if (stringFieldSet.has(fullPath)) return value;
 
-    // Only convert to number if it's a string with no leading/trailing whitespace
-    // and is a valid number
     if (typeof value === 'string') {
       const trimmed = value.trim();
-      // If original has whitespace but trimmed doesn't, preserve the original
       if (trimmed !== value) {
         return value;
       }
-      // Only convert if it's a valid number
       if (trimmed !== '' && !isNaN(+trimmed)) {
         return +trimmed;
       }
