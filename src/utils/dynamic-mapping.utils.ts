@@ -10,11 +10,10 @@ import { getValueByPath } from './has_nested_property';
  */
 export function handleDynamicMapping(mapping: any, payload: any, dynamicMapping: any, loggerService: LoggerService): void {
   // append to dynamic mapping object
-  const ObjectName: string = mapping.destination.split('.')[0]; // e.g., Toyota
-  const PropertyName: string = mapping.destination.split('.')[1]; // e.g., model
-  const nestedPropertyName: string = mapping.destination.split('.')[2]; // e.g., name (if any)
+  const ObjectName: string = mapping.destination.split('.')[0];
+  const PropertyName: string = mapping.destination.split('.')[1];
+  const nestedPropertyName: string = mapping.destination.split('.')[2];
 
-  // if (mapping.datasource === 'dataModel') {
   loggerService.log('dataModel case for dynamic mapping source: ', mapping.source[0]);
   loggerService.log('dataModel case for dynamic mapping value: ', getValueByPath(payload, mapping.source[0]));
 
@@ -25,7 +24,6 @@ export function handleDynamicMapping(mapping: any, payload: any, dynamicMapping:
   } else {
     dynamicMapping[ObjectName][PropertyName] = getValueByPath(payload, mapping.source[0]);
   }
-  // }
 
   loggerService.log('dynamicMapping object is now: ', JSON.stringify(dynamicMapping));
 }
