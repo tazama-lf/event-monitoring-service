@@ -34,6 +34,12 @@ describe('DemsEngineController', () => {
     headers: {
       'content-type': 'application/json',
     },
+    get: jest.fn().mockImplementation((headerName: string) => {
+      if (headerName.toLowerCase() === 'content-type') {
+        return 'application/json';
+      }
+      return undefined;
+    }),
   };
 
   const mockSuccessResult = {
@@ -132,7 +138,15 @@ describe('DemsEngineController', () => {
     });
 
     it('should handle XML content type', async () => {
-      const xmlRequest: Partial<Request> = { headers: { 'content-type': 'application/xml' } };
+      const xmlRequest: Partial<Request> = {
+        headers: { 'content-type': 'application/xml' },
+        get: jest.fn().mockImplementation((headerName: string) => {
+          if (headerName.toLowerCase() === 'content-type') {
+            return 'application/xml';
+          }
+          return undefined;
+        }),
+      };
       mockDemsEngineService.handleMessage.mockResolvedValue(mockSuccessResult);
       mockDemsEngineService.saveTransactionDataAndNotify.mockResolvedValue(undefined);
 
