@@ -5,6 +5,5 @@
  */
 export const transformEndpoint = (endpoint: string): string => '/' + endpoint.trim().replaceAll(',', '/');
 
-const MIN_ENDPOINT_LENGTH = 0;
 export const isValidEndpointFormat = (endpoint: unknown): endpoint is string =>
-  typeof endpoint === 'string' && endpoint.length > MIN_ENDPOINT_LENGTH && endpoint.includes(',');
+  typeof endpoint === 'string' && endpoint.length > 0 && endpoint.includes(',');
