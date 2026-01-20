@@ -1,5 +1,5 @@
 import { getValueByPath } from './has_nested_property';
-import type { TransactionDetails } from '../interfaces/iTransactionRelationship';
+import type { TransactionDetails } from '@tazama-lf/frms-coe-lib/lib/interfaces';
 
 /**
  * Handles split value logic for multiple destinations from single source

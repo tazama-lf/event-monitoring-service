@@ -1,4 +1,4 @@
-import type { TransactionDetails } from './iTransactionRelationship';
+import type { TransactionDetails } from '@tazama-lf/frms-coe-lib/lib/interfaces';
 
 export interface MessageHandlerResponse {
   message: string;

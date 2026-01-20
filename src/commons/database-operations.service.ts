@@ -5,7 +5,7 @@ import { randomUUID } from 'node:crypto';
 import { ErrorPattern } from '../interfaces/iErrorPattern';
 import { QuarantineStatus } from '../enums/quarantineStatus.enum';
 import { TazamaPayload } from '../interfaces/iTazamaPayload';
-import { TransactionDetails } from '../interfaces/iTransactionRelationship';
+import { TransactionDetails } from '@tazama-lf/frms-coe-lib/lib/interfaces';
 import { SaveTransactionHistoryError, SaveTransactionRelationshipError } from '../errors/transaction-operation.errors';
 
 @Injectable()

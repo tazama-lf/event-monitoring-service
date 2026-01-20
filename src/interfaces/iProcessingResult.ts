@@ -1,6 +1,6 @@
 import type { CacheData } from './iCacheData';
 import type { TazamaPayload } from './iTazamaPayload';
-import type { TransactionDetails } from './iTransactionRelationship';
+import type { TransactionDetails } from '@tazama-lf/frms-coe-lib/lib/interfaces';
 
 export interface ProcessingResult {
   success: boolean;

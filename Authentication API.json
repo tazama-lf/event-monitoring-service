@@ -51,10 +51,8 @@
               "raw": "// {\n//     \"username\": \"{{username}}\",\n//     \"password\": \"{{password}}\"\n// }\n\n// for dems\n{\n    \"username\": \"ar\",\n    \"password\": \"ar\"\n}"
             },
             "url": {
-              "raw": "http://10.10.80.37:3000/auth/login",
-              "protocol": "http",
-              "host": ["10", "10", "80", "37"],
-              "port": "3000",
+              "raw": "{{base_url}}/auth/login",
+              "host": ["{{base_url}}"],
               "path": ["auth", "login"]
             },
             "description": "Authenticate user and obtain JWT token.\n\n### Request Body\n- **username**: User login name\n- **password**: User password\n\n### Response\n- **token**: JWT access token\n- **message**: Success message\n- **expiresIn**: Token expiration time (optional)\n\n### Use Case\nRequired for all subsequent API calls. Token is automatically saved to environment variable."

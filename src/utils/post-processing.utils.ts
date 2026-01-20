@@ -1,4 +1,4 @@
-import type { TransactionDetails } from '../interfaces/iTransactionRelationship';
+import type { TransactionDetails } from '@tazama-lf/frms-coe-lib/lib/interfaces';
 import { handleThirdLevelMapping } from './third-level-mapping.utils';
 
 /**
