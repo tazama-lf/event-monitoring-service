@@ -309,7 +309,7 @@ export class DemsEngineService {
         }
 
         // process only when it exists.
-        if (configuredMapping.length > 0) {
+        if (configuredMapping?.length > 0) {
           sources = processSourceMapping(sources, configuredMapping, payload);
         }
 
