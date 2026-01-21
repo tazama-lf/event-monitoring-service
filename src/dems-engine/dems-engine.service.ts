@@ -260,7 +260,14 @@ export class DemsEngineService {
         const functionToCall = row.functionName;
         let sources = row.params ?? [];
 
-        const ALLOWED_DB_FUNCTIONS = ['addAccount', 'addEntity', 'addAccountHolder', 'saveTransactionHistory', 'addDataModelTable'];
+        const ALLOWED_DB_FUNCTIONS = [
+          'addAccount',
+          'addEntity',
+          'addAccountHolder',
+          'saveTransactionHistory',
+          'addDataModelTable',
+          'saveTransactionDetails',
+        ];
         if (!ALLOWED_DB_FUNCTIONS.includes(functionToCall)) {
           throw new Error(`Function '${functionToCall}' is not in the allowed functions list`);
         }
