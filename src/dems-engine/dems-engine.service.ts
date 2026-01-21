@@ -448,7 +448,7 @@ export class DemsEngineService {
       const { dataCache, transactionRelationship, endToEndId, dynamicMapping } = responseFromProcessMappings;
       this.loggerService.log('Successfully processed mappings for ED. all ok');
       this.loggerService.log(`transactionRelationship: ${JSON.stringify(transactionRelationship)}`, this.LOG_CONTEXT);
-      this.loggerService.log('dataCache: ', JSON.stringify(dataCache), this.LOG_CONTEXT);
+      this.loggerService.log(`dataCache: ${JSON.stringify(dataCache)}`, this.LOG_CONTEXT);
 
       try {
         // refer to /docs/helpers for example functions configuration
