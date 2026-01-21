@@ -18,7 +18,6 @@ import { handleSplitValue } from '../utils/split-value.utils';
 import { handlePostProcessing } from '../utils/post-processing.utils';
 import { handleConcatenation } from '../utils/concatenation.utils';
 import { randomUUID } from 'node:crypto';
-// import { TransactionDetails } from '../interfaces/iTransactionRelationship';
 import type { TransactionDetails } from '@tazama-lf/frms-coe-lib/lib/interfaces';
 import { ErrorResponse } from '../interfaces/iErrorResponse';
 import { ProcessingResult } from '../interfaces/iProcessingResult';
@@ -156,7 +155,6 @@ export class DemsEngineService {
       TxSts: '',
     };
 
-    // dynamic object creation logic
     const dynamicMapping: any = {};
 
     let endToEndId = '';
