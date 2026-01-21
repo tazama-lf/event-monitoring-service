@@ -460,8 +460,8 @@ export class DemsEngineService {
           dynamicMapping,
         );
       } catch (error) {
-        this.loggerService.warn('Building error response: the configured functions', this.LOG_CONTEXT);
-        return buildErrorResponse('the configured functions', [`Function execution failed: ${String(error)}`]);
+        this.loggerService.warn('Building error response: function execution failed', this.LOG_CONTEXT);
+        return buildErrorResponse('function execution failed', [String(error)]);
       }
 
       this.loggerService.log(`Building Tazama payload for transaction type: ${transactionType}, tenant: ${tenantId}`, this.LOG_CONTEXT);
