@@ -279,8 +279,15 @@ export class DemsEngineService {
 
         if (functionToCall === 'addDataModelTable') {
           // dynamically build the table name using TenantId and param from mapping
+          if (!row.columns || !Array.isArray(row.columns) || row.columns.length < 2) {
+            throw new Error('Invalid configuration for addDataModelTable: columns must have at least 2 entries');
+          }
 
           const { tableName } = row;
+
+          if (!tableName || typeof tableName !== 'string') {
+            throw new Error(`Invalid table name configuration for addDataModelTable: ${tableName}`);
+          }
 
           this.loggerService.log(`table name: ${tableName} for function: ${functionToCall} `);
           this.loggerService.log(`params are : ${JSON.stringify(row)}`);
