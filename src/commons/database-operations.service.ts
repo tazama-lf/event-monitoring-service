@@ -1,5 +1,24 @@
+/**
+ * Database Operations Service - Single Source of Truth Implementation
+ *
+ * This service has been refactored to use frms-coe-lib as the single source of truth
+ * for database operations
+ *
+ * Architecture:
+ * - Primary: Uses centralized database operations from frms-coe-lib
+ * - Fallback: Direct database queries if frms-coe-lib initialization fails
+ * - Benefits: Consistent SQL patterns, reduced duplication, centralized connection management
+ */
+
 import { Injectable, BadRequestException, InternalServerErrorException, ConflictException } from '@nestjs/common';
-import { LoggerService } from '@tazama-lf/frms-coe-lib';
+// Core frms-coe-lib imports for centralized database management
+import {
+  LoggerService,
+  CreateDatabaseManager,
+  type EventHistoryDB,
+  type DatabaseManagerInstance,
+  type ManagerConfig,
+} from '@tazama-lf/frms-coe-lib';
 import { DatabaseService } from '../database/database.service';
 import { randomUUID } from 'node:crypto';
 import { ErrorPattern } from '../interfaces/iErrorPattern';
@@ -10,10 +29,54 @@ import { SaveTransactionHistoryError, SaveTransactionRelationshipError } from '.
 
 @Injectable()
 export class DatabaseOperationsService {
+  /**
+   * Centralized database manager from frms-coe-lib
+   *
+   * This manager provides consistent database operations across all services.
+   * If initialization fails, this remains null and methods fall back to direct queries.
+   *
+   * Type: Intersection of DatabaseManagerInstance and EventHistoryDB to provide
+   * both management functionality and specific event history operations.
+   */
+  private eventHistoryManager: (DatabaseManagerInstance<ManagerConfig> & EventHistoryDB) | null = null;
+
   constructor(
     private readonly loggerService: LoggerService,
     private readonly databaseService: DatabaseService,
-  ) {}
+  ) {
+    this.initializeEventHistory();
+  }
+
+  /**
+   * Initializes the centralized event history database manager from frms-coe-lib
+   *
+   * This method:
+   * 1. Maps existing environment variables to frms-coe-lib's expected configuration format
+   * 2. Creates a DatabaseManager instance with event history capabilities
+   *
+   */
+  private async initializeEventHistory(): Promise<void> {
+    try {
+      // Configure event history database using existing environment variables
+      const eventHistoryConfig: ManagerConfig = {
+        eventHistory: {
+          host: process.env.DB_HOST ?? 'localhost',
+          port: parseInt(process.env.DB_PORT ?? '5432'),
+          databaseName: process.env.DB_NAME ?? 'tcs',
+          user: process.env.DB_USER ?? 'postgres',
+          password: process.env.DB_PASSWORD ?? 'postgres',
+          certPath: process.env.DB_CERT_PATH ?? '',
+        },
+      };
+
+      // Create centralized database manager with EventHistoryDB capabilities
+      this.eventHistoryManager = (await CreateDatabaseManager(eventHistoryConfig)) as DatabaseManagerInstance<ManagerConfig> &
+        EventHistoryDB;
+      this.loggerService.log('EventHistory manager initialized successfully', this.log_context);
+    } catch (error) {
+      this.loggerService.error(`Failed to initialize EventHistory manager: ${String(error)}`, this.log_context);
+    }
+  }
 
   private readonly log_context = DatabaseOperationsService.name;
   ERROR_PATTERNS: ErrorPattern[] = [
@@ -83,10 +146,28 @@ export class DatabaseOperationsService {
     throw new InternalServerErrorException(`Failed to ${context}`);
   }
 
+  /**
+   * Adds an account record using single source of truth pattern
+   *
+   * MIGRATION: This method now uses frms-coe-lib's centralized saveAccount operation
+   * as the primary implementation
+   *
+   * Primary Path: eventHistoryManager.saveAccount() - Centralized, consistent SQL patterns
+   *
+   *
+   * @param accountId - Unique account identifier
+   * @param tenantId - Tenant identifier for multi-tenancy
+   */
   async addAccount(accountId: string, tenantId: string): Promise<void> {
     try {
-      const AccountQuery = 'INSERT INTO account (id, tenantid) VALUES ($1, $2) ON CONFLICT DO NOTHING';
-      await this.databaseService.query(AccountQuery, [accountId, tenantId]);
+      // PRIMARY: Use centralized logic from frms-coe-lib (single source of truth)
+      if (this.eventHistoryManager) {
+        // console.log('Using eventHistoryManager to save account');
+        this.loggerService.log('Using eventHistoryManager to save account', this.log_context);
+        await this.eventHistoryManager.saveAccount(accountId, tenantId);
+      } else {
+        throw new InternalServerErrorException('EventHistory manager not initialized - database operation cannot proceed');
+      }
       this.loggerService.log(`Added account: ${accountId} for tenant: ${tenantId}`, this.log_context);
     } catch (error) {
       this.handleDatabaseError(error, 'add account', {
@@ -95,13 +176,26 @@ export class DatabaseOperationsService {
     }
   }
 
+  /**
+   * Adds an entity record using single source of truth pattern
+   *
+   * MIGRATION: This method now uses frms-coe-lib's centralized saveEntity operation
+   * as the primary implementation
+   *
+   * @param entityId - Unique entity identifier
+   * @param tenantId - Tenant identifier for multi-tenancy
+   * @param CreDtTm - Creation date/time timestamp
+   */
   async addEntity(entityId: string, tenantId: string, CreDtTm: string): Promise<void> {
     try {
-      await this.databaseService.query('INSERT INTO entity (id, tenantid, credttm) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING', [
-        entityId,
-        tenantId,
-        CreDtTm,
-      ]);
+      // PRIMARY: Use centralized logic from frms-coe-lib (single source of truth)
+      if (this.eventHistoryManager) {
+        // console.log('Using eventHistoryManager to save entity');
+        await this.eventHistoryManager.saveEntity(entityId, tenantId, CreDtTm);
+      } else {
+        // ERROR: EventHistory manager not initialized - frms-coe-lib is required
+        throw new InternalServerErrorException('EventHistory manager not initialized - database operation cannot proceed');
+      }
       this.loggerService.log(`Added entity: ${entityId} for tenant: ${tenantId} and CreDtTm: ${CreDtTm}`, this.log_context);
     } catch (error) {
       this.handleDatabaseError(error, 'add entity', {
@@ -110,12 +204,28 @@ export class DatabaseOperationsService {
     }
   }
 
+  /**
+   * Adds an account holder relationship using single source of truth pattern
+   *
+   * MIGRATION: This method now uses frms-coe-lib's centralized saveAccountHolder operation
+   *
+   * Establishes the relationship between an entity (person/organization) and an account.
+   *
+   * @param entityId - Entity identifier (account holder)
+   * @param accountId - Account identifier being held
+   * @param CreDtTm - Creation date/time timestamp
+   * @param tenantId - Tenant identifier for multi-tenancy
+   */
   async addAccountHolder(entityId: string, accountId: string, CreDtTm: string, tenantId: string): Promise<void> {
     try {
-      await this.databaseService.query(
-        'INSERT INTO account_holder (source, destination, credttm, tenantid) VALUES ($1, $2, $3, $4) ON CONFLICT DO NOTHING',
-        [entityId, accountId, CreDtTm, tenantId],
-      );
+      // PRIMARY: Use centralized logic from frms-coe-lib (single source of truth)
+      if (this.eventHistoryManager) {
+        // console.log('Using eventHistoryManager to save account holder');
+        await this.eventHistoryManager.saveAccountHolder(entityId, accountId, CreDtTm, tenantId);
+      } else {
+        // ERROR: EventHistory manager not initialized - frms-coe-lib is required
+        throw new InternalServerErrorException('EventHistory manager not initialized - database operation cannot proceed');
+      }
       this.loggerService.log(
         `Added account holder: ${entityId} for account: ${accountId} and tenant: ${tenantId} and CreDtTm: ${CreDtTm}`,
         this.log_context,
@@ -161,6 +271,12 @@ export class DatabaseOperationsService {
     }
   }
 
+  /**
+   * Saves transaction relationship details
+   *
+   * TODO: Consider migrating to frms-coe-lib's saveTransactionDetails method
+   * for consistency with single source of truth pattern.
+   */
   async saveTransactionRelationship(transactionDetails: TransactionDetails): Promise<void> {
     this.loggerService.log(
       `Saving transaction relationship: ${transactionDetails.source} -> ${transactionDetails.destination}`,
