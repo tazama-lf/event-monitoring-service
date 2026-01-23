@@ -43,7 +43,13 @@ Make frms-coe-lib the single source of truth by:
 
 - Replace addEntity with eventHistoryManager.saveEntity ✅
 - Replace addAccountHolder with eventHistoryManager.saveAccountHolder ✅
-- Consider other database operations for future migration
+- Replace saveTransactionRelationship with eventHistoryManager.saveTransactionDetails ✅
+
+### Step 5: Enforce strict single source of truth ✅
+
+- Remove all fallback database queries ✅
+- Throw errors when eventHistoryManager is not available ✅
+- Ensure frms-coe-lib is truly the only source of database operations ✅
 
 ## Technical Implementation Details
 
@@ -58,25 +64,35 @@ The service maps existing environment variables to frms-coe-lib expected format:
 - `DB_PASSWORD` → `password`
 - `DB_CERT_PATH` → `certPath`
 
-### Graceful Fallback Strategy
+### Graceful Fallback Strategy → Strict Enforcement Strategy
 
-- Each method checks if `eventHistoryManager` is available
-- If initialization failed, methods fall back to direct database queries
-- This ensures backward compatibility and resilience
+- ~~Each method checks if `eventHistoryManager` is available~~
+- ~~If initialization failed, methods fall back to direct database queries~~
+- ~~This ensures backward compatibility and resilience~~
+
+**Updated to Strict Enforcement:**
+
+- Each method requires `eventHistoryManager` to be available
+- If initialization fails, methods throw `InternalServerErrorException`
+- This enforces frms-coe-lib as the true single source of truth
 
 ### Methods Migrated
 
 1. `addAccount(accountId: string, tenantId: string)`
    - Uses `eventHistoryManager.saveAccount()` from frms-coe-lib
-   - Fallback: Direct SQL INSERT with ON CONFLICT DO NOTHING
+   - ~~Fallback: Direct SQL INSERT with ON CONFLICT DO NOTHING~~
 
 2. `addEntity(entityId: string, tenantId: string, CreDtTm: string)`
    - Uses `eventHistoryManager.saveEntity()` from frms-coe-lib
-   - Fallback: Direct SQL INSERT with ON CONFLICT DO NOTHING
+   - ~~Fallback: Direct SQL INSERT with ON CONFLICT DO NOTHING~~
 
 3. `addAccountHolder(entityId: string, accountId: string, CreDtTm: string, tenantId: string)`
    - Uses `eventHistoryManager.saveAccountHolder()` from frms-coe-lib
-   - Fallback: Direct SQL INSERT with ON CONFLICT DO NOTHING
+   - ~~Fallback: Direct SQL INSERT with ON CONFLICT DO NOTHING~~
+
+4. `saveTransactionRelationship(transactionDetails: TransactionDetails)`
+   - Uses `eventHistoryManager.saveTransactionDetails()` from frms-coe-lib
+   - **NEW**: Migrated to enforce single source of truth
 
 ### Benefits Achieved
 
@@ -84,8 +100,9 @@ The service maps existing environment variables to frms-coe-lib expected format:
 - ✅ Consistent SQL patterns across all services
 - ✅ Centralized database connection management
 - ✅ Reduced code duplication
-- ✅ Backward compatibility maintained
-- ✅ Graceful degradation if frms-coe-lib is unavailable
+- ✅ **Strict enforcement** - No fallbacks to direct database operations
+- ✅ **Fail-fast behavior** - Issues caught immediately rather than silently degrading
+- ✅ **True centralization** - frms-coe-lib is the only path for database operations
 
 ## Validation Results
 

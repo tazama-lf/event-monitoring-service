@@ -60,9 +60,9 @@ export class DatabaseOperationsService {
       // Configure event history database using existing environment variables
       const eventHistoryConfig: ManagerConfig = {
         eventHistory: {
-          host: process.env.DB_HOST ?? 'localhost',
+          host: process.env.DB_HOST ?? '10.10.80.34',
           port: parseInt(process.env.DB_PORT ?? '5432'),
-          databaseName: process.env.DB_NAME ?? 'tcs',
+          databaseName: process.env.DB_NAME ?? 'uat',
           user: process.env.DB_USER ?? 'postgres',
           password: process.env.DB_PASSWORD ?? 'postgres',
           certPath: process.env.DB_CERT_PATH ?? '',
@@ -272,10 +272,12 @@ export class DatabaseOperationsService {
   }
 
   /**
-   * Saves transaction relationship details
+   * Saves transaction relationship details using single source of truth pattern
    *
-   * TODO: Consider migrating to frms-coe-lib's saveTransactionDetails method
-   * for consistency with single source of truth pattern.
+   * MIGRATION: This method now uses frms-coe-lib's centralized saveTransactionDetails operation
+   * as the primary implementation, enforcing frms-coe-lib as the single source of truth.
+   *
+   * @param transactionDetails - Transaction details containing source, destination, and transaction data
    */
   async saveTransactionRelationship(transactionDetails: TransactionDetails): Promise<void> {
     this.loggerService.log(
@@ -291,14 +293,14 @@ export class DatabaseOperationsService {
     }
 
     try {
-      await this.databaseService.query(
-        'INSERT INTO transaction (source, destination, transaction) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING',
-        [transactionDetails.source, transactionDetails.destination, JSON.stringify(transactionDetails)],
-      );
-      this.loggerService.log(
-        `Saved transaction relationship: ${transactionDetails.source} -> ${transactionDetails.destination}`,
-        this.log_context,
-      );
+      // PRIMARY: Use centralized logic from frms-coe-lib (single source of truth)
+      if (this.eventHistoryManager) {
+        await this.eventHistoryManager.saveTransactionDetails(transactionDetails);
+      } else {
+        // ERROR: EventHistory manager not initialized - frms-coe-lib is required
+        // console.log('EventHistory manager not initialized - cannot save transaction relationship');
+        throw new InternalServerErrorException('EventHistory manager not initialized - database operation cannot proceed');
+      }
     } catch (error) {
       // Wrap in typed error before re-throwing
       const relationship = `${transactionDetails.source} -> ${transactionDetails.destination}`;
