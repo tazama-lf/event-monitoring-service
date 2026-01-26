@@ -6,8 +6,6 @@
  *
  * Architecture:
  * - Primary: Uses centralized database operations from frms-coe-lib
- * - Fallback: Direct database queries if frms-coe-lib initialization fails
- * - Benefits: Consistent SQL patterns, reduced duplication, centralized connection management
  */
 
 import { Injectable, BadRequestException, InternalServerErrorException, ConflictException } from '@nestjs/common';
@@ -16,6 +14,7 @@ import {
   LoggerService,
   CreateDatabaseManager,
   type EventHistoryDB,
+  type RawHistoryDB,
   type DatabaseManagerInstance,
   type ManagerConfig,
 } from '@tazama-lf/frms-coe-lib';
@@ -24,7 +23,7 @@ import { randomUUID } from 'node:crypto';
 import { ErrorPattern } from '../interfaces/iErrorPattern';
 import { QuarantineStatus } from '../enums/quarantineStatus.enum';
 import { TazamaPayload } from '../interfaces/iTazamaPayload';
-import { TransactionDetails } from '@tazama-lf/frms-coe-lib/lib/interfaces';
+import { TransactionDetails, type Pain001, type Pain013, type Pacs008, type Pacs002 } from '@tazama-lf/frms-coe-lib/lib/interfaces';
 import { SaveTransactionHistoryError, SaveTransactionRelationshipError } from '../errors/transaction-operation.errors';
 
 @Injectable()
@@ -33,12 +32,11 @@ export class DatabaseOperationsService {
    * Centralized database manager from frms-coe-lib
    *
    * This manager provides consistent database operations across all services.
-   * If initialization fails, this remains null and methods fall back to direct queries.
    *
-   * Type: Intersection of DatabaseManagerInstance and EventHistoryDB to provide
-   * both management functionality and specific event history operations.
+   * Type: Intersection of DatabaseManagerInstance, EventHistoryDB, and RawHistoryDB to provide
+   * management functionality, event history operations, and raw transaction history operations.
    */
-  private eventHistoryManager: (DatabaseManagerInstance<ManagerConfig> & EventHistoryDB) | null = null;
+  private DbManager: (DatabaseManagerInstance<ManagerConfig> & EventHistoryDB & RawHistoryDB) | null = null;
 
   constructor(
     private readonly loggerService: LoggerService,
@@ -57,7 +55,7 @@ export class DatabaseOperationsService {
    */
   private async initializeEventHistory(): Promise<void> {
     try {
-      // Configure event history database using existing environment variables
+      // Configure event history and raw history databases using existing environment variables
       const eventHistoryConfig: ManagerConfig = {
         eventHistory: {
           host: process.env.DB_HOST ?? '10.10.80.34',
@@ -67,14 +65,23 @@ export class DatabaseOperationsService {
           password: process.env.DB_PASSWORD ?? 'postgres',
           certPath: process.env.DB_CERT_PATH ?? '',
         },
+        rawHistory: {
+          host: process.env.DB_HOST ?? '10.10.80.34',
+          port: parseInt(process.env.DB_PORT ?? '5432'),
+          databaseName: process.env.DB_NAME ?? 'uat',
+          user: process.env.DB_USER ?? 'postgres',
+          password: process.env.DB_PASSWORD ?? 'postgres',
+          certPath: process.env.DB_CERT_PATH ?? '',
+        },
       };
 
-      // Create centralized database manager with EventHistoryDB capabilities
-      this.eventHistoryManager = (await CreateDatabaseManager(eventHistoryConfig)) as DatabaseManagerInstance<ManagerConfig> &
-        EventHistoryDB;
-      this.loggerService.log('EventHistory manager initialized successfully', this.log_context);
+      // Create centralized database manager with EventHistoryDB and RawHistoryDB capabilities
+      this.DbManager = (await CreateDatabaseManager(eventHistoryConfig)) as DatabaseManagerInstance<ManagerConfig> &
+        EventHistoryDB &
+        RawHistoryDB;
+      this.loggerService.log('Database manager initialized successfully', this.log_context);
     } catch (error) {
-      this.loggerService.error(`Failed to initialize EventHistory manager: ${String(error)}`, this.log_context);
+      this.loggerService.error(`Failed to initialize Database manager: ${String(error)}`, this.log_context);
     }
   }
 
@@ -152,7 +159,7 @@ export class DatabaseOperationsService {
    * MIGRATION: This method now uses frms-coe-lib's centralized saveAccount operation
    * as the primary implementation
    *
-   * Primary Path: eventHistoryManager.saveAccount() - Centralized, consistent SQL patterns
+   * Primary Path: DbManager.saveAccount() - Centralized, consistent SQL patterns
    *
    *
    * @param accountId - Unique account identifier
@@ -161,18 +168,66 @@ export class DatabaseOperationsService {
   async addAccount(accountId: string, tenantId: string): Promise<void> {
     try {
       // PRIMARY: Use centralized logic from frms-coe-lib (single source of truth)
-      if (this.eventHistoryManager) {
-        // console.log('Using eventHistoryManager to save account');
-        this.loggerService.log('Using eventHistoryManager to save account', this.log_context);
-        await this.eventHistoryManager.saveAccount(accountId, tenantId);
+      if (this.DbManager) {
+        // console.log('Using DbManager to save account');
+        this.loggerService.log('Using DbManager to save account', this.log_context);
+        await this.DbManager.saveAccount(accountId, tenantId);
       } else {
-        throw new InternalServerErrorException('EventHistory manager not initialized - database operation cannot proceed');
+        throw new InternalServerErrorException('Database manager not initialized - database operation cannot proceed');
       }
       this.loggerService.log(`Added account: ${accountId} for tenant: ${tenantId}`, this.log_context);
     } catch (error) {
       this.handleDatabaseError(error, 'add account', {
         details: `account ${accountId} for tenant ${tenantId}`,
       });
+    }
+  }
+
+  /**
+   * Saves transaction history using single source of truth pattern
+   *
+   * MIGRATION: This method now uses frms-coe-lib's centralized transaction history operations
+   * as the primary implementation, enforcing frms-coe-lib as the single source of truth.
+   *
+   * @param transaction - Transaction payload containing transaction data and type
+   * @param key - Transaction key for logging purposes
+   */
+  async saveTransactionHistory(transaction: TazamaPayload, key: string): Promise<void> {
+    try {
+      if (this.DbManager) {
+        switch (transaction.TxTp) {
+          case 'pain.001.001.11': {
+            await this.DbManager.saveTransactionHistoryPain001(transaction.transaction as Pain001);
+            break;
+          }
+          case 'pain.013.001.09': {
+            await this.DbManager.saveTransactionHistoryPain013(transaction.transaction as Pain013);
+            break;
+          }
+          case 'pacs.008.001.10': {
+            await this.DbManager.saveTransactionHistoryPacs008(transaction.transaction as Pacs008);
+            break;
+          }
+          case 'pacs.002.001.12': {
+            await this.DbManager.saveTransactionHistoryPacs002(transaction.transaction as Pacs002);
+            break;
+          }
+          default:
+            throw new BadRequestException(`Unsupported transaction type: ${transaction.TxTp}`);
+        }
+      } else {
+        // ERROR: Database manager not initialized - frms-coe-lib is required
+        throw new InternalServerErrorException('Database manager not initialized - database operation cannot proceed');
+      }
+      this.loggerService.log(`Saved transaction history with key: ${key}`, this.log_context);
+    } catch (error) {
+      try {
+        this.handleDatabaseError(error, 'save transaction history', {
+          details: `key ${key}, type ${transaction.TxTp}`,
+        });
+      } catch (dbError) {
+        throw new SaveTransactionHistoryError(dbError, key);
+      }
     }
   }
 
@@ -189,12 +244,12 @@ export class DatabaseOperationsService {
   async addEntity(entityId: string, tenantId: string, CreDtTm: string): Promise<void> {
     try {
       // PRIMARY: Use centralized logic from frms-coe-lib (single source of truth)
-      if (this.eventHistoryManager) {
-        // console.log('Using eventHistoryManager to save entity');
-        await this.eventHistoryManager.saveEntity(entityId, tenantId, CreDtTm);
+      if (this.DbManager) {
+        // console.log('Using DbManager to save entity');
+        await this.DbManager.saveEntity(entityId, tenantId, CreDtTm);
       } else {
-        // ERROR: EventHistory manager not initialized - frms-coe-lib is required
-        throw new InternalServerErrorException('EventHistory manager not initialized - database operation cannot proceed');
+        // ERROR: Database manager not initialized - frms-coe-lib is required
+        throw new InternalServerErrorException('Database manager not initialized - database operation cannot proceed');
       }
       this.loggerService.log(`Added entity: ${entityId} for tenant: ${tenantId} and CreDtTm: ${CreDtTm}`, this.log_context);
     } catch (error) {
@@ -219,12 +274,12 @@ export class DatabaseOperationsService {
   async addAccountHolder(entityId: string, accountId: string, CreDtTm: string, tenantId: string): Promise<void> {
     try {
       // PRIMARY: Use centralized logic from frms-coe-lib (single source of truth)
-      if (this.eventHistoryManager) {
-        // console.log('Using eventHistoryManager to save account holder');
-        await this.eventHistoryManager.saveAccountHolder(entityId, accountId, CreDtTm, tenantId);
+      if (this.DbManager) {
+        // console.log('Using DbManager to save account holder');
+        await this.DbManager.saveAccountHolder(entityId, accountId, CreDtTm, tenantId);
       } else {
-        // ERROR: EventHistory manager not initialized - frms-coe-lib is required
-        throw new InternalServerErrorException('EventHistory manager not initialized - database operation cannot proceed');
+        // ERROR: Database manager not initialized - frms-coe-lib is required
+        throw new InternalServerErrorException('Database manager not initialized - database operation cannot proceed');
       }
       this.loggerService.log(
         `Added account holder: ${entityId} for account: ${accountId} and tenant: ${tenantId} and CreDtTm: ${CreDtTm}`,
@@ -250,27 +305,6 @@ export class DatabaseOperationsService {
     return name;
   }
 
-  async saveTransactionHistory(transaction: TazamaPayload, key: string): Promise<void> {
-    const txtp = transaction.TxTp.replaceAll('.', '').toLowerCase();
-
-    // Validate table name to prevent SQL injection
-    const safeTableName = this.getSafeIdentifier(txtp);
-
-    try {
-      await this.databaseService.query(`INSERT INTO ${safeTableName} (document) VALUES ($1)`, [transaction.transaction]);
-      this.loggerService.log(`Saved transaction history with key: ${key}`, this.log_context);
-    } catch (error) {
-      // Wrap in typed error before re-throwing
-      try {
-        this.handleDatabaseError(error, 'save transaction history', {
-          details: `key ${key}, table ${safeTableName}`,
-        });
-      } catch (dbError) {
-        throw new SaveTransactionHistoryError(dbError, key);
-      }
-    }
-  }
-
   /**
    * Saves transaction relationship details using single source of truth pattern
    *
@@ -294,12 +328,12 @@ export class DatabaseOperationsService {
 
     try {
       // PRIMARY: Use centralized logic from frms-coe-lib (single source of truth)
-      if (this.eventHistoryManager) {
-        await this.eventHistoryManager.saveTransactionDetails(transactionDetails);
+      if (this.DbManager) {
+        await this.DbManager.saveTransactionDetails(transactionDetails);
       } else {
-        // ERROR: EventHistory manager not initialized - frms-coe-lib is required
-        // console.log('EventHistory manager not initialized - cannot save transaction relationship');
-        throw new InternalServerErrorException('EventHistory manager not initialized - database operation cannot proceed');
+        // ERROR: Database manager not initialized - frms-coe-lib is required
+        // console.log('Database manager not initialized - cannot save transaction relationship');
+        throw new InternalServerErrorException('Database manager not initialized - database operation cannot proceed');
       }
     } catch (error) {
       // Wrap in typed error before re-throwing
