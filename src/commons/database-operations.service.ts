@@ -1,19 +1,87 @@
+/**
+ * Database Operations Service - Single Source of Truth Implementation
+ *
+ * This service has been refactored to use frms-coe-lib as the single source of truth
+ * for database operations
+ *
+ * Architecture:
+ * - Primary: Uses centralized database operations from frms-coe-lib
+ */
+
 import { Injectable, BadRequestException, InternalServerErrorException, ConflictException } from '@nestjs/common';
-import { LoggerService } from '@tazama-lf/frms-coe-lib';
+// Core frms-coe-lib imports for centralized database management
+import {
+  LoggerService,
+  CreateDatabaseManager,
+  type EventHistoryDB,
+  type RawHistoryDB,
+  type DatabaseManagerInstance,
+  type ManagerConfig,
+} from '@tazama-lf/frms-coe-lib';
 import { DatabaseService } from '../database/database.service';
 import { randomUUID } from 'node:crypto';
 import { ErrorPattern } from '../interfaces/iErrorPattern';
 import { QuarantineStatus } from '../enums/quarantineStatus.enum';
 import { TazamaPayload } from '../interfaces/iTazamaPayload';
-import { TransactionDetails } from '@tazama-lf/frms-coe-lib/lib/interfaces';
-import { SaveTransactionHistoryError, SaveTransactionRelationshipError } from '../errors/transaction-operation.errors';
+import { TransactionDetails, type Pain001, type Pain013, type Pacs008, type Pacs002 } from '@tazama-lf/frms-coe-lib/lib/interfaces';
+import { SaveTransactionRelationshipError } from '../errors/transaction-operation.errors';
 
 @Injectable()
 export class DatabaseOperationsService {
+  /**
+   * Centralized database manager from frms-coe-lib
+   *
+   * This manager provides consistent database operations across all services.
+   *
+   * Type: Intersection of DatabaseManagerInstance, EventHistoryDB, and RawHistoryDB to provide
+   * management functionality, event history operations, and raw transaction history operations.
+   */
+  private DbManager: (DatabaseManagerInstance<ManagerConfig> & EventHistoryDB & RawHistoryDB) | null = null;
+
   constructor(
     private readonly loggerService: LoggerService,
     private readonly databaseService: DatabaseService,
-  ) {}
+  ) {
+    this.initDb();
+  }
+
+  /**
+   * Initializes the centralized event history database manager from frms-coe-lib
+   *
+   * This method:
+   * 1. Maps existing environment variables to frms-coe-lib's expected configuration format
+   * 2. Creates a DatabaseManager instance with event history capabilities
+   *
+   */
+  private async initDb(): Promise<void> {
+    try {
+      const eventHistoryConfig: ManagerConfig = {
+        eventHistory: {
+          host: process.env.DB_HOST ?? '10.10.80.34',
+          port: parseInt(process.env.DB_PORT ?? '5432'),
+          databaseName: process.env.DB_NAME ?? 'uat',
+          user: process.env.DB_USER ?? 'postgres',
+          password: process.env.DB_PASSWORD ?? 'postgres',
+          certPath: process.env.DB_CERT_PATH ?? '',
+        },
+        rawHistory: {
+          host: process.env.DB_HOST ?? '10.10.80.34',
+          port: parseInt(process.env.DB_PORT ?? '5432'),
+          databaseName: process.env.DB_NAME ?? 'uat',
+          user: process.env.DB_USER ?? 'postgres',
+          password: process.env.DB_PASSWORD ?? 'postgres',
+          certPath: process.env.DB_CERT_PATH ?? '',
+        },
+      };
+
+      this.DbManager = (await CreateDatabaseManager(eventHistoryConfig)) as DatabaseManagerInstance<ManagerConfig> &
+        EventHistoryDB &
+        RawHistoryDB;
+      this.loggerService.log('Database manager initialized successfully', this.log_context);
+    } catch (error) {
+      this.loggerService.error(`Failed to initialize Database manager: ${String(error)}`, this.log_context);
+    }
+  }
 
   private readonly log_context = DatabaseOperationsService.name;
   ERROR_PATTERNS: ErrorPattern[] = [
@@ -83,10 +151,25 @@ export class DatabaseOperationsService {
     throw new InternalServerErrorException(`Failed to ${context}`);
   }
 
+  /**
+   * Adds an account record using single source of truth pattern
+   *
+   * MIGRATION: This method now uses frms-coe-lib's centralized saveAccount operation
+   * as the primary implementation
+   *
+   * Primary Path: DbManager.saveAccount() - Centralized, consistent SQL patterns
+   *
+   *
+   * @param accountId - Unique account identifier
+   * @param tenantId - Tenant identifier for multi-tenancy
+   */
   async addAccount(accountId: string, tenantId: string): Promise<void> {
     try {
-      const AccountQuery = 'INSERT INTO account (id, tenantid) VALUES ($1, $2) ON CONFLICT DO NOTHING';
-      await this.databaseService.query(AccountQuery, [accountId, tenantId]);
+      if (!this.DbManager) {
+        throw new InternalServerErrorException('Database manager not initialized - database operation cannot proceed');
+      }
+
+      await this.DbManager.saveAccount(accountId, tenantId);
       this.loggerService.log(`Added account: ${accountId} for tenant: ${tenantId}`, this.log_context);
     } catch (error) {
       this.handleDatabaseError(error, 'add account', {
@@ -95,13 +178,66 @@ export class DatabaseOperationsService {
     }
   }
 
+  /**
+   * Saves transaction history using single source of truth pattern
+   *
+   * MIGRATION: This method now uses frms-coe-lib's centralized transaction history operations
+   * as the primary implementation, enforcing frms-coe-lib as the single source of truth.
+   *
+   * @param transaction - Transaction payload containing transaction data and type
+   * @param key - Transaction key for logging purposes
+   */
+  async saveTransactionHistory(transaction: TazamaPayload, key: string): Promise<void> {
+    try {
+      if (!this.DbManager) {
+        throw new InternalServerErrorException('Database manager not initialized - database operation cannot proceed');
+      }
+
+      switch (transaction.TxTp) {
+        case 'pain.001.001.11': {
+          await this.DbManager.saveTransactionHistoryPain001(transaction.transaction as Pain001);
+          break;
+        }
+        case 'pain.013.001.09': {
+          await this.DbManager.saveTransactionHistoryPain013(transaction.transaction as Pain013);
+          break;
+        }
+        case 'pacs.008.001.10': {
+          await this.DbManager.saveTransactionHistoryPacs008(transaction.transaction as Pacs008);
+          break;
+        }
+        case 'pacs.002.001.12': {
+          await this.DbManager.saveTransactionHistoryPacs002(transaction.transaction as Pacs002);
+          break;
+        }
+        default:
+          throw new BadRequestException(`Unsupported transaction type: ${transaction.TxTp}`);
+      }
+      this.loggerService.log(`Saved transaction history with key: ${key}`, this.log_context);
+    } catch (error) {
+      this.handleDatabaseError(error, 'save transaction history', {
+        details: `key ${key}, type ${transaction.TxTp}`,
+      });
+    }
+  }
+
+  /**
+   * Adds an entity record using single source of truth pattern
+   *
+   * MIGRATION: This method now uses frms-coe-lib's centralized saveEntity operation
+   * as the primary implementation
+   *
+   * @param entityId - Unique entity identifier
+   * @param tenantId - Tenant identifier for multi-tenancy
+   * @param CreDtTm - Creation date/time timestamp
+   */
   async addEntity(entityId: string, tenantId: string, CreDtTm: string): Promise<void> {
     try {
-      await this.databaseService.query('INSERT INTO entity (id, tenantid, credttm) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING', [
-        entityId,
-        tenantId,
-        CreDtTm,
-      ]);
+      if (!this.DbManager) {
+        throw new InternalServerErrorException('Database manager not initialized - database operation cannot proceed');
+      }
+      await this.DbManager.saveEntity(entityId, tenantId, CreDtTm);
+
       this.loggerService.log(`Added entity: ${entityId} for tenant: ${tenantId} and CreDtTm: ${CreDtTm}`, this.log_context);
     } catch (error) {
       this.handleDatabaseError(error, 'add entity', {
@@ -110,12 +246,25 @@ export class DatabaseOperationsService {
     }
   }
 
+  /**
+   * Adds an account holder relationship using single source of truth pattern
+   *
+   * MIGRATION: This method now uses frms-coe-lib's centralized saveAccountHolder operation
+   *
+   * Establishes the relationship between an entity (person/organization) and an account.
+   *
+   * @param entityId - Entity identifier (account holder)
+   * @param accountId - Account identifier being held
+   * @param CreDtTm - Creation date/time timestamp
+   * @param tenantId - Tenant identifier for multi-tenancy
+   */
   async addAccountHolder(entityId: string, accountId: string, CreDtTm: string, tenantId: string): Promise<void> {
     try {
-      await this.databaseService.query(
-        'INSERT INTO account_holder (source, destination, credttm, tenantid) VALUES ($1, $2, $3, $4) ON CONFLICT DO NOTHING',
-        [entityId, accountId, CreDtTm, tenantId],
-      );
+      if (!this.DbManager) {
+        throw new InternalServerErrorException('Database manager not initialized - database operation cannot proceed');
+      }
+
+      await this.DbManager.saveAccountHolder(entityId, accountId, CreDtTm, tenantId);
       this.loggerService.log(
         `Added account holder: ${entityId} for account: ${accountId} and tenant: ${tenantId} and CreDtTm: ${CreDtTm}`,
         this.log_context,
@@ -140,27 +289,14 @@ export class DatabaseOperationsService {
     return name;
   }
 
-  async saveTransactionHistory(transaction: TazamaPayload, key: string): Promise<void> {
-    const txtp = transaction.TxTp.replaceAll('.', '').toLowerCase();
-
-    // Validate table name to prevent SQL injection
-    const safeTableName = this.getSafeIdentifier(txtp);
-
-    try {
-      await this.databaseService.query(`INSERT INTO ${safeTableName} (document) VALUES ($1)`, [transaction.transaction]);
-      this.loggerService.log(`Saved transaction history with key: ${key}`, this.log_context);
-    } catch (error) {
-      // Wrap in typed error before re-throwing
-      try {
-        this.handleDatabaseError(error, 'save transaction history', {
-          details: `key ${key}, table ${safeTableName}`,
-        });
-      } catch (dbError) {
-        throw new SaveTransactionHistoryError(dbError, key);
-      }
-    }
-  }
-
+  /**
+   * Saves transaction relationship details using single source of truth pattern
+   *
+   * MIGRATION: This method now uses frms-coe-lib's centralized saveTransactionDetails operation
+   * as the primary implementation, enforcing frms-coe-lib as the single source of truth.
+   *
+   * @param transactionDetails - Transaction details containing source, destination, and transaction data
+   */
   async saveTransactionRelationship(transactionDetails: TransactionDetails): Promise<void> {
     this.loggerService.log(
       `Saving transaction relationship: ${transactionDetails.source} -> ${transactionDetails.destination}`,
@@ -175,16 +311,12 @@ export class DatabaseOperationsService {
     }
 
     try {
-      await this.databaseService.query(
-        'INSERT INTO transaction (source, destination, transaction) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING',
-        [transactionDetails.source, transactionDetails.destination, JSON.stringify(transactionDetails)],
-      );
-      this.loggerService.log(
-        `Saved transaction relationship: ${transactionDetails.source} -> ${transactionDetails.destination}`,
-        this.log_context,
-      );
+      if (!this.DbManager) {
+        throw new InternalServerErrorException('Database manager not initialized - database operation cannot proceed');
+      }
+
+      await this.DbManager.saveTransactionDetails(transactionDetails);
     } catch (error) {
-      // Wrap in typed error before re-throwing
       const relationship = `${transactionDetails.source} -> ${transactionDetails.destination}`;
       try {
         this.handleDatabaseError(error, 'save transaction relationship', {
@@ -231,11 +363,10 @@ export class DatabaseOperationsService {
       );
       this.loggerService.log(`Saved failed record to quarantine with ID: ${quarantineRecord.id}`, this.log_context);
     } catch (error) {
-      // Special handling for quarantine - don't throw on duplicates
       const errorMessage = String(error);
       if (errorMessage.includes('unique constraint')) {
         this.loggerService.warn(`Duplicate quarantine record with correlation ID: ${correlationId}`, this.log_context);
-        return; // Don't throw for quarantine duplicates
+        return;
       }
 
       this.handleDatabaseError(error, 'save to quarantine', {
