@@ -24,7 +24,7 @@ import { ErrorPattern } from '../interfaces/iErrorPattern';
 import { QuarantineStatus } from '../enums/quarantineStatus.enum';
 import { TazamaPayload } from '../interfaces/iTazamaPayload';
 import { TransactionDetails, type Pain001, type Pain013, type Pacs008, type Pacs002 } from '@tazama-lf/frms-coe-lib/lib/interfaces';
-import { SaveTransactionHistoryError, SaveTransactionRelationshipError } from '../errors/transaction-operation.errors';
+import { SaveTransactionRelationshipError } from '../errors/transaction-operation.errors';
 
 @Injectable()
 export class DatabaseOperationsService {
@@ -42,7 +42,7 @@ export class DatabaseOperationsService {
     private readonly loggerService: LoggerService,
     private readonly databaseService: DatabaseService,
   ) {
-    this.initializeEventHistory();
+    this.initDb();
   }
 
   /**
@@ -53,9 +53,8 @@ export class DatabaseOperationsService {
    * 2. Creates a DatabaseManager instance with event history capabilities
    *
    */
-  private async initializeEventHistory(): Promise<void> {
+  private async initDb(): Promise<void> {
     try {
-      // Configure event history and raw history databases using existing environment variables
       const eventHistoryConfig: ManagerConfig = {
         eventHistory: {
           host: process.env.DB_HOST ?? '10.10.80.34',
@@ -75,7 +74,6 @@ export class DatabaseOperationsService {
         },
       };
 
-      // Create centralized database manager with EventHistoryDB and RawHistoryDB capabilities
       this.DbManager = (await CreateDatabaseManager(eventHistoryConfig)) as DatabaseManagerInstance<ManagerConfig> &
         EventHistoryDB &
         RawHistoryDB;
@@ -167,14 +165,11 @@ export class DatabaseOperationsService {
    */
   async addAccount(accountId: string, tenantId: string): Promise<void> {
     try {
-      // PRIMARY: Use centralized logic from frms-coe-lib (single source of truth)
-      if (this.DbManager) {
-        // console.log('Using DbManager to save account');
-        this.loggerService.log('Using DbManager to save account', this.log_context);
-        await this.DbManager.saveAccount(accountId, tenantId);
-      } else {
+      if (!this.DbManager) {
         throw new InternalServerErrorException('Database manager not initialized - database operation cannot proceed');
       }
+
+      await this.DbManager.saveAccount(accountId, tenantId);
       this.loggerService.log(`Added account: ${accountId} for tenant: ${tenantId}`, this.log_context);
     } catch (error) {
       this.handleDatabaseError(error, 'add account', {
@@ -194,40 +189,35 @@ export class DatabaseOperationsService {
    */
   async saveTransactionHistory(transaction: TazamaPayload, key: string): Promise<void> {
     try {
-      if (this.DbManager) {
-        switch (transaction.TxTp) {
-          case 'pain.001.001.11': {
-            await this.DbManager.saveTransactionHistoryPain001(transaction.transaction as Pain001);
-            break;
-          }
-          case 'pain.013.001.09': {
-            await this.DbManager.saveTransactionHistoryPain013(transaction.transaction as Pain013);
-            break;
-          }
-          case 'pacs.008.001.10': {
-            await this.DbManager.saveTransactionHistoryPacs008(transaction.transaction as Pacs008);
-            break;
-          }
-          case 'pacs.002.001.12': {
-            await this.DbManager.saveTransactionHistoryPacs002(transaction.transaction as Pacs002);
-            break;
-          }
-          default:
-            throw new BadRequestException(`Unsupported transaction type: ${transaction.TxTp}`);
-        }
-      } else {
-        // ERROR: Database manager not initialized - frms-coe-lib is required
+      if (!this.DbManager) {
         throw new InternalServerErrorException('Database manager not initialized - database operation cannot proceed');
+      }
+
+      switch (transaction.TxTp) {
+        case 'pain.001.001.11': {
+          await this.DbManager.saveTransactionHistoryPain001(transaction.transaction as Pain001);
+          break;
+        }
+        case 'pain.013.001.09': {
+          await this.DbManager.saveTransactionHistoryPain013(transaction.transaction as Pain013);
+          break;
+        }
+        case 'pacs.008.001.10': {
+          await this.DbManager.saveTransactionHistoryPacs008(transaction.transaction as Pacs008);
+          break;
+        }
+        case 'pacs.002.001.12': {
+          await this.DbManager.saveTransactionHistoryPacs002(transaction.transaction as Pacs002);
+          break;
+        }
+        default:
+          throw new BadRequestException(`Unsupported transaction type: ${transaction.TxTp}`);
       }
       this.loggerService.log(`Saved transaction history with key: ${key}`, this.log_context);
     } catch (error) {
-      try {
-        this.handleDatabaseError(error, 'save transaction history', {
-          details: `key ${key}, type ${transaction.TxTp}`,
-        });
-      } catch (dbError) {
-        throw new SaveTransactionHistoryError(dbError, key);
-      }
+      this.handleDatabaseError(error, 'save transaction history', {
+        details: `key ${key}, type ${transaction.TxTp}`,
+      });
     }
   }
 
@@ -243,14 +233,11 @@ export class DatabaseOperationsService {
    */
   async addEntity(entityId: string, tenantId: string, CreDtTm: string): Promise<void> {
     try {
-      // PRIMARY: Use centralized logic from frms-coe-lib (single source of truth)
-      if (this.DbManager) {
-        // console.log('Using DbManager to save entity');
-        await this.DbManager.saveEntity(entityId, tenantId, CreDtTm);
-      } else {
-        // ERROR: Database manager not initialized - frms-coe-lib is required
+      if (!this.DbManager) {
         throw new InternalServerErrorException('Database manager not initialized - database operation cannot proceed');
       }
+      await this.DbManager.saveEntity(entityId, tenantId, CreDtTm);
+
       this.loggerService.log(`Added entity: ${entityId} for tenant: ${tenantId} and CreDtTm: ${CreDtTm}`, this.log_context);
     } catch (error) {
       this.handleDatabaseError(error, 'add entity', {
@@ -273,14 +260,11 @@ export class DatabaseOperationsService {
    */
   async addAccountHolder(entityId: string, accountId: string, CreDtTm: string, tenantId: string): Promise<void> {
     try {
-      // PRIMARY: Use centralized logic from frms-coe-lib (single source of truth)
-      if (this.DbManager) {
-        // console.log('Using DbManager to save account holder');
-        await this.DbManager.saveAccountHolder(entityId, accountId, CreDtTm, tenantId);
-      } else {
-        // ERROR: Database manager not initialized - frms-coe-lib is required
+      if (!this.DbManager) {
         throw new InternalServerErrorException('Database manager not initialized - database operation cannot proceed');
       }
+
+      await this.DbManager.saveAccountHolder(entityId, accountId, CreDtTm, tenantId);
       this.loggerService.log(
         `Added account holder: ${entityId} for account: ${accountId} and tenant: ${tenantId} and CreDtTm: ${CreDtTm}`,
         this.log_context,
@@ -327,16 +311,12 @@ export class DatabaseOperationsService {
     }
 
     try {
-      // PRIMARY: Use centralized logic from frms-coe-lib (single source of truth)
-      if (this.DbManager) {
-        await this.DbManager.saveTransactionDetails(transactionDetails);
-      } else {
-        // ERROR: Database manager not initialized - frms-coe-lib is required
-        // console.log('Database manager not initialized - cannot save transaction relationship');
+      if (!this.DbManager) {
         throw new InternalServerErrorException('Database manager not initialized - database operation cannot proceed');
       }
+
+      await this.DbManager.saveTransactionDetails(transactionDetails);
     } catch (error) {
-      // Wrap in typed error before re-throwing
       const relationship = `${transactionDetails.source} -> ${transactionDetails.destination}`;
       try {
         this.handleDatabaseError(error, 'save transaction relationship', {
@@ -383,11 +363,10 @@ export class DatabaseOperationsService {
       );
       this.loggerService.log(`Saved failed record to quarantine with ID: ${quarantineRecord.id}`, this.log_context);
     } catch (error) {
-      // Special handling for quarantine - don't throw on duplicates
       const errorMessage = String(error);
       if (errorMessage.includes('unique constraint')) {
         this.loggerService.warn(`Duplicate quarantine record with correlation ID: ${correlationId}`, this.log_context);
-        return; // Don't throw for quarantine duplicates
+        return;
       }
 
       this.handleDatabaseError(error, 'save to quarantine', {
