@@ -57,28 +57,63 @@ export class DatabaseOperationsService implements OnModuleInit {
    * Initializes the centralized event history database manager from frms-coe-lib
    *
    * This method:
-   * 1. Maps existing environment variables to frms-coe-lib's expected configuration format
+   * 1. Validates and maps environment variables to frms-coe-lib's expected configuration format
    * 2. Creates a DatabaseManager instance with event history capabilities
+   * 3. Enforces explicit configuration by requiring all critical environment variables
    *
+   * @throws {Error} If required environment variables are missing or invalid
    */
   private async initDb(): Promise<void> {
     try {
+      // Validate required environment variables
+      const host = process.env.DB_HOST;
+      if (!host) {
+        throw new Error('DB_HOST environment variable is required');
+      }
+
+      const portStr = process.env.DB_PORT;
+      if (!portStr) {
+        throw new Error('DB_PORT environment variable is required');
+      }
+      const port = parseInt(portStr, 10);
+      if (isNaN(port) || port <= 0 || port > 65535) {
+        throw new Error(`DB_PORT must be a valid port number (1-65535), received: ${portStr}`);
+      }
+
+      const databaseName = process.env.DB_NAME;
+      if (!databaseName) {
+        throw new Error('DB_NAME environment variable is required');
+      }
+
+      const user = process.env.DB_USER;
+      if (!user) {
+        throw new Error('DB_USER environment variable is required');
+      }
+
+      const password = process.env.DB_PASSWORD;
+      if (!password) {
+        throw new Error('DB_PASSWORD environment variable is required');
+      }
+
+      // Certificate path is optional
+      const certPath = process.env.DB_CERT_PATH ?? '';
+
       const eventHistoryConfig: ManagerConfig = {
         eventHistory: {
-          host: process.env.DB_HOST ?? '10.10.80.34',
-          port: parseInt(process.env.DB_PORT ?? '5432'),
-          databaseName: process.env.DB_NAME ?? 'uat',
-          user: process.env.DB_USER ?? 'postgres',
-          password: process.env.DB_PASSWORD ?? 'postgres',
-          certPath: process.env.DB_CERT_PATH ?? '',
+          host,
+          port,
+          databaseName,
+          user,
+          password,
+          certPath,
         },
         rawHistory: {
-          host: process.env.DB_HOST ?? '10.10.80.34',
-          port: parseInt(process.env.DB_PORT ?? '5432'),
-          databaseName: process.env.DB_NAME ?? 'uat',
-          user: process.env.DB_USER ?? 'postgres',
-          password: process.env.DB_PASSWORD ?? 'postgres',
-          certPath: process.env.DB_CERT_PATH ?? '',
+          host,
+          port,
+          databaseName,
+          user,
+          password,
+          certPath,
         },
       };
 
@@ -87,7 +122,10 @@ export class DatabaseOperationsService implements OnModuleInit {
         RawHistoryDB;
       this.loggerService.log('Database manager initialized successfully', this.log_context);
     } catch (error) {
-      this.loggerService.error(`Failed to initialize Database manager: ${String(error)}`, this.log_context);
+      const errorMessage = `Failed to initialize Database manager: ${String(error)}`;
+      this.loggerService.error(errorMessage, this.log_context);
+      // Rethrow to ensure callers are aware of initialization failure
+      throw new Error(errorMessage, { cause: error });
     }
   }
 
