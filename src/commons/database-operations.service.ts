@@ -8,7 +8,7 @@
  * - Primary: Uses centralized database operations from frms-coe-lib
  */
 
-import { Injectable, BadRequestException, InternalServerErrorException, ConflictException } from '@nestjs/common';
+import { Injectable, BadRequestException, InternalServerErrorException, ConflictException, OnModuleInit } from '@nestjs/common';
 // Core frms-coe-lib imports for centralized database management
 import {
   LoggerService,
@@ -27,7 +27,7 @@ import { TransactionDetails, type Pain001, type Pain013, type Pacs008, type Pacs
 import { SaveTransactionRelationshipError } from '../errors/transaction-operation.errors';
 
 @Injectable()
-export class DatabaseOperationsService {
+export class DatabaseOperationsService implements OnModuleInit {
   /**
    * Centralized database manager from frms-coe-lib
    *
@@ -42,7 +42,15 @@ export class DatabaseOperationsService {
     private readonly loggerService: LoggerService,
     private readonly databaseService: DatabaseService,
   ) {
-    this.initDb();
+    // Database initialization moved to onModuleInit to properly handle async initialization
+  }
+
+  /**
+   * NestJS lifecycle method - called after module initialization
+   * Ensures proper async initialization of the database manager
+   */
+  async onModuleInit(): Promise<void> {
+    await this.initDb();
   }
 
   /**
