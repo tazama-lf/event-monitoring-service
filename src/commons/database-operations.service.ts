@@ -376,6 +376,10 @@ export class DatabaseOperationsService implements OnModuleInit {
 
   async saveToQuarantine(payload: any, endpoint: string, differences: string[], tenantId: string, correlationId?: string): Promise<void> {
     try {
+      if (!this.DbManager) {
+        throw new InternalServerErrorException('Database manager not initialized - database operation cannot proceed');
+      }
+
       const quarantineRecord = {
         id: randomUUID(),
         correlation_id: correlationId ?? null,
@@ -393,20 +397,7 @@ export class DatabaseOperationsService implements OnModuleInit {
         status: QuarantineStatus.FAILED,
       };
 
-      await this.databaseService.query(
-        'INSERT INTO dems_quarantine (id, correlation_id, tenant_id, endpoint_path, config_id, version, error, raw_payload, status) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)',
-        [
-          quarantineRecord.id,
-          quarantineRecord.correlation_id,
-          quarantineRecord.tenant_id,
-          quarantineRecord.endpoint_path,
-          quarantineRecord.config_id,
-          quarantineRecord.version,
-          quarantineRecord.error,
-          quarantineRecord.raw_payload,
-          quarantineRecord.status,
-        ],
-      );
+      await this.DbManager.saveToQuarantine(quarantineRecord);
       this.loggerService.log(`Saved failed record to quarantine with ID: ${quarantineRecord.id}`, this.log_context);
     } catch (error) {
       const errorMessage = String(error);
