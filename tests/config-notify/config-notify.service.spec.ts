@@ -1,0 +1,212 @@
+import { Test, TestingModule } from '@nestjs/testing';
+import { ConfigService } from '@nestjs/config';
+import { LoggerService, RedisService } from '@tazama-lf/frms-coe-lib';
+import { ConfigNotifyService } from '../../src/config-notify/config-notify.service';
+import { DatabaseService } from '../../src/database/database.service';
+import { NatsService } from '../../src/nats/nats.service';
+
+describe('ConfigNotifyService', () => {
+  let service: ConfigNotifyService;
+  let mockLogger: jest.Mocked<LoggerService>;
+  let mockRedis: jest.Mocked<RedisService>;
+  let mockDatabaseService: jest.Mocked<DatabaseService>;
+  let mockNatsService: jest.Mocked<NatsService>;
+
+  beforeEach(async () => {
+    mockLogger = {
+      log: jest.fn(),
+      warn: jest.fn(),
+      error: jest.fn(),
+    } as any;
+
+    mockRedis = {
+      setJson: jest.fn(),
+    } as any;
+
+    mockDatabaseService = {
+      query: jest.fn(),
+    } as any;
+
+    mockNatsService = {
+      registerConsumer: jest.fn(),
+    } as any;
+
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        ConfigNotifyService,
+        { provide: LoggerService, useValue: mockLogger },
+        { provide: RedisService, useValue: mockRedis },
+        {
+          provide: ConfigService,
+          useValue: {
+            get: jest.fn((key, defaultValue) => {
+              if (key === 'cache.timeToLive') return 86400;
+              if (key === 'nats.consumerStream') return 'config.notification';
+              if (key === 'PRODUCER_STREAM') return 'dems.notification.response';
+              return defaultValue;
+            }),
+          },
+        },
+        { provide: DatabaseService, useValue: mockDatabaseService },
+        { provide: NatsService, useValue: mockNatsService },
+      ],
+    }).compile();
+
+    service = module.get<ConfigNotifyService>(ConfigNotifyService);
+  });
+
+  it('should be defined', () => {
+    expect(service).toBeDefined();
+  });
+
+  describe('onModuleInit', () => {
+    it('should register consumer and preload cache', async () => {
+      mockDatabaseService.query.mockResolvedValue({
+        rows: [{ endpointPath: '/test', schema: {}, mapping: {}, functions: {}, publishing_status: 'active' }],
+        rowCount: 1,
+        command: 'SELECT',
+        oid: 0,
+        fields: [],
+      });
+
+      await service.onModuleInit();
+
+      expect(mockNatsService.registerConsumer).toHaveBeenCalled();
+      expect(mockRedis.setJson).toHaveBeenCalled();
+      expect(mockLogger.log).toHaveBeenCalledWith('NATS consumer registered for config.notification', 'ConfigNotifyService');
+    });
+
+    it('should throw error on failure', async () => {
+      mockNatsService.registerConsumer.mockRejectedValue(new Error('Connection failed'));
+
+      await expect(service.onModuleInit()).rejects.toThrow('Connection failed');
+    });
+  });
+
+  describe('handleNatsMessage', () => {
+    it('should update cache when config found', async () => {
+      const message = { transactionID: '123' };
+      mockDatabaseService.query.mockResolvedValue({
+        rows: [{ endpointPath: '/test', schema: {}, mapping: {}, functions: {}, publishing_status: 'active' }],
+        rowCount: 1,
+        command: 'SELECT',
+        oid: 0,
+        fields: [],
+      });
+
+      await (service as any).handleNatsMessage(message);
+
+      expect(mockRedis.setJson).toHaveBeenCalled();
+      expect(mockLogger.log).toHaveBeenCalledWith('Updated cache for key: /test --> publishing status: active', 'ConfigNotifyService');
+    });
+
+    it('should log warning when config not found', async () => {
+      const message = { transactionID: '456' };
+      mockDatabaseService.query.mockResolvedValue({
+        rows: [],
+        rowCount: 0,
+        command: 'SELECT',
+        oid: 0,
+        fields: [],
+      });
+
+      await (service as any).handleNatsMessage(message);
+
+      expect(mockLogger.warn).toHaveBeenCalledWith('Config not found for ID: 456', 'ConfigNotifyService');
+    });
+
+    it('should log error for invalid message', async () => {
+      await (service as any).handleNatsMessage(null);
+
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        'Invalid NATS message: expected JSON with non-empty transactionID',
+        'ConfigNotifyService',
+      );
+    });
+
+    it('should log error for missing transactionID', async () => {
+      await (service as any).handleNatsMessage({});
+
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        'Invalid NATS message: expected JSON with non-empty transactionID',
+        'ConfigNotifyService',
+      );
+    });
+
+    it('should log error on database error', async () => {
+      const message = { transactionID: '789' };
+      const dbError = new Error('DB error');
+      mockDatabaseService.query.mockRejectedValue(dbError);
+
+      await (service as any).handleNatsMessage(message);
+
+      expect(mockLogger.error).toHaveBeenCalledWith('Error processing message', dbError, 'ConfigNotifyService');
+    });
+
+    it('should handle string JSON payload', async () => {
+      const stringMessage = JSON.stringify({ transactionID: '999' });
+      mockDatabaseService.query.mockResolvedValue({
+        rows: [{ endpointPath: '/test', schema: {}, mapping: {}, functions: {}, publishing_status: 'active' }],
+        rowCount: 1,
+        command: 'SELECT',
+        oid: 0,
+        fields: [],
+      });
+
+      await (service as any).handleNatsMessage(stringMessage);
+
+      expect(mockRedis.setJson).toHaveBeenCalled();
+      expect(mockLogger.log).toHaveBeenCalledWith('Received NATS message for config id: 999', 'ConfigNotifyService');
+    });
+
+    it('should handle Buffer payload', async () => {
+      const bufferMessage = Buffer.from(JSON.stringify({ transactionID: '888' }), 'utf8');
+      mockDatabaseService.query.mockResolvedValue({
+        rows: [{ endpointPath: '/test', schema: {}, mapping: {}, functions: {}, publishing_status: 'active' }],
+        rowCount: 1,
+        command: 'SELECT',
+        oid: 0,
+        fields: [],
+      });
+
+      await (service as any).handleNatsMessage(bufferMessage);
+
+      expect(mockRedis.setJson).toHaveBeenCalled();
+      expect(mockLogger.log).toHaveBeenCalledWith('Received NATS message for config id: 888', 'ConfigNotifyService');
+    });
+
+    it('should reject invalid JSON string', async () => {
+      await (service as any).handleNatsMessage('invalid json');
+
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        'Invalid NATS message: expected JSON with non-empty transactionID',
+        'ConfigNotifyService',
+      );
+    });
+  });
+
+  describe('setCache', () => {
+    it('should store config in Redis', async () => {
+      const config = {
+        endpointPath: '/test',
+        schema: { type: 'object' },
+        mapping: { field: 'value' },
+        functions: { fn: 'test' },
+        publishing_status: 'active',
+      };
+
+      await service.setCache(config);
+
+      expect(mockRedis.setJson).toHaveBeenCalledWith(
+        '/test',
+        JSON.stringify({
+          schema: { type: 'object' },
+          mapping: { field: 'value' },
+          functions: { fn: 'test' },
+          publishing_status: 'active',
+        }),
+        86400,
+      );
+    });
+  });
+});

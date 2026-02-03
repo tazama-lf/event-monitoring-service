@@ -1,0 +1,53 @@
+services:
+  event-monitoring-service:
+    container_name: event-monitoring-service
+    build:
+      context: .
+      secrets:
+        - gh_token
+    ports:
+      - '3002:3002'
+    environment:
+      - NODE_ENV=development
+    depends_on:
+      - postgres
+      - valkey
+      - nats
+
+  postgres:
+    image: postgres:15-alpine
+    container_name: event-monitoring-postgres
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=tcs
+    ports:
+      - '5432:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/init:/docker-entrypoint-initdb.d
+
+  valkey:
+    image: valkey/valkey:7-alpine
+    container_name: event-monitoring-valkey
+    command: valkey-server --requirepass redis-password
+    ports:
+      - '6379:6379'
+    volumes:
+      - valkey_data:/data
+
+  nats:
+    image: nats:2.10-alpine
+    container_name: event-monitoring-nats
+    ports:
+      - '4222:4222'
+      - '8222:8222'
+    command: ['nats-server', '--jetstream', '--http_port', '8222']
+
+secrets:
+  gh_token:
+    environment: GH_TOKEN
+
+volumes:
+  postgres_data:
+  valkey_data:
