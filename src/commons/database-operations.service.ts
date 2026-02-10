@@ -376,10 +376,6 @@ export class DatabaseOperationsService implements OnModuleInit {
 
   async saveToQuarantine(payload: any, endpoint: string, differences: string[], tenantId: string, correlationId?: string): Promise<void> {
     try {
-      if (!this.DbManager) {
-        throw new InternalServerErrorException('Database manager not initialized - database operation cannot proceed');
-      }
-
       const quarantineRecord = {
         id: randomUUID(),
         correlation_id: correlationId ?? null,
@@ -397,7 +393,26 @@ export class DatabaseOperationsService implements OnModuleInit {
         status: QuarantineStatus.FAILED,
       };
 
-      await this.DbManager.saveToQuarantine(quarantineRecord);
+      // Use DatabaseService directly as saveToQuarantine is not available in frms-coe-lib interfaces
+      const insertQuery = `
+        INSERT INTO quarantine (
+          id, correlation_id, tenant_id, endpoint_path, config_id, version, error, raw_payload, status, created_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())
+        ON CONFLICT (correlation_id) DO NOTHING
+      `;
+
+      await this.databaseService.query(insertQuery, [
+        quarantineRecord.id,
+        quarantineRecord.correlation_id,
+        quarantineRecord.tenant_id,
+        quarantineRecord.endpoint_path,
+        quarantineRecord.config_id,
+        quarantineRecord.version,
+        quarantineRecord.error,
+        quarantineRecord.raw_payload,
+        quarantineRecord.status,
+      ]);
+
       this.loggerService.log(`Saved failed record to quarantine with ID: ${quarantineRecord.id}`, this.log_context);
     } catch (error) {
       const errorMessage = String(error);
