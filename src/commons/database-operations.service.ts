@@ -66,7 +66,7 @@ export class DatabaseOperationsService implements OnModuleInit {
    */
   private async initDb(): Promise<void> {
     try {
-      // Validate required environment variables
+      // Validate required environment variables for main database
       const host = process.env.DB_HOST;
       if (!host) {
         throw new Error('DB_HOST environment variable is required');
@@ -96,8 +96,43 @@ export class DatabaseOperationsService implements OnModuleInit {
         throw new Error('DB_PASSWORD environment variable is required');
       }
 
+      const dynamicHistoryHost = process.env.DYNAMIC_HISTORY_DB_HOST;
+      if (!dynamicHistoryHost) {
+        throw new Error('DYNAMIC_HISTORY_DB_HOST environment variable is required');
+      }
+
+      const dynamicHistoryPortStr = process.env.DYNAMIC_HISTORY_DB_PORT;
+      if (!dynamicHistoryPortStr) {
+        throw new Error('DYNAMIC_HISTORY_DB_PORT environment variable is required');
+      }
+
+      const dynamicHistoryPort = parseInt(dynamicHistoryPortStr, 10);
+      if (isNaN(dynamicHistoryPort) || dynamicHistoryPort <= 0 || dynamicHistoryPort > 65535) {
+        throw new Error(`DYNAMIC_HISTORY_DB_PORT must be a valid port number (1-65535), received: ${dynamicHistoryPortStr}`);
+      }
+
+      const dynamicHistoryDbName = process.env.DYNAMIC_HISTORY_DB_NAME ?? 'dynamic_transactions';
+      if (!dynamicHistoryDbName) {
+        throw new Error('DYNAMIC_HISTORY_DB_NAME environment variable is required');
+      }
+
+      const dynamicHistoryUser = process.env.DYNAMIC_HISTORY_DB_USER ?? user;
+      if (!dynamicHistoryUser) {
+        throw new Error('DYNAMIC_HISTORY_DB_USER environment variable is required');
+      }
+
+      const dynamicHistoryPassword = process.env.DYNAMIC_HISTORY_DB_PASSWORD ?? password;
+      if (!dynamicHistoryPassword) {
+        throw new Error('DYNAMIC_HISTORY_DB_PASSWORD environment variable is required');
+      }
+
       // Certificate path is optional
       const certPath = process.env.DB_CERT_PATH ?? '';
+
+      this.loggerService.log(
+        `Initializing database manager with separate dynamic history database: ${dynamicHistoryDbName} on ${dynamicHistoryHost}:${dynamicHistoryPort}`,
+        this.log_context,
+      );
 
       const eventHistoryConfig: ManagerConfig = {
         eventHistory: {
@@ -109,12 +144,12 @@ export class DatabaseOperationsService implements OnModuleInit {
           certPath,
         },
         rawHistory: {
-          host,
-          port,
-          databaseName,
-          user,
-          password,
-          certPath,
+          host: dynamicHistoryHost,
+          port: dynamicHistoryPort,
+          databaseName: dynamicHistoryDbName,
+          user: dynamicHistoryUser,
+          password: dynamicHistoryPassword,
+          certPath: process.env.DYNAMIC_HISTORY_DB_CERT_PATH ?? '', // Optional certificate path for dynamic history database
         },
       };
 
