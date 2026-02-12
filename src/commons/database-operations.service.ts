@@ -17,6 +17,7 @@ import {
   type RawHistoryDB,
   type DatabaseManagerInstance,
   type ManagerConfig,
+  type trackedFields,
 } from '@tazama-lf/frms-coe-lib';
 import { DatabaseService } from '../database/database.service';
 import { randomUUID } from 'node:crypto';
@@ -232,8 +233,14 @@ export class DatabaseOperationsService implements OnModuleInit {
    *
    * @param transaction - Transaction payload containing transaction data and type
    * @param key - Transaction key for logging purposes
+   * @param trackedFields - Optional tracked fields from mapping processing
    */
-  async saveTransactionHistory(transaction: TazamaPayload, key: string): Promise<void> {
+  async saveTransactionHistory(transaction: TazamaPayload, key: string, trackedFields?: trackedFields): Promise<void> {
+    this.loggerService.log(
+      `Saving transaction history with key: ${key} and tracked fields: ${JSON.stringify(trackedFields)}`,
+      this.log_context,
+    );
+
     try {
       if (!this.DbManager) {
         throw new InternalServerErrorException('Database manager not initialized - database operation cannot proceed');
@@ -257,8 +264,7 @@ export class DatabaseOperationsService implements OnModuleInit {
           break;
         }
         default:
-          await this.DbManager.saveDynamicTransactionHistory(transaction.TxTp, transaction.transaction);
-        // throw new BadRequestException(`Unsupported transaction type: ${transaction.TxTp}`);
+          await this.DbManager.saveDynamicTransactionHistory(transaction.TxTp, transaction.transaction, trackedFields); // need to discuss type issue
       }
       this.loggerService.log(`Saved transaction history with key: ${key}`, this.log_context);
     } catch (error) {

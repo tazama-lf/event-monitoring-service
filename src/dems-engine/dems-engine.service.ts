@@ -26,6 +26,7 @@ import { formatValidationErrors } from '../utils/validation.utils';
 import { buildTazamaPayload, buildErrorResponse } from '../utils/payload-builder.utils';
 import { parseCachedSchema, prepareSchemaForCache } from '../utils/schema-cache.utils';
 import { SaveTransactionHistoryError, NotifyEventDirectorError, TransactionOperationError } from '../errors/transaction-operation.errors';
+import type { trackedFields } from '@tazama-lf/frms-coe-lib';
 
 type FindSchemaAndMappingResult = [any, any, any] | null;
 
@@ -245,7 +246,7 @@ export class DemsEngineService {
     this.loggerService.log(`Completed processing mappings for endpoint: ${endpoint}`, this.LOG_CONTEXT);
     this.loggerService.log(`Transaction Relationship: ${JSON.stringify(transactionRelationship)}`, this.LOG_CONTEXT);
 
-    // Extract tracked fields from transactionRelationship and dataCache after all processing is complete
+    // simple extraction
     trackedFields.CreDtTm = transactionRelationship.CreDtTm;
     trackedFields.MsgId = transactionRelationship.MsgId;
     trackedFields.EndToEndId = transactionRelationship.EndToEndId;
@@ -276,6 +277,7 @@ export class DemsEngineService {
     configuredFunctions: any,
     transactionRelationship: TransactionDetails,
     dynamicMapping: any,
+    trackedFields: trackedFields,
   ): Promise<void> {
     let containsSaveTransactionRelationship = false;
     this.loggerService.log(
@@ -341,7 +343,9 @@ export class DemsEngineService {
         }
 
         if (functionToCall === 'saveTransactionHistory') {
-          // skip saveTransactionHistory here, it will be called separately after transactionRelationship is saved
+          this.loggerService.log(`the tracked fields are ${JSON.stringify(trackedFields)}`, this.LOG_CONTEXT);
+
+          await this.databaseOperationsService[functionToCall](...Object.values(sources), trackedFields);
           continue;
         }
 
@@ -379,10 +383,15 @@ export class DemsEngineService {
    * @param TransactionDetails The transaction relationship data
    */
   @ApmSpan('dems-save-transaction-and-notify')
-  async saveTransactionDataAndNotify(tazamaPayload: TazamaPayload, transactionType: string, endToEndId: string): Promise<void> {
+  async saveTransactionDataAndNotify(
+    tazamaPayload: TazamaPayload,
+    transactionType: string,
+    endToEndId: string,
+    trackedFields?: trackedFields,
+  ): Promise<void> {
     // using Promise.allSettled, instead of promise.all, to execute operations and capture individual results
     const results = await Promise.allSettled([
-      this.databaseOperationsService.saveTransactionHistory(tazamaPayload, `${transactionType}_${endToEndId}`),
+      this.databaseOperationsService.saveTransactionHistory(tazamaPayload, `${transactionType}_${endToEndId}`, trackedFields),
       this.natsService.notifyEventDirector(tazamaPayload),
     ]);
 
@@ -496,6 +505,7 @@ export class DemsEngineService {
           configuredFunctions,
           transactionRelationship,
           dynamicMapping,
+          trackedFields,
         );
       } catch (error) {
         this.loggerService.warn('Building error response: function execution failed', this.LOG_CONTEXT);

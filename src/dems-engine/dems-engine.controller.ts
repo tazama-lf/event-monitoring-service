@@ -65,7 +65,12 @@ export class DemsEngineController {
     }
 
     try {
-      await this.demsEngineService.saveTransactionDataAndNotify(result.tazamaPayload, result.transactionType, result.endToEndId);
+      await this.demsEngineService.saveTransactionDataAndNotify(
+        result.tazamaPayload,
+        result.transactionType,
+        result.endToEndId,
+        result.trackedFields,
+      );
     } catch (error) {
       this.logger.error(`Failed to save transaction data or notify: ${String(error)}`);
       throw new BadRequestException({
