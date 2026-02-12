@@ -26,6 +26,7 @@ import { formatValidationErrors } from '../utils/validation.utils';
 import { buildTazamaPayload, buildErrorResponse } from '../utils/payload-builder.utils';
 import { parseCachedSchema, prepareSchemaForCache } from '../utils/schema-cache.utils';
 import { SaveTransactionHistoryError, NotifyEventDirectorError, TransactionOperationError } from '../errors/transaction-operation.errors';
+
 type FindSchemaAndMappingResult = [any, any, any] | null;
 
 @Injectable()
@@ -137,7 +138,13 @@ export class DemsEngineService {
     payload: any,
     configuredMapping: any,
     endpoint: string,
-  ): Promise<{ dataCache: any; transactionRelationship: TransactionDetails; endToEndId: string; dynamicMapping?: any }> {
+  ): Promise<{
+    dataCache: any;
+    transactionRelationship: TransactionDetails;
+    endToEndId: string;
+    dynamicMapping?: any;
+    trackedFields: ProcessingResult['trackedFields'];
+  }> {
     // static object creation logic
     const dataCache: any = {};
     const transactionRelationship: TransactionDetails = {
@@ -157,6 +164,16 @@ export class DemsEngineService {
 
     const dynamicMapping: any = {};
 
+    // Track specific fields for database storage
+    const trackedFields = {
+      CreDtTm: '' as string,
+      MsgId: '' as string,
+      EndToEndId: '' as string,
+      dbtrAcctId: '' as string,
+      cdtrAcctId: '' as string,
+      TenantId: '' as string,
+    };
+
     let endToEndId = '';
     this.loggerService.log(`Processing mappings for endpoint: ${endpoint}`, this.LOG_CONTEXT);
 
@@ -164,6 +181,8 @@ export class DemsEngineService {
       this.loggerService.log('configuredMapping is: ', JSON.stringify(configuredMapping));
       try {
         for (const mapping of configuredMapping) {
+          const logthis = mapping.destination.split('.')[1];
+          this.loggerService.log(`Processing mapping: ${JSON.stringify(logthis)}`, this.LOG_CONTEXT);
           const sources = mapping.source;
           const separator = mapping.delimiter;
 
@@ -216,6 +235,7 @@ export class DemsEngineService {
           transactionRelationship,
           endToEndId,
           dynamicMapping,
+          trackedFields,
         };
       }
     } else {
@@ -225,11 +245,22 @@ export class DemsEngineService {
     this.loggerService.log(`Completed processing mappings for endpoint: ${endpoint}`, this.LOG_CONTEXT);
     this.loggerService.log(`Transaction Relationship: ${JSON.stringify(transactionRelationship)}`, this.LOG_CONTEXT);
 
+    // Extract tracked fields from transactionRelationship and dataCache after all processing is complete
+    trackedFields.CreDtTm = transactionRelationship.CreDtTm;
+    trackedFields.MsgId = transactionRelationship.MsgId;
+    trackedFields.EndToEndId = transactionRelationship.EndToEndId;
+    trackedFields.dbtrAcctId = dataCache.dbtrAcctId ?? null;
+    trackedFields.cdtrAcctId = dataCache.cdtrAcctId ?? null;
+    trackedFields.TenantId = transactionRelationship.TenantId;
+
+    this.loggerService.log(`Tracked fields: ${JSON.stringify(trackedFields)}`, this.LOG_CONTEXT);
+
     return {
       dataCache,
       transactionRelationship,
       endToEndId,
       dynamicMapping,
+      trackedFields,
     };
   }
 
@@ -256,6 +287,7 @@ export class DemsEngineService {
       for (const row of configuredFunctions) {
         // prepare params (getPayloadByPath) --> and call each function one by one
         const functionToCall = row.functionName;
+        this.loggerService.log(`function to call is : ${functionToCall}`);
         let sources = row.params ?? [];
 
         const ALLOWED_DB_FUNCTIONS = [
@@ -305,6 +337,11 @@ export class DemsEngineService {
 
           // async addDataModelTable(tableName: string, primaryKey: string, data: any)
           await this.databaseOperationsService[functionToCall](tableName, primaryKeyValue, dataValue);
+          continue;
+        }
+
+        if (functionToCall === 'saveTransactionHistory') {
+          // skip saveTransactionHistory here, it will be called separately after transactionRelationship is saved
           continue;
         }
 
@@ -445,10 +482,11 @@ export class DemsEngineService {
 
       // refer to /docs/helpers for example mapping configuration
       const responseFromProcessMappings = await this.processMappings(enhancedRequest, configuredMapping, endpoint);
-      const { dataCache, transactionRelationship, endToEndId, dynamicMapping } = responseFromProcessMappings;
+      const { dataCache, transactionRelationship, endToEndId, dynamicMapping, trackedFields } = responseFromProcessMappings;
       this.loggerService.log('Successfully processed mappings for ED. all ok');
       this.loggerService.log(`transactionRelationship: ${JSON.stringify(transactionRelationship)}`, this.LOG_CONTEXT);
       this.loggerService.log(`dataCache: ${JSON.stringify(dataCache)}`, this.LOG_CONTEXT);
+      this.loggerService.log(`trackedFields: ${JSON.stringify(trackedFields)}`, this.LOG_CONTEXT);
 
       try {
         // refer to /docs/helpers for example functions configuration
@@ -477,6 +515,7 @@ export class DemsEngineService {
         transactionType,
         endToEndId,
         dynamicMapping: responseFromProcessMappings.dynamicMapping,
+        trackedFields,
       };
     } catch (error) {
       this.loggerService.error(`Unexpected error in handleMessage: ${String(error)}`);

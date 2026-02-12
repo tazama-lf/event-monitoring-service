@@ -83,6 +83,7 @@ export class DemsEngineController {
       dynamicMapping: result.dynamicMapping,
       schema: result.configuredSchema,
       payload: result.tazamaPayload,
+      trackedFields: result.trackedFields,
     };
   }
 }

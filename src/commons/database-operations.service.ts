@@ -257,7 +257,8 @@ export class DatabaseOperationsService implements OnModuleInit {
           break;
         }
         default:
-          throw new BadRequestException(`Unsupported transaction type: ${transaction.TxTp}`);
+          await this.DbManager.saveDynamicTransactionHistory(transaction.TxTp, transaction.transaction);
+        // throw new BadRequestException(`Unsupported transaction type: ${transaction.TxTp}`);
       }
       this.loggerService.log(`Saved transaction history with key: ${key}`, this.log_context);
     } catch (error) {

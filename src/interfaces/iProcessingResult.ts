@@ -11,4 +11,12 @@ export interface ProcessingResult {
   dataCache: CacheData;
   transactionType: string;
   endToEndId: string;
+  trackedFields: {
+    CreDtTm: string;
+    MsgId: string;
+    EndToEndId: string;
+    dbtrAcctId: string;
+    cdtrAcctId: string;
+    TenantId: string;
+  };
 }
