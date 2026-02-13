@@ -69,6 +69,14 @@ describe('DemsEngineController', () => {
       publishing_status: 'active',
     },
     publishing_status: 'active',
+    trackedFields: {
+      CreDtTm: '2024-01-01T00:00:00Z',
+      MsgId: 'msg-123',
+      EndToEndId: 'end-to-end-123',
+      dbtrAcctId: 'debtor-account-123',
+      cdtrAcctId: 'creditor-account-123',
+      TenantId: 'test-tenant',
+    },
   };
 
   const mockErrorResult = {
