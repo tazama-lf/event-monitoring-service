@@ -166,13 +166,13 @@ export class DemsEngineService {
     const dynamicMapping: any = {};
 
     // Track specific fields for database storage
-    const trackedFields = {
-      CreDtTm: '' as string,
-      MsgId: '' as string,
-      EndToEndId: '' as string,
-      dbtrAcctId: '' as string,
-      cdtrAcctId: '' as string,
-      TenantId: '' as string,
+    const trackedFields: trackedFields = {
+      CreDtTm: '',
+      MsgId: '',
+      EndToEndId: '',
+      dbtrAcctId: '',
+      cdtrAcctId: '',
+      TenantId: '',
     };
 
     let endToEndId = '';
