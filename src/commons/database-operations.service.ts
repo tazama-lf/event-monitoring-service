@@ -244,14 +244,16 @@ export class DatabaseOperationsService implements OnModuleInit {
    *
    * @param accountId - Unique account identifier
    * @param tenantId - Tenant identifier for multi-tenancy
+   * @param creDtTm - Creation date and time
    */
-  async addAccount(accountId: string, tenantId: string): Promise<void> {
+  async addAccount(accountId: string, tenantId: string, creDtTm: string): Promise<void> {
+    // need to add one more param here for creation date time
     try {
       if (!this.DbManager) {
         throw new InternalServerErrorException('Database manager not initialized - database operation cannot proceed');
       }
 
-      await this.DbManager.saveAccount(accountId, tenantId);
+      await this.DbManager.saveAccount(accountId, tenantId, creDtTm);
       this.loggerService.log(`Added account: ${accountId} for tenant: ${tenantId}`, this.log_context);
     } catch (error) {
       this.handleDatabaseError(error, 'add account', {
@@ -298,8 +300,10 @@ export class DatabaseOperationsService implements OnModuleInit {
           await this.DbManager.saveTransactionHistoryPacs002(transaction.transaction as Pacs002);
           break;
         }
-        default:
+        default: {
+          // console.log(`No specific history method for TxTp ${transaction.TxTp}, falling back to generic save with tracked fields if available`);
           await this.DbManager.saveDynamicTransactionHistory(transaction.TxTp, transaction.transaction, trackedFields); // need to discuss type issue
+        }
       }
       this.loggerService.log(`Saved transaction history with key: ${key}`, this.log_context);
     } catch (error) {
