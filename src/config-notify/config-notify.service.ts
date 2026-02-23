@@ -33,7 +33,7 @@ export class ConfigNotifyService implements OnModuleInit {
       this.loggerService.log(`NATS consumer registered for ${this.consumerStream}`, this.LOG_CONTEXT);
 
       const result = await this.databaseService.query<CacheData>(
-        'SELECT endpoint_path AS "endpointPath", schema, mapping, functions, publishing_status FROM config where publishing_status = \'active\' ',
+        'SELECT endpoint_path AS "endpointPath", schema, mapping, functions, publishing_status FROM tcs_config where publishing_status = \'active\' ',
       );
       const configs = result.rows;
 
@@ -60,7 +60,7 @@ export class ConfigNotifyService implements OnModuleInit {
       this.loggerService.log(`Received NATS message for config id: ${message.transactionID}`, this.LOG_CONTEXT);
 
       const result = await this.databaseService.query<CacheData>(
-        'SELECT endpoint_path AS "endpointPath", schema, mapping, functions, publishing_status FROM config WHERE id = $1',
+        'SELECT endpoint_path AS "endpointPath", schema, mapping, functions, publishing_status FROM tcs_config WHERE id = $1',
         [message.transactionID],
       );
 
