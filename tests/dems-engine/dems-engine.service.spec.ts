@@ -25,8 +25,10 @@ describe('DemsEngineService', () => {
     properties: {
       name: { type: 'string' },
       age: { type: 'number' },
+      FIToFIPmtSts: { type: 'object', additionalProperties: true },
     },
     required: ['name'],
+    additionalProperties: true,
   };
 
   const mockMapping = [
@@ -71,6 +73,7 @@ describe('DemsEngineService', () => {
       saveTransactionHistory: jest.fn(),
       saveTransactionRelationship: jest.fn(),
       saveToQuarantine: jest.fn(),
+      getPacs008ByEndToEndId: jest.fn(),
     } as any;
 
     mockConfigService = {
@@ -123,7 +126,9 @@ describe('DemsEngineService', () => {
     it('should handle cache parsing error and fallback to database', async () => {
       (mockRedisService.getJson as jest.Mock).mockResolvedValue('invalid-json-string');
       mockDatabaseService.query.mockResolvedValue(
-        createMockQueryResult([{ schema: mockSchema, mapping: mockMapping, functions: mockFunctions, publishing_status: 'active' }]),
+        createMockQueryResult([
+          { schema: mockSchema, mapping: mockMapping, functions: mockFunctions, related_transaction: '', publishing_status: 'active' },
+        ]),
       );
 
       const result = await service.findSchemaAndMapping('/test');
@@ -135,7 +140,9 @@ describe('DemsEngineService', () => {
     it('should query database on cache miss', async () => {
       (mockRedisService.getJson as jest.Mock).mockResolvedValue(null);
       mockDatabaseService.query.mockResolvedValue(
-        createMockQueryResult([{ schema: mockSchema, mapping: mockMapping, functions: mockFunctions, publishing_status: 'active' }]),
+        createMockQueryResult([
+          { schema: mockSchema, mapping: mockMapping, functions: mockFunctions, related_transaction: '', publishing_status: 'active' },
+        ]),
       );
 
       const result = await service.findSchemaAndMapping('/test');
@@ -169,12 +176,22 @@ describe('DemsEngineService', () => {
   describe('handleMessage', () => {
     beforeEach(() => {
       mockDatabaseService.query.mockResolvedValue(
-        createMockQueryResult([{ schema: mockSchema, mapping: mockMapping, functions: mockFunctions, publishing_status: 'active' }]),
+        createMockQueryResult([
+          {
+            schema: mockSchema,
+            mapping: mockMapping,
+            functions: mockFunctions,
+            relatedTransaction: null,
+            related_transaction: '',
+            publishing_status: 'active',
+          },
+        ]),
       );
       (mockRedisService.getJson as jest.Mock).mockResolvedValue(null);
       mockDatabaseOperationsService.saveTransactionHistory.mockResolvedValue(undefined);
       mockDatabaseOperationsService.saveTransactionRelationship.mockResolvedValue(undefined);
       mockDatabaseOperationsService.saveToQuarantine.mockResolvedValue(undefined);
+      mockDatabaseOperationsService.getPacs008ByEndToEndId.mockResolvedValue(undefined);
       mockNatsService.notifyEventDirector.mockResolvedValue(undefined);
     });
 
@@ -187,7 +204,16 @@ describe('DemsEngineService', () => {
     });
 
     it('should process valid JSON payload', async () => {
-      const result = await service.handleMessage({ name: 'John', age: 30 }, '/test', 'tenant1', false);
+      const testPayload = {
+        name: 'John',
+        age: 30,
+        FIToFIPmtSts: {
+          TxInfAndSts: {
+            OrgnlEndToEndId: 'test-end-to-end-id',
+          },
+        },
+      };
+      const result = await service.handleMessage(testPayload, '/test', 'tenant1', false);
 
       expect(result).toHaveProperty('success', true);
       expect(result).toHaveProperty('configuredSchema');

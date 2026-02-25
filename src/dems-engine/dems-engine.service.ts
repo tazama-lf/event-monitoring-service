@@ -498,25 +498,27 @@ export class DemsEngineService {
       // we need payload of relatedTransaction for both dataCache and transactionRelationship, so doing transformation once and reusing it in both places
       // console.log('relatedTransaction is : ', relatedTransaction);
 
-      const relatedResult = await this.findSchemaAndMapping(relatedTransaction);
+      const relatedResult = relatedTransaction ? await this.findSchemaAndMapping(relatedTransaction) : null;
       const [, relatedMapping, ,] = relatedResult ?? [];
       // console.log('relatedMapping is : ', relatedMapping);
-      // console.log('enhancedRequest before related transaction mapping is : ', a,c,d);
+      // console.log('enhancedRequest before related transaction mapping is : ', relatedMapping);
 
       // in case of pacs002, the first processMapping will give the DataCache
       // second processMapping will give the transactionRelation and all others
       // so we will have to tell the second processMapping, somehow, that we have already built the dataCache and it needs to only build the transactionRelationship and other details. we can do this by passing a flag or by checking if the dataCache is empty or not. for now, we will check if the dataCache is empty or not.
 
       let relatedTransactionBoolean = false;
-      const relatedPayloadPath = 'FIToFIPmtSts.TxInfAndSts.OrgnlEndToEndId';
-      // console.log('fetching end to end id')
-      const relatedEndToEndId = getValueByPath(enhancedRequest, relatedPayloadPath);
-      // console.log('end to end id is ', relatedEndToEndId)
-      const relatedPayload = await this.databaseOperationsService.getPacs008ByEndToEndId(relatedEndToEndId, tenantId);
+      let relatedPayload: any = null;
 
-      // console.log('related payload is ', relatedPayload)
-
+      // Only process related transaction if we have a related mapping configuration
       if (relatedMapping) {
+        const relatedPayloadPath = 'FIToFIPmtSts.TxInfAndSts.OrgnlEndToEndId';
+        // console.log('fetching end to end id')
+        const relatedEndToEndId = getValueByPath(enhancedRequest, relatedPayloadPath);
+        // console.log('end to end id is ', relatedEndToEndId)
+        relatedPayload = await this.databaseOperationsService.getPacs008ByEndToEndId(relatedEndToEndId, tenantId);
+
+        // console.log('related payload is ', relatedPayload)
         relatedTransactionBoolean = true;
 
         const responseFromRelatedProcessMappings = await this.processMappings(relatedPayload, relatedMapping, relatedTransaction, false);

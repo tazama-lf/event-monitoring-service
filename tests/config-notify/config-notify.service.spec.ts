@@ -192,6 +192,7 @@ describe('ConfigNotifyService', () => {
         schema: { type: 'object' },
         mapping: { field: 'value' },
         functions: { fn: 'test' },
+        related_transaction: '',
         publishing_status: 'active',
       };
 
@@ -203,6 +204,7 @@ describe('ConfigNotifyService', () => {
           schema: { type: 'object' },
           mapping: { field: 'value' },
           functions: { fn: 'test' },
+          related_transaction: '',
           publishing_status: 'active',
         }),
         86400,

@@ -66,6 +66,7 @@ describe('DemsEngineController', () => {
       schema: { type: 'object' },
       mapping: { test: 'mapping' },
       functions: { test: 'function' },
+      related_transaction: '',
       publishing_status: 'active',
     },
     publishing_status: 'active',
