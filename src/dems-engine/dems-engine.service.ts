@@ -28,7 +28,7 @@ import { parseCachedSchema, prepareSchemaForCache } from '../utils/schema-cache.
 import { SaveTransactionHistoryError, NotifyEventDirectorError, TransactionOperationError } from '../errors/transaction-operation.errors';
 import type { trackedFields } from '@tazama-lf/frms-coe-lib';
 
-type FindSchemaAndMappingResult = [any, any, any] | null;
+type FindSchemaAndMappingResult = [any, any, any, any] | null;
 
 @Injectable()
 export class DemsEngineService {
@@ -51,6 +51,7 @@ export class DemsEngineService {
 
   @ApmSpan('dems-find-schema-and-mapping')
   async findSchemaAndMapping(endpoint: string): Promise<FindSchemaAndMappingResult> {
+    // latest change here is: it also fetches relatedTransaction now
     this.loggerService.log(`Looking up schema for endpoint: ${endpoint}`);
 
     const cacheKey = endpoint;
@@ -67,7 +68,7 @@ export class DemsEngineService {
     // not found in cache, query the database
     this.loggerService.log(`Cache miss for endpoint: ${endpoint}. Querying database...`);
     const result = await this.databaseService.query(
-      "SELECT schema, mapping, functions, publishing_status FROM config WHERE endpoint_path = $1 and publishing_status = 'active'",
+      "SELECT schema, mapping, functions, relatedTransaction, publishing_status FROM tcs_config WHERE endpoint_path = $1 and publishing_status = 'active'",
       [endpoint],
     );
     const [record] = result.rows;
@@ -76,7 +77,7 @@ export class DemsEngineService {
       const data = prepareSchemaForCache(record);
       await this.redisService.setJson(cacheKey, JSON.stringify(data), this.timeToLive);
 
-      return [record.schema, record.mapping, record.functions] as [any, any, any];
+      return [record.schema, record.mapping, record.functions, record.relatedTransaction] as [any, any, any, any];
     }
 
     this.loggerService.log(`No schema found for endpoint: ${endpoint}`);
@@ -139,6 +140,7 @@ export class DemsEngineService {
     payload: any,
     configuredMapping: any,
     endpoint: string,
+    relatedTransactionBoolean: boolean, //this line has been added because pacs002 main 2 baar chalega processMApping
   ): Promise<{
     dataCache: any;
     transactionRelationship: TransactionDetails;
@@ -164,6 +166,9 @@ export class DemsEngineService {
     };
 
     const dynamicMapping: any = {};
+    if (relatedTransactionBoolean) {
+      // console.log('relatedTransactionBoolean is : ', relatedTransactionBoolean);
+    }
 
     // Track specific fields for database storage
     const trackedFields: trackedFields = {
@@ -224,6 +229,7 @@ export class DemsEngineService {
             mapping,
             dataCache,
             transactionRelationship,
+            relatedTransactionBoolean,
           );
           if (postProcessingEndToEndId) {
             endToEndId = postProcessingEndToEndId;
@@ -443,7 +449,7 @@ export class DemsEngineService {
         return buildErrorResponse('Schema not found for the specified endpoint', ['No schema exists for this endpoint']);
       }
 
-      const [configuredSchema, configuredMapping, configuredFunctions] = result;
+      const [configuredSchema, configuredMapping, configuredFunctions, relatedTransaction] = result;
 
       if (isPayloadXml) {
         const { stringFields, arrayFields } = returnArrayFieldsFromSchema(configuredSchema);
@@ -489,9 +495,45 @@ export class DemsEngineService {
       // this is required as per event-director payload structure
       const enhancedRequest = { ...payload, TenantId: tenantId, TxTp: transactionType };
 
+      // we need payload of relatedTransaction for both dataCache and transactionRelationship, so doing transformation once and reusing it in both places
+      // console.log('relatedTransaction is : ', relatedTransaction);
+
+      const relatedResult = await this.findSchemaAndMapping(relatedTransaction);
+      const [, relatedMapping, ,] = relatedResult ?? [];
+      // console.log('relatedMapping is : ', relatedMapping);
+      // console.log('enhancedRequest before related transaction mapping is : ', a,c,d);
+
+      // in case of pacs002, the first processMapping will give the DataCache
+      // second processMapping will give the transactionRelation and all others
+      // so we will have to tell the second processMapping, somehow, that we have already built the dataCache and it needs to only build the transactionRelationship and other details. we can do this by passing a flag or by checking if the dataCache is empty or not. for now, we will check if the dataCache is empty or not.
+
+      let relatedTransactionBoolean = false;
+      const relatedPayloadPath = 'FIToFIPmtSts.TxInfAndSts.OrgnlEndToEndId';
+      // console.log('fetching end to end id')
+      const relatedEndToEndId = getValueByPath(enhancedRequest, relatedPayloadPath);
+      // console.log('end to end id is ', relatedEndToEndId)
+      const relatedPayload = await this.databaseOperationsService.getPacs008ByEndToEndId(relatedEndToEndId, tenantId);
+
+      // console.log('related payload is ', relatedPayload)
+
+      if (relatedMapping) {
+        relatedTransactionBoolean = true;
+
+        const responseFromRelatedProcessMappings = await this.processMappings(relatedPayload, relatedMapping, relatedTransaction, false);
+
+        enhancedRequest.dataCache = { ...enhancedRequest.dataCache, ...responseFromRelatedProcessMappings.dataCache };
+        // console.log('enhancedRequest after related transaction mapping is : ', enhancedRequest);
+      }
+
       // refer to /docs/helpers for example mapping configuration
-      const responseFromProcessMappings = await this.processMappings(enhancedRequest, configuredMapping, endpoint);
+      const responseFromProcessMappings = await this.processMappings(
+        enhancedRequest,
+        configuredMapping,
+        endpoint,
+        relatedTransactionBoolean,
+      );
       const { dataCache, transactionRelationship, endToEndId, dynamicMapping, trackedFields } = responseFromProcessMappings;
+
       this.loggerService.log('Successfully processed mappings for ED. all ok');
       this.loggerService.log(`transactionRelationship: ${JSON.stringify(transactionRelationship)}`, this.LOG_CONTEXT);
       this.loggerService.log(`dataCache: ${JSON.stringify(dataCache)}`, this.LOG_CONTEXT);
@@ -513,7 +555,12 @@ export class DemsEngineService {
       }
 
       this.loggerService.log(`Building Tazama payload for transaction type: ${transactionType}, tenant: ${tenantId}`, this.LOG_CONTEXT);
-      const tazamaPayload = buildTazamaPayload(enhancedRequest, transactionType, dataCache);
+      let tazamaPayload;
+      if (relatedMapping) {
+        tazamaPayload = buildTazamaPayload(enhancedRequest, transactionType, enhancedRequest.dataCache);
+      } else {
+        tazamaPayload = buildTazamaPayload(enhancedRequest, transactionType, dataCache);
+      }
       this.loggerService.log('Successfully built Tazama payload for ED. all ok');
 
       return {
@@ -521,7 +568,7 @@ export class DemsEngineService {
         configuredSchema,
         tazamaPayload,
         transactionRelationship,
-        dataCache,
+        dataCache: relatedTransactionBoolean ? enhancedRequest.dataCache : dataCache,
         transactionType,
         endToEndId,
         dynamicMapping: responseFromProcessMappings.dynamicMapping,

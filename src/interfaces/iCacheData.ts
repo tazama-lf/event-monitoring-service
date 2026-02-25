@@ -3,6 +3,7 @@ interface CacheData {
   schema: object;
   mapping: object;
   functions: object;
+  related_transaction: string;
   publishing_status: string;
 }
 export type { CacheData };

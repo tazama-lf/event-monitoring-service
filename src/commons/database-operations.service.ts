@@ -313,6 +313,19 @@ export class DatabaseOperationsService implements OnModuleInit {
     }
   }
 
+  async getPacs008ByEndToEndId(endToEndId: string, tenantId: string): Promise<Pacs008 | undefined> {
+    try {
+      if (!this.DbManager) {
+        throw new InternalServerErrorException('Database manager not initialized - database operation cannot proceed');
+      }
+      return await this.DbManager.getTransactionPacs008(endToEndId, tenantId);
+    } catch (error) {
+      this.handleDatabaseError(error, 'fetch pacs.008 by EndToEndId', {
+        details: `EndToEndId ${endToEndId} for tenant ${tenantId}`,
+      });
+    }
+  }
+
   /**
    * Adds an entity record using single source of truth pattern
    *
