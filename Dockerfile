@@ -1,4 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
+
 ARG BUILD_IMAGE=node:20-bullseye
 ARG RUN_IMAGE=gcr.io/distroless/nodejs20-debian11:nonroot
 
@@ -11,34 +12,27 @@ COPY ./src ./src
 COPY ./package*.json ./
 COPY ./tsconfig.json ./
 COPY .npmrc ./
-COPY public-key.pem ./
+ARG GH_TOKEN
 
 RUN npm ci --ignore-scripts
-
-# Build the project
 RUN npm run build
 
 FROM ${BUILD_IMAGE} AS dep-resolver
 LABEL stage=pre-prod
 # To filter out dev dependencies from final build
 
-WORKDIR /home/app
 COPY package*.json ./
 COPY .npmrc ./
-
-# Install only production dependencies
+ARG GH_TOKEN
 RUN npm ci --omit=dev --ignore-scripts
 
 FROM ${RUN_IMAGE} AS run-env
 USER nonroot
 
 WORKDIR /home/app
-# Copy node_modules from dep-resolver stage
-COPY --from=dep-resolver /home/app/node_modules ./node_modules
-# Copy dist from builder stage
-COPY --from=builder /home/app/dist ./dist
+COPY --from=dep-resolver /node_modules ./node_modules
+COPY --from=builder /home/app/dist ./build
 COPY package.json ./
-COPY public-key.pem ./
 
 # Turn down the verbosity to default level.
 ENV NPM_CONFIG_LOGLEVEL warn
@@ -101,4 +95,4 @@ ENV STDOUT=true
 ENV ELASTIC=true
 
 # Execute application
-CMD ["dist/main.js"]
+CMD ["build/main.js"]
