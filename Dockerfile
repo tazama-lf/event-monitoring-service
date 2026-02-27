@@ -13,26 +13,29 @@ COPY ./tsconfig.json ./
 COPY .npmrc ./
 COPY public-key.pem ./
 
-RUN --mount=type=secret,id=gh_token \
-    GH_TOKEN=$(cat /run/secrets/gh_token) \
-    npm ci --ignore-scripts
+RUN npm ci --ignore-scripts
+
+# Build the project
 RUN npm run build
 
 FROM ${BUILD_IMAGE} AS dep-resolver
 LABEL stage=pre-prod
 # To filter out dev dependencies from final build
 
+WORKDIR /home/app
 COPY package*.json ./
 COPY .npmrc ./
-RUN --mount=type=secret,id=gh_token \
-    GH_TOKEN=$(cat /run/secrets/gh_token) \
-    npm ci --omit=dev --ignore-scripts
+
+# Install only production dependencies
+RUN npm ci --omit=dev --ignore-scripts
 
 FROM ${RUN_IMAGE} AS run-env
 USER nonroot
 
 WORKDIR /home/app
-COPY --from=dep-resolver /node_modules ./node_modules
+# Copy node_modules from dep-resolver stage
+COPY --from=dep-resolver /home/app/node_modules ./node_modules
+# Copy dist from builder stage
 COPY --from=builder /home/app/dist ./dist
 COPY package.json ./
 COPY public-key.pem ./
@@ -40,13 +43,13 @@ COPY public-key.pem ./
 # Turn down the verbosity to default level.
 ENV NPM_CONFIG_LOGLEVEL warn
 
-# Service Based variables
+# Service-Based variables (replace with secure methods at runtime)
 ENV FUNCTION_NAME=event-monitoring-service
 ENV NODE_ENV=production
 ENV MAX_CPU=
 ENV APP_PORT=3002
 
-# Database Configuration
+# Database Configuration (replace with secure methods at runtime)
 ENV CONFIGURATION_DATABASE_URL=
 ENV DB_HOST=
 ENV DB_PORT=
@@ -56,7 +59,7 @@ ENV DB_NAME=
 ENV DB_MIN_CONNECTIONS=8
 ENV DB_MAX_CONNECTIONS=500
 
-# Redis Configuration
+# Redis Configuration (replace with secure methods at runtime)
 ENV REDIS_HOST=
 ENV REDIS_PORT=6379
 ENV REDIS_PASSWORD=
