@@ -512,19 +512,22 @@ export class DemsEngineService {
 
       // Only process related transaction if we have a related mapping configuration
       if (relatedMapping) {
+        this.loggerService.log('Processing related transaction mapping for related transaction: ', relatedTransaction);
         const relatedPayloadPath = 'FIToFIPmtSts.TxInfAndSts.OrgnlEndToEndId'; //transactionDetails.endtoendit traverse
         // console.log('fetching end to end id')
         const relatedEndToEndId = getValueByPath(enhancedRequest, relatedPayloadPath);
         // console.log('end to end id is ', relatedEndToEndId)
         relatedPayload = await this.databaseOperationsService.getPacs008ByEndToEndId(relatedEndToEndId, tenantId);
+        this.loggerService.log('Related payload fetched from database: ', relatedPayload);
 
         // console.log('related payload is ', relatedPayload)
         relatedTransactionBoolean = true;
 
         const responseFromRelatedProcessMappings = await this.processMappings(relatedPayload, relatedMapping, relatedTransaction, false);
+        this.loggerService.log('before merging related transaction mapping, enhancedRequest is : ', enhancedRequest);
 
         enhancedRequest.dataCache = { ...enhancedRequest.dataCache, ...responseFromRelatedProcessMappings.dataCache };
-        // console.log('enhancedRequest after related transaction mapping is : ', enhancedRequest);
+        this.loggerService.log('enhancedRequest after merging related transaction mapping is : ', enhancedRequest);
       }
 
       // refer to /docs/helpers for example mapping configuration
