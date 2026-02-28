@@ -451,6 +451,9 @@ export class DemsEngineService {
 
       const [configuredSchema, configuredMapping, configuredFunctions, relatedTransaction] = result;
 
+      this.loggerService.log(`Schema and mapping retrieved for endpoint: ${endpoint}`, this.LOG_CONTEXT);
+      this.loggerService.log(`Related transaction: ${JSON.stringify(relatedTransaction)}`, this.LOG_CONTEXT);
+
       if (isPayloadXml) {
         const { stringFields, arrayFields } = returnArrayFieldsFromSchema(configuredSchema);
 
