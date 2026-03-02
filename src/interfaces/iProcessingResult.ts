@@ -8,7 +8,7 @@ export interface ProcessingResult {
   tazamaPayload: TazamaPayload;
   dynamicMapping?: any;
   transactionRelationship: TransactionDetails;
-  dataCache: CacheData;
+  DataCache: CacheData;
   transactionType: string;
   endToEndId: string;
   trackedFields: trackedFields;

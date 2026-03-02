@@ -576,7 +576,7 @@ export class DemsEngineService {
         configuredSchema,
         tazamaPayload,
         transactionRelationship,
-        dataCache: relatedTransactionBoolean ? enhancedRequest.dataCache : dataCache,
+        DataCache: relatedTransactionBoolean ? enhancedRequest.dataCache : dataCache,
         transactionType,
         endToEndId,
         dynamicMapping: responseFromProcessMappings.dynamicMapping,
