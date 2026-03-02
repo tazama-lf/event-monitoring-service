@@ -88,6 +88,8 @@ export class DemsEngineController {
 
     this.logger.log('Dynamic Mapping in Controller: ', result.dynamicMapping);
 
+    // console.log('Configured Schema in Controller: ', result);
+
     return {
       message: 'Everything is OK!',
       isMatch: true,
