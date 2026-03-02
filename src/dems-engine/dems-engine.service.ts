@@ -529,7 +529,7 @@ export class DemsEngineService {
         const responseFromRelatedProcessMappings = await this.processMappings(relatedPayload, relatedMapping, relatedTransaction, false);
         this.loggerService.log('before merging related transaction mapping, enhancedRequest is : ', enhancedRequest);
 
-        enhancedRequest.dataCache = { ...enhancedRequest.dataCache, ...responseFromRelatedProcessMappings.dataCache };
+        enhancedRequest.DataCache = { ...enhancedRequest.DataCache, ...responseFromRelatedProcessMappings.dataCache };
         this.loggerService.log('enhancedRequest after merging related transaction mapping is : ', enhancedRequest);
       }
 
@@ -565,7 +565,7 @@ export class DemsEngineService {
       this.loggerService.log(`Building Tazama payload for transaction type: ${transactionType}, tenant: ${tenantId}`, this.LOG_CONTEXT);
       let tazamaPayload;
       if (relatedMapping) {
-        tazamaPayload = buildTazamaPayload(enhancedRequest, transactionType, enhancedRequest.dataCache);
+        tazamaPayload = buildTazamaPayload(enhancedRequest, transactionType, enhancedRequest.DataCache);
       } else {
         tazamaPayload = buildTazamaPayload(enhancedRequest, transactionType, dataCache);
       }
@@ -576,7 +576,7 @@ export class DemsEngineService {
         configuredSchema,
         tazamaPayload,
         transactionRelationship,
-        DataCache: relatedTransactionBoolean ? enhancedRequest.dataCache : dataCache,
+        DataCache: relatedTransactionBoolean ? enhancedRequest.DataCache : dataCache,
         transactionType,
         endToEndId,
         dynamicMapping: responseFromProcessMappings.dynamicMapping,
