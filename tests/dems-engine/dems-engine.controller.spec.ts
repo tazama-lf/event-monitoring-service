@@ -61,7 +61,7 @@ describe('DemsEngineController', () => {
       CreDtTm: '2024-01-01T00:00:00Z',
       EndToEndId: 'end-to-end-123',
     },
-    dataCache: {
+    DataCache: {
       endpointPath: '/test/endpoint/path',
       schema: { type: 'object' },
       mapping: { test: 'mapping' },

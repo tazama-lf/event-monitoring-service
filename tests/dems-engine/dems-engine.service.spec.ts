@@ -218,7 +218,7 @@ describe('DemsEngineService', () => {
       expect(result).toHaveProperty('success', true);
       expect(result).toHaveProperty('configuredSchema');
       expect(result).toHaveProperty('tazamaPayload');
-      expect(result).toHaveProperty('dataCache');
+      expect(result).toHaveProperty('DataCache');
     });
 
     it('should return error for invalid payload', async () => {
@@ -354,7 +354,7 @@ describe('DemsEngineService', () => {
 
       // Should still succeed even with missing fields
       expect(result).toHaveProperty('success', true);
-      expect(result).toHaveProperty('dataCache');
+      expect(result).toHaveProperty('DataCache');
     });
 
     it('should handle database errors', async () => {
