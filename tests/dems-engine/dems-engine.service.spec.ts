@@ -134,7 +134,7 @@ describe('DemsEngineService', () => {
       const result = await service.findSchemaAndMapping('/test');
 
       expect(mockLoggerService.error).toHaveBeenCalledWith(expect.stringContaining('Failed to parse cached schema'));
-      expect(result).toEqual([mockSchema, mockMapping, mockFunctions]);
+      expect(result).toEqual([mockSchema, mockMapping, mockFunctions, '']);
     });
 
     it('should query database on cache miss', async () => {
@@ -147,7 +147,7 @@ describe('DemsEngineService', () => {
 
       const result = await service.findSchemaAndMapping('/test');
 
-      expect(result).toEqual([mockSchema, mockMapping, mockFunctions]);
+      expect(result).toEqual([mockSchema, mockMapping, mockFunctions, '']);
       expect(mockRedisService.setJson).toHaveBeenCalledWith(
         '/test',
         JSON.stringify({ schema: mockSchema, mapping: mockMapping, functions: mockFunctions, publishing_status: 'active' }),
