@@ -77,7 +77,7 @@ export class DemsEngineService {
       const data = prepareSchemaForCache(record);
       await this.redisService.setJson(cacheKey, JSON.stringify(data), this.timeToLive);
 
-      return [record.schema, record.mapping, record.functions, record.relatedTransaction] as [any, any, any, any];
+      return [record.schema, record.mapping, record.functions, record.related_transaction] as [any, any, any, any];
     }
 
     this.loggerService.log(`No schema found for endpoint: ${endpoint}`);
