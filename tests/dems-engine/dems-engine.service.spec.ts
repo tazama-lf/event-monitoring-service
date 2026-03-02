@@ -626,7 +626,7 @@ describe('DemsEngineService', () => {
     const mockTazamaPayload = {
       transaction: { name: 'John', age: 30 },
       TxTp: 'pacs.002',
-      dataCache: { userName: 'John' },
+      DataCache: { userName: 'John' },
     };
 
     beforeEach(() => {
@@ -682,7 +682,7 @@ describe('DemsEngineService', () => {
   });
 
   describe('saveTransactionDataAndNotify', () => {
-    const testPayload = { transaction: { test: 'data' }, TxTp: 'test.type', dataCache: {} };
+    const testPayload = { transaction: { test: 'data' }, TxTp: 'test.type', DataCache: {} };
 
     it('should save and notify successfully', async () => {
       mockDatabaseOperationsService.saveTransactionHistory.mockResolvedValue(undefined);

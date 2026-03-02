@@ -50,7 +50,7 @@ describe('DemsEngineController', () => {
     tazamaPayload: {
       transaction: { name: 'John' },
       TxTp: 'test.transaction',
-      dataCache: { cached: 'data' },
+      DataCache: { cached: 'data' },
     },
     transactionRelationship: {
       source: 'test-source',
