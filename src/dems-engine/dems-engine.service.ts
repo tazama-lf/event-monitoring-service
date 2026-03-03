@@ -28,6 +28,14 @@ import { parseCachedSchema, prepareSchemaForCache } from '../utils/schema-cache.
 import { SaveTransactionHistoryError, NotifyEventDirectorError, TransactionOperationError } from '../errors/transaction-operation.errors';
 import type { trackedFields } from '@tazama-lf/frms-coe-lib';
 
+interface Mapping {
+  source: string[] | string;
+  delimiter?: string;
+  destination: string | string[];
+  transformation?: string;
+  type?: string;
+}
+
 type FindSchemaAndMappingResult = [any, any, any, any] | null;
 
 @Injectable()
@@ -184,11 +192,8 @@ export class DemsEngineService {
     this.loggerService.log(`Processing mappings for endpoint: ${endpoint}`, this.LOG_CONTEXT);
 
     if (configuredMapping) {
-      this.loggerService.log('configuredMapping is: ', JSON.stringify(configuredMapping));
       try {
         for (const mapping of configuredMapping) {
-          const logthis = mapping.destination.split('.')[1];
-          this.loggerService.log(`Processing mapping: ${JSON.stringify(logthis)}`, this.LOG_CONTEXT);
           const sources = mapping.source;
           const separator = mapping.delimiter;
 
@@ -515,22 +520,28 @@ export class DemsEngineService {
 
       // Only process related transaction if we have a related mapping configuration
       if (relatedMapping) {
-        this.loggerService.log('Processing related transaction mapping for related transaction: ', relatedTransaction);
-        const relatedPayloadPath = 'FIToFIPmtSts.TxInfAndSts.OrgnlEndToEndId'; //transactionDetails.endtoendit traverse
-        // console.log('fetching end to end id')
+        this.loggerService.log('Processing related transaction mapping for related transaction: ', relatedTransaction, this.LOG_CONTEXT);
+
+        // finding the end to end id
+        const endToEndMapping = configuredMapping.find((mapping: Mapping) => mapping.destination === 'transactionDetails.EndToEndId');
+        const relatedPayloadPath = Array.isArray(endToEndMapping?.source) ? endToEndMapping?.source[0] : endToEndMapping?.source;
+
+        this.loggerService.log('relatedPayloadPath is : ', relatedPayloadPath);
+
+        // We need to validate the related transaction payload against its schema before processing the mapping, to ensure data integrity
+
         const relatedEndToEndId = getValueByPath(enhancedRequest, relatedPayloadPath);
-        // console.log('end to end id is ', relatedEndToEndId)
+
         relatedPayload = await this.databaseOperationsService.getPacs008ByEndToEndId(relatedEndToEndId, tenantId);
-        this.loggerService.log('Related payload fetched from database: ', relatedPayload);
 
         // console.log('related payload is ', relatedPayload)
         relatedTransactionBoolean = true;
 
         const responseFromRelatedProcessMappings = await this.processMappings(relatedPayload, relatedMapping, relatedTransaction, false);
-        this.loggerService.log('before merging related transaction mapping, enhancedRequest is : ', enhancedRequest);
 
         enhancedRequest.DataCache = { ...enhancedRequest.DataCache, ...responseFromRelatedProcessMappings.dataCache };
-        this.loggerService.log('enhancedRequest after merging related transaction mapping is : ', enhancedRequest);
+      } else {
+        this.loggerService.log('No related transaction mapping found, skipping related transaction processing', this.LOG_CONTEXT);
       }
 
       // refer to /docs/helpers for example mapping configuration
