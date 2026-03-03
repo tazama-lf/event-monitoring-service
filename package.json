@@ -32,7 +32,7 @@
     "@nestjs/platform-express": "^11.0.1",
     "@nestjs/schedule": "^6.0.1",
     "@tazama-lf/auth-lib": "2.2.0-rc.1",
-    "@tazama-lf/frms-coe-lib": "7.0.0-rc.3ar",
+    "@tazama-lf/frms-coe-lib": "7.0.0-rc.6ar",
     "@tazama-lf/frms-coe-startup-lib": "3.0.0-rc.1",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/xml2js": "^0.4.14",
