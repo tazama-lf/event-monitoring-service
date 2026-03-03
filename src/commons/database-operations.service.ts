@@ -326,6 +326,19 @@ export class DatabaseOperationsService implements OnModuleInit {
     }
   }
 
+  async getTransaction(endToEndId: string, tenantId: string, tableName: string): Promise<Record<string, unknown> | undefined> {
+    try {
+      if (!this.DbManager) {
+        throw new InternalServerErrorException('Database manager not initialized - database operation cannot proceed');
+      }
+      return await this.DbManager.getTransactionAny(endToEndId, tenantId, tableName);
+    } catch (error) {
+      this.handleDatabaseError(error, 'fetch transaction by EndToEndId', {
+        details: `EndToEndId ${endToEndId} for tenant ${tenantId} from table ${tableName}`,
+      });
+    }
+  }
+
   /**
    * Adds an entity record using single source of truth pattern
    *

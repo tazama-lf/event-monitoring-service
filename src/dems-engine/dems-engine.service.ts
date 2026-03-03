@@ -532,7 +532,8 @@ export class DemsEngineService {
 
         const relatedEndToEndId = getValueByPath(enhancedRequest, relatedPayloadPath);
 
-        relatedPayload = await this.databaseOperationsService.getPacs008ByEndToEndId(relatedEndToEndId, tenantId);
+        const tableName = relatedTransaction.split('/')[4].split('.')[0] + relatedTransaction.split('/')[4].split('.')[1];
+        relatedPayload = await this.databaseOperationsService.getTransaction(relatedEndToEndId, tenantId, tableName);
 
         // console.log('related payload is ', relatedPayload)
         relatedTransactionBoolean = true;
