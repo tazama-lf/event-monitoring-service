@@ -48,6 +48,7 @@ export function prepareSchemaForCache(record: any): SchemaData {
     schema: record.schema,
     mapping: record.mapping,
     functions: record.functions,
+    related_transaction: record.related_transaction,
     publishing_status: record.publishing_status,
   };
 }

@@ -150,7 +150,13 @@ describe('DemsEngineService', () => {
       expect(result).toEqual([mockSchema, mockMapping, mockFunctions, '']);
       expect(mockRedisService.setJson).toHaveBeenCalledWith(
         '/test',
-        JSON.stringify({ schema: mockSchema, mapping: mockMapping, functions: mockFunctions, publishing_status: 'active' }),
+        JSON.stringify({
+          schema: mockSchema,
+          mapping: mockMapping,
+          functions: mockFunctions,
+          related_transaction: '',
+          publishing_status: 'active',
+        }),
         3600,
       );
     });
