@@ -17,6 +17,22 @@ export async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule);
   const configService = app.get(ConfigService);
 
+  // Enable CORS for frontend communication
+  app.enableCors({
+    origin: [
+      'http://localhost:3000',
+      'http://localhost:3001',
+      'http://localhost:5173',
+      'http://localhost:5174',
+      'http://localhost:8080',
+      'http://10.10.80.37:5174',
+      'http://10.10.80.37:5175',
+    ],
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
+    credentials: true,
+  });
+
   // Initialize APM interceptor for global transaction monitoring
   const apmService = app.get(ApmService);
   app.useGlobalInterceptors(new ApmInterceptor(apmService));
