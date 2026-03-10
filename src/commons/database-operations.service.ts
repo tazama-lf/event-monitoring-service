@@ -446,7 +446,14 @@ export class DatabaseOperationsService implements OnModuleInit {
     }
   }
 
-  async saveToQuarantine(payload: any, endpoint: string, differences: string[], tenantId: string, correlationId?: string): Promise<void> {
+  async saveToQuarantine(
+    payload: any,
+    endpoint: string,
+    differences: string[],
+    tenantId: string,
+    creDtTm: string,
+    correlationId?: string,
+  ): Promise<void> {
     try {
       const quarantineRecord = {
         id: randomUUID(),
@@ -459,31 +466,17 @@ export class DatabaseOperationsService implements OnModuleInit {
           code: 'VALIDATION_ERROR',
           message: 'Payload validation failed',
           differences,
-          timestamp: new Date().toISOString(),
+          timestamp: creDtTm,
         }),
         raw_payload: JSON.stringify(payload),
         status: QuarantineStatus.FAILED,
       };
 
-      // Use DatabaseService directly as saveToQuarantine is not available in frms-coe-lib interfaces
-      const insertQuery = `
-        INSERT INTO quarantine (
-          id, correlation_id, tenant_id, endpoint_path, config_id, version, error, raw_payload, status, created_at
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())
-        ON CONFLICT (correlation_id) DO NOTHING
-      `;
+      if (!this.DbManager) {
+        throw new InternalServerErrorException('Database manager not initialized - database operation cannot proceed');
+      }
 
-      await this.databaseService.query(insertQuery, [
-        quarantineRecord.id,
-        quarantineRecord.correlation_id,
-        quarantineRecord.tenant_id,
-        quarantineRecord.endpoint_path,
-        quarantineRecord.config_id,
-        quarantineRecord.version,
-        quarantineRecord.error,
-        quarantineRecord.raw_payload,
-        quarantineRecord.status,
-      ]);
+      await this.DbManager.saveToQuarantine(quarantineRecord);
 
       this.loggerService.log(`Saved failed record to quarantine with ID: ${quarantineRecord.id}`, this.log_context);
     } catch (error) {
