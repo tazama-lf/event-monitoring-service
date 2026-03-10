@@ -135,7 +135,7 @@ export class DatabaseOperationsService implements OnModuleInit {
       );
 
       const eventHistoryConfig: ManagerConfig = {
-        eventHistory: {
+        configuration: {
           host,
           port,
           databaseName,
@@ -150,6 +150,14 @@ export class DatabaseOperationsService implements OnModuleInit {
           user: dynamicHistoryUser,
           password: dynamicHistoryPassword,
           certPath: process.env.DYNAMIC_HISTORY_DB_CERT_PATH ?? '', // Optional certificate path for dynamic history database
+        },
+        eventHistory: {
+          host: process.env.EVENT_HISTORY_DB_HOST ?? host,
+          port: parseInt(process.env.EVENT_HISTORY_DB_PORT ?? portStr, 10),
+          databaseName: process.env.EVENT_HISTORY_DB_NAME ?? databaseName,
+          user: process.env.EVENT_HISTORY_DB_USER ?? user,
+          password: process.env.EVENT_HISTORY_DB_PASSWORD ?? password,
+          certPath: process.env.EVENT_HISTORY_DB_CERT_PATH ?? '', // Optional certificate path for event history database
         },
       };
 
