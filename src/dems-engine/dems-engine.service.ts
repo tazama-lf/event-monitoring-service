@@ -162,7 +162,7 @@ export class DemsEngineService {
       source: '',
       destination: '',
       TxTp: '',
-      TenantId: '',
+      TenantId: payload.TenantId ?? '',
       MsgId: '',
       CreDtTm: '',
       Amt: 0,
