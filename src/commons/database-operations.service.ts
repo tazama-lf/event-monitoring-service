@@ -17,7 +17,7 @@ import {
   type RawHistoryDB,
   type DatabaseManagerInstance,
   type ManagerConfig,
-  type trackedFields,
+  type TrackedFields,
 } from '@tazama-lf/frms-coe-lib';
 import { DatabaseService } from '../database/database.service';
 import { randomUUID } from 'node:crypto';
@@ -280,7 +280,7 @@ export class DatabaseOperationsService implements OnModuleInit {
    * @param key - Transaction key for logging purposes
    * @param trackedFields - Optional tracked fields from mapping processing
    */
-  async saveTransactionHistory(transaction: TazamaPayload, key: string, trackedFields?: trackedFields): Promise<void> {
+  async saveTransactionHistory(transaction: TazamaPayload, key: string, trackedFields?: TrackedFields): Promise<void> {
     this.loggerService.log(
       `Saving transaction history with key: ${key} and tracked fields: ${JSON.stringify(trackedFields)}`,
       this.log_context,

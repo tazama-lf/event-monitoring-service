@@ -26,7 +26,7 @@ import { formatValidationErrors } from '../utils/validation.utils';
 import { buildTazamaPayload, buildErrorResponse } from '../utils/payload-builder.utils';
 import { parseCachedSchema, prepareSchemaForCache } from '../utils/schema-cache.utils';
 import { SaveTransactionHistoryError, NotifyEventDirectorError, TransactionOperationError } from '../errors/transaction-operation.errors';
-import type { trackedFields } from '@tazama-lf/frms-coe-lib';
+import type { TrackedFields } from '@tazama-lf/frms-coe-lib';
 import { processRelatedTransactionMapping } from '../utils/related-transaction.utils';
 
 type FindSchemaAndMappingResult = [any, any, any, any] | null;
@@ -147,7 +147,7 @@ export class DemsEngineService {
     transactionRelationship: TransactionDetails;
     endToEndId: string;
     dynamicMapping?: any;
-    trackedFields: ProcessingResult['trackedFields'];
+    trackedFields: TrackedFields;
   }> {
     // static object creation logic
     const dataCache: any = {};
@@ -172,7 +172,7 @@ export class DemsEngineService {
     }
 
     // Track specific fields for database storage
-    const trackedFields: trackedFields = {
+    const trackedFields: TrackedFields = {
       CreDtTm: '',
       MsgId: '',
       EndToEndId: '',
@@ -281,7 +281,7 @@ export class DemsEngineService {
     configuredFunctions: any,
     transactionRelationship: TransactionDetails,
     dynamicMapping: any,
-    trackedFields: trackedFields,
+    trackedFields: TrackedFields,
   ): Promise<void> {
     let containsSaveTransactionRelationship = false;
     this.loggerService.log(
@@ -396,7 +396,7 @@ export class DemsEngineService {
     tazamaPayload: TazamaPayload,
     transactionType: string,
     endToEndId: string,
-    trackedFields?: trackedFields,
+    trackedFields?: TrackedFields,
   ): Promise<void> {
     // using Promise.allSettled, instead of promise.all, to execute operations and capture individual results
     const results = await Promise.allSettled([
