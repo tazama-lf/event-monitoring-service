@@ -504,13 +504,10 @@ export class DatabaseOperationsService implements OnModuleInit {
     // Validate table name to prevent SQL injection
     const safeTableName = this.getSafeIdentifier(tableName);
     try {
-      const insertIntoDynamicTable = `
-      INSERT INTO ${safeTableName} (
-       _key,
-        data)
-       VALUES ($1, $2)
-      on conflict (_key) do update set data = EXCLUDED.data`;
-      await this.databaseService.query(insertIntoDynamicTable, [primaryKey, data]);
+      if (!this.DbManager) {
+        throw new InternalServerErrorException('Database manager not initialized - database operation cannot proceed');
+      }
+      await this.DbManager.saveInDataModelTable(safeTableName, primaryKey, data);
 
       this.loggerService.log(`Inserted data into the data model table: ${safeTableName}`, this.log_context);
     } catch (error) {
