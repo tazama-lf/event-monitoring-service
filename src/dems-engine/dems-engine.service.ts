@@ -329,7 +329,12 @@ export class DemsEngineService {
           this.loggerService.log(`params are : ${JSON.stringify(row)}`);
 
           // access the value from dynamicMapping object
-          const primaryKeyValue = getValueByPath(dynamicMapping, row.columns[0].param);
+          let primaryKeyValue;
+          if (row.columns[0].datasource === 'dataModel') {
+            primaryKeyValue = getValueByPath(dynamicMapping, row.columns[0].param);
+          } else {
+            primaryKeyValue = getValueByPath(payload, row.columns[0].param);
+          }
 
           let dataValue;
           // access the value conditionally from dynamicMapping or payload based on datasource
