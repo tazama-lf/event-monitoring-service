@@ -500,14 +500,14 @@ export class DatabaseOperationsService implements OnModuleInit {
     }
   }
 
-  async addDataModelTable(tableName: string, primaryKey: string, data: any): Promise<void> {
+  async addDataModelTable(tableName: string, primaryKey: string, data: any, tenantId: string, creDtTm: string): Promise<void> {
     // Validate table name to prevent SQL injection
     const safeTableName = this.getSafeIdentifier(tableName);
     try {
       if (!this.DbManager) {
         throw new InternalServerErrorException('Database manager not initialized - database operation cannot proceed');
       }
-      await this.DbManager.saveInDataModelTable(safeTableName, primaryKey, data);
+      await this.DbManager.saveInDataModelTable(safeTableName, primaryKey, data, tenantId, creDtTm);
 
       this.loggerService.log(`Inserted data into the data model table: ${safeTableName}`, this.log_context);
     } catch (error) {

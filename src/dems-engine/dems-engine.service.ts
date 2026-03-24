@@ -347,7 +347,7 @@ export class DemsEngineService {
           this.loggerService.log(`the primary key value is : ${primaryKeyValue} and data value is : ${JSON.stringify(dataValue)}`);
 
           // async addDataModelTable(tableName: string, primaryKey: string, data: any)
-          await this.databaseOperationsService[functionToCall](tableName, primaryKeyValue, dataValue);
+          await this.databaseOperationsService[functionToCall](tableName, primaryKeyValue, dataValue, transactionRelationship.TenantId, transactionRelationship.CreDtTm);
           continue;
         }
 
