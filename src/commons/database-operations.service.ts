@@ -111,23 +111,51 @@ export class DatabaseOperationsService implements OnModuleInit {
         throw new Error(`DYNAMIC_HISTORY_DB_PORT must be a valid port number (1-65535), received: ${dynamicHistoryPortStr}`);
       }
 
-      const dynamicHistoryDbName = process.env.DYNAMIC_HISTORY_DB_NAME ?? 'dynamic_transactions';
+      const dynamicHistoryDbName = process.env.DYNAMIC_HISTORY_DB_NAME;
       if (!dynamicHistoryDbName) {
         throw new Error('DYNAMIC_HISTORY_DB_NAME environment variable is required');
       }
 
-      const dynamicHistoryUser = process.env.DYNAMIC_HISTORY_DB_USER ?? user;
+      const dynamicHistoryUser = process.env.DYNAMIC_HISTORY_DB_USER;
       if (!dynamicHistoryUser) {
         throw new Error('DYNAMIC_HISTORY_DB_USER environment variable is required');
       }
 
-      const dynamicHistoryPassword = process.env.DYNAMIC_HISTORY_DB_PASSWORD ?? password;
+      const dynamicHistoryPassword = process.env.DYNAMIC_HISTORY_DB_PASSWORD;
       if (!dynamicHistoryPassword) {
         throw new Error('DYNAMIC_HISTORY_DB_PASSWORD environment variable is required');
       }
 
-      // Certificate path is optional
       const certPath = process.env.DB_CERT_PATH ?? '';
+
+      const eventHistoryHost = process.env.EVENT_HISTORY_DB_HOST;
+      if (!eventHistoryHost) {
+        throw new Error('EVENT_HISTORY_DB_HOST environment variable is required');
+      }
+
+      const eventHistoryPortStr = process.env.EVENT_HISTORY_DB_PORT;
+      if (!eventHistoryPortStr) {
+        throw new Error('EVENT_HISTORY_DB_PORT environment variable is required');
+      }
+      const eventHistoryPort = parseInt(eventHistoryPortStr, 10);
+      if (isNaN(eventHistoryPort) || eventHistoryPort <= 0 || eventHistoryPort > 65535) {
+        throw new Error(`EVENT_HISTORY_DB_PORT must be a valid port number (1-65535), received: ${eventHistoryPortStr}`);
+      }
+
+      const eventHistoryDbName = process.env.EVENT_HISTORY_DB_NAME;
+      if (!eventHistoryDbName) {
+        throw new Error('EVENT_HISTORY_DB_NAME environment variable is required');
+      }
+
+      const eventHistoryUser = process.env.EVENT_HISTORY_DB_USER;
+      if (!eventHistoryUser) {
+        throw new Error('EVENT_HISTORY_DB_USER environment variable is required');
+      }
+
+      const eventHistoryPassword = process.env.EVENT_HISTORY_DB_PASSWORD;
+      if (!eventHistoryPassword) {
+        throw new Error('EVENT_HISTORY_DB_PASSWORD environment variable is required');
+      }
 
       this.loggerService.log(
         `Initializing database manager with separate dynamic history database: ${dynamicHistoryDbName} on ${dynamicHistoryHost}:${dynamicHistoryPort}`,
@@ -149,15 +177,15 @@ export class DatabaseOperationsService implements OnModuleInit {
           databaseName: dynamicHistoryDbName,
           user: dynamicHistoryUser,
           password: dynamicHistoryPassword,
-          certPath: process.env.DYNAMIC_HISTORY_DB_CERT_PATH ?? '', // Optional certificate path for dynamic history database
+          certPath: process.env.DYNAMIC_HISTORY_DB_CERT_PATH ?? certPath,
         },
         eventHistory: {
-          host: process.env.EVENT_HISTORY_DB_HOST ?? host,
-          port: parseInt(process.env.EVENT_HISTORY_DB_PORT ?? portStr, 10),
-          databaseName: process.env.EVENT_HISTORY_DB_NAME ?? databaseName,
-          user: process.env.EVENT_HISTORY_DB_USER ?? user,
-          password: process.env.EVENT_HISTORY_DB_PASSWORD ?? password,
-          certPath: process.env.EVENT_HISTORY_DB_CERT_PATH ?? '', // Optional certificate path for event history database
+          host: eventHistoryHost,
+          port: eventHistoryPort,
+          databaseName: eventHistoryDbName,
+          user: eventHistoryUser,
+          password: eventHistoryPassword,
+          certPath: process.env.EVENT_HISTORY_DB_CERT_PATH ?? certPath,
         },
       };
 
@@ -309,7 +337,6 @@ export class DatabaseOperationsService implements OnModuleInit {
           break;
         }
         default: {
-          // console.log(`No specific history method for TxTp ${transaction.TxTp}, falling back to generic save with tracked fields if available`);
           await this.DbManager.saveDynamicTransactionHistory(transaction.TxTp, transaction.transaction, trackedFields); // need to discuss type issue
         }
       }
