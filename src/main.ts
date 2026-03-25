@@ -17,17 +17,35 @@ export async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule);
   const configService = app.get(ConfigService);
 
-  // Enable CORS for frontend communication
+  // Configure CORS origins from environment or fall back to local dev defaults
+  const corsOriginsConfig = configService.get<string>('CORS_ORIGINS') || process.env.CORS_ORIGINS;
+  const defaultOrigins = [
+    'http://localhost:3000',
+    'http://localhost:3001',
+    'http://localhost:5173',
+    'http://localhost:5174',
+    'http://localhost:8080',
+    'http://10.10.80.37:5174',
+    'http://10.10.80.37:5175',
+  ];
+  
+  let corsOrigins: string[];
+  if (corsOriginsConfig) {
+    try {
+      // parsing as JSON array first, then fall back to comma-separated - aproach prevents parsing errors
+      corsOrigins = corsOriginsConfig.startsWith('[') 
+        ? JSON.parse(corsOriginsConfig)
+        : corsOriginsConfig.split(',').map(origin => origin.trim());
+    } catch (error) {
+      console.warn('Failed to parse CORS_ORIGINS, using default origins:', error);
+      corsOrigins = defaultOrigins;
+    }
+  } else {
+    corsOrigins = defaultOrigins;
+  }
+
   app.enableCors({
-    origin: [
-      'http://localhost:3000',
-      'http://localhost:3001',
-      'http://localhost:5173',
-      'http://localhost:5174',
-      'http://localhost:8080',
-      'http://10.10.80.37:5174',
-      'http://10.10.80.37:5175',
-    ],
+    origin: corsOrigins,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
     credentials: true,
