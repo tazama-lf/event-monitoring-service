@@ -258,8 +258,6 @@ export class DemsEngineService {
     trackedFields.cdtrAcctId = dataCache.cdtrAcctId ?? null;
     trackedFields.TenantId = transactionRelationship.TenantId;
 
-    this.loggerService.log(`Tracked fields: ${JSON.stringify(trackedFields)}`, this.LOG_CONTEXT);
-
     return {
       dataCache,
       transactionRelationship,

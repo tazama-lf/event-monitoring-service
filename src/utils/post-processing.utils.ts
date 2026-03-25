@@ -56,7 +56,7 @@ export function handlePostProcessing(
 
   if (type === 'redis') {
     if (relatedTransactionBoolean) {
-      return ' ';
+      return '';
     }
 
     dataCacheValue += mapping.suffix ?? '';
