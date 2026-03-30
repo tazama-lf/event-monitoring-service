@@ -17,31 +17,20 @@ export async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule);
   const configService = app.get(ConfigService);
 
-  // Configure CORS origins from environment or fall back to local dev defaults
-  const corsOriginsConfig = configService.get<string>('CORS_ORIGINS') || process.env.CORS_ORIGINS;
-  const defaultOrigins = [
-    'http://localhost:3000',
-    'http://localhost:3001',
-    'http://localhost:5173',
-    'http://localhost:5174',
-    'http://localhost:8080',
-    'http://10.10.80.37:5174',
-    'http://10.10.80.37:5175',
-  ];
-  
+  // Configure CORS origins from environment variable
+  const corsOriginsConfig = configService.get<string>('CORS_ORIGINS') ?? process.env.CORS_ORIGINS;
+  if (!corsOriginsConfig) {
+    throw new Error('CORS_ORIGINS environment variable is not set');
+  }
+
   let corsOrigins: string[];
-  if (corsOriginsConfig) {
-    try {
-      // parsing as JSON array first, then fall back to comma-separated - aproach prevents parsing errors
-      corsOrigins = corsOriginsConfig.startsWith('[') 
-        ? JSON.parse(corsOriginsConfig)
-        : corsOriginsConfig.split(',').map(origin => origin.trim());
-    } catch (error) {
-      console.warn('Failed to parse CORS_ORIGINS, using default origins:', error);
-      corsOrigins = defaultOrigins;
-    }
-  } else {
-    corsOrigins = defaultOrigins;
+  try {
+    // parsing as JSON array first, then fall back to comma-separated
+    corsOrigins = corsOriginsConfig.startsWith('[') 
+      ? JSON.parse(corsOriginsConfig)
+      : corsOriginsConfig.split(',').map(origin => origin.trim());
+  } catch (error) {
+    throw new Error(`Failed to parse CORS_ORIGINS: ${error}`);
   }
 
   app.enableCors({
