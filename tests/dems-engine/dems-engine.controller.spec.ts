@@ -50,7 +50,7 @@ describe('DemsEngineController', () => {
     tazamaPayload: {
       transaction: { name: 'John' },
       TxTp: 'test.transaction',
-      dataCache: { cached: 'data' },
+      DataCache: { cached: 'data' },
     },
     transactionRelationship: {
       source: 'test-source',
@@ -61,14 +61,23 @@ describe('DemsEngineController', () => {
       CreDtTm: '2024-01-01T00:00:00Z',
       EndToEndId: 'end-to-end-123',
     },
-    dataCache: {
+    DataCache: {
       endpointPath: '/test/endpoint/path',
       schema: { type: 'object' },
       mapping: { test: 'mapping' },
       functions: { test: 'function' },
+      related_transaction: '',
       publishing_status: 'active',
     },
     publishing_status: 'active',
+    trackedFields: {
+      CreDtTm: '2024-01-01T00:00:00Z',
+      MsgId: 'msg-123',
+      EndToEndId: 'end-to-end-123',
+      dbtrAcctId: 'debtor-account-123',
+      cdtrAcctId: 'creditor-account-123',
+      TenantId: 'test-tenant',
+    },
   };
 
   const mockErrorResult = {

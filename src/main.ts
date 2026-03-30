@@ -17,6 +17,29 @@ export async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule);
   const configService = app.get(ConfigService);
 
+  // Configure CORS origins from environment variable
+  const corsOriginsConfig = configService.get<string>('CORS_ORIGINS') ?? process.env.CORS_ORIGINS;
+  if (!corsOriginsConfig) {
+    throw new Error('CORS_ORIGINS environment variable is not set');
+  }
+
+  let corsOrigins: string[];
+  try {
+    // parsing as JSON array first, then fall back to comma-separated
+    corsOrigins = corsOriginsConfig.startsWith('[') 
+      ? JSON.parse(corsOriginsConfig)
+      : corsOriginsConfig.split(',').map(origin => origin.trim());
+  } catch (error) {
+    throw new Error(`Failed to parse CORS_ORIGINS: ${error}`);
+  }
+
+  app.enableCors({
+    origin: corsOrigins,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
+    credentials: true,
+  });
+
   // Initialize APM interceptor for global transaction monitoring
   const apmService = app.get(ApmService);
   app.useGlobalInterceptors(new ApmInterceptor(apmService));

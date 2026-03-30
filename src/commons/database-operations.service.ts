@@ -17,6 +17,7 @@ import {
   type RawHistoryDB,
   type DatabaseManagerInstance,
   type ManagerConfig,
+  type TrackedFields,
 } from '@tazama-lf/frms-coe-lib';
 import { DatabaseService } from '../database/database.service';
 import { randomUUID } from 'node:crypto';
@@ -65,7 +66,7 @@ export class DatabaseOperationsService implements OnModuleInit {
    */
   private async initDb(): Promise<void> {
     try {
-      // Validate required environment variables
+      // Validate required environment variables for main database
       const host = process.env.DB_HOST;
       if (!host) {
         throw new Error('DB_HOST environment variable is required');
@@ -95,11 +96,74 @@ export class DatabaseOperationsService implements OnModuleInit {
         throw new Error('DB_PASSWORD environment variable is required');
       }
 
-      // Certificate path is optional
+      const dynamicHistoryHost = process.env.DYNAMIC_HISTORY_DB_HOST;
+      if (!dynamicHistoryHost) {
+        throw new Error('DYNAMIC_HISTORY_DB_HOST environment variable is required');
+      }
+
+      const dynamicHistoryPortStr = process.env.DYNAMIC_HISTORY_DB_PORT;
+      if (!dynamicHistoryPortStr) {
+        throw new Error('DYNAMIC_HISTORY_DB_PORT environment variable is required');
+      }
+
+      const dynamicHistoryPort = parseInt(dynamicHistoryPortStr, 10);
+      if (isNaN(dynamicHistoryPort) || dynamicHistoryPort <= 0 || dynamicHistoryPort > 65535) {
+        throw new Error(`DYNAMIC_HISTORY_DB_PORT must be a valid port number (1-65535), received: ${dynamicHistoryPortStr}`);
+      }
+
+      const dynamicHistoryDbName = process.env.DYNAMIC_HISTORY_DB_NAME;
+      if (!dynamicHistoryDbName) {
+        throw new Error('DYNAMIC_HISTORY_DB_NAME environment variable is required');
+      }
+
+      const dynamicHistoryUser = process.env.DYNAMIC_HISTORY_DB_USER;
+      if (!dynamicHistoryUser) {
+        throw new Error('DYNAMIC_HISTORY_DB_USER environment variable is required');
+      }
+
+      const dynamicHistoryPassword = process.env.DYNAMIC_HISTORY_DB_PASSWORD;
+      if (!dynamicHistoryPassword) {
+        throw new Error('DYNAMIC_HISTORY_DB_PASSWORD environment variable is required');
+      }
+
       const certPath = process.env.DB_CERT_PATH ?? '';
 
+      const eventHistoryHost = process.env.EVENT_HISTORY_DB_HOST;
+      if (!eventHistoryHost) {
+        throw new Error('EVENT_HISTORY_DB_HOST environment variable is required');
+      }
+
+      const eventHistoryPortStr = process.env.EVENT_HISTORY_DB_PORT;
+      if (!eventHistoryPortStr) {
+        throw new Error('EVENT_HISTORY_DB_PORT environment variable is required');
+      }
+      const eventHistoryPort = parseInt(eventHistoryPortStr, 10);
+      if (isNaN(eventHistoryPort) || eventHistoryPort <= 0 || eventHistoryPort > 65535) {
+        throw new Error(`EVENT_HISTORY_DB_PORT must be a valid port number (1-65535), received: ${eventHistoryPortStr}`);
+      }
+
+      const eventHistoryDbName = process.env.EVENT_HISTORY_DB_NAME;
+      if (!eventHistoryDbName) {
+        throw new Error('EVENT_HISTORY_DB_NAME environment variable is required');
+      }
+
+      const eventHistoryUser = process.env.EVENT_HISTORY_DB_USER;
+      if (!eventHistoryUser) {
+        throw new Error('EVENT_HISTORY_DB_USER environment variable is required');
+      }
+
+      const eventHistoryPassword = process.env.EVENT_HISTORY_DB_PASSWORD;
+      if (!eventHistoryPassword) {
+        throw new Error('EVENT_HISTORY_DB_PASSWORD environment variable is required');
+      }
+
+      this.loggerService.log(
+        `Initializing database manager with separate dynamic history database: ${dynamicHistoryDbName} on ${dynamicHistoryHost}:${dynamicHistoryPort}`,
+        this.log_context,
+      );
+
       const eventHistoryConfig: ManagerConfig = {
-        eventHistory: {
+        configuration: {
           host,
           port,
           databaseName,
@@ -108,12 +172,20 @@ export class DatabaseOperationsService implements OnModuleInit {
           certPath,
         },
         rawHistory: {
-          host,
-          port,
-          databaseName,
-          user,
-          password,
-          certPath,
+          host: dynamicHistoryHost,
+          port: dynamicHistoryPort,
+          databaseName: dynamicHistoryDbName,
+          user: dynamicHistoryUser,
+          password: dynamicHistoryPassword,
+          certPath: process.env.DYNAMIC_HISTORY_DB_CERT_PATH ?? certPath,
+        },
+        eventHistory: {
+          host: eventHistoryHost,
+          port: eventHistoryPort,
+          databaseName: eventHistoryDbName,
+          user: eventHistoryUser,
+          password: eventHistoryPassword,
+          certPath: process.env.EVENT_HISTORY_DB_CERT_PATH ?? certPath,
         },
       };
 
@@ -208,14 +280,16 @@ export class DatabaseOperationsService implements OnModuleInit {
    *
    * @param accountId - Unique account identifier
    * @param tenantId - Tenant identifier for multi-tenancy
+   * @param creDtTm - Creation date and time
    */
-  async addAccount(accountId: string, tenantId: string): Promise<void> {
+  async addAccount(accountId: string, tenantId: string, creDtTm: string): Promise<void> {
+    // need to add one more param here for creation date time
     try {
       if (!this.DbManager) {
         throw new InternalServerErrorException('Database manager not initialized - database operation cannot proceed');
       }
 
-      await this.DbManager.saveAccount(accountId, tenantId);
+      await this.DbManager.saveAccount(accountId, tenantId, creDtTm);
       this.loggerService.log(`Added account: ${accountId} for tenant: ${tenantId}`, this.log_context);
     } catch (error) {
       this.handleDatabaseError(error, 'add account', {
@@ -232,8 +306,14 @@ export class DatabaseOperationsService implements OnModuleInit {
    *
    * @param transaction - Transaction payload containing transaction data and type
    * @param key - Transaction key for logging purposes
+   * @param trackedFields - Optional tracked fields from mapping processing
    */
-  async saveTransactionHistory(transaction: TazamaPayload, key: string): Promise<void> {
+  async saveTransactionHistory(transaction: TazamaPayload, key: string, trackedFields?: TrackedFields): Promise<void> {
+    this.loggerService.log(
+      `Saving transaction history with key: ${key} and tracked fields: ${JSON.stringify(trackedFields)}`,
+      this.log_context,
+    );
+
     try {
       if (!this.DbManager) {
         throw new InternalServerErrorException('Database manager not initialized - database operation cannot proceed');
@@ -256,13 +336,40 @@ export class DatabaseOperationsService implements OnModuleInit {
           await this.DbManager.saveTransactionHistoryPacs002(transaction.transaction as Pacs002);
           break;
         }
-        default:
-          throw new BadRequestException(`Unsupported transaction type: ${transaction.TxTp}`);
+        default: {
+          await this.DbManager.saveDynamicTransactionHistory(transaction.TxTp, transaction.transaction, trackedFields); // need to discuss type issue
+        }
       }
       this.loggerService.log(`Saved transaction history with key: ${key}`, this.log_context);
     } catch (error) {
       this.handleDatabaseError(error, 'save transaction history', {
         details: `key ${key}, type ${transaction.TxTp}`,
+      });
+    }
+  }
+
+  async getPacs008ByEndToEndId(endToEndId: string, tenantId: string): Promise<Pacs008 | undefined> {
+    try {
+      if (!this.DbManager) {
+        throw new InternalServerErrorException('Database manager not initialized - database operation cannot proceed');
+      }
+      return await this.DbManager.getTransactionPacs008(endToEndId, tenantId);
+    } catch (error) {
+      this.handleDatabaseError(error, 'fetch pacs.008 by EndToEndId', {
+        details: `EndToEndId ${endToEndId} for tenant ${tenantId}`,
+      });
+    }
+  }
+
+  async getTransaction(endToEndId: string, tenantId: string, tableName: string): Promise<Record<string, unknown> | undefined> {
+    try {
+      if (!this.DbManager) {
+        throw new InternalServerErrorException('Database manager not initialized - database operation cannot proceed');
+      }
+      return await this.DbManager.getTransactionAny(endToEndId, tenantId, tableName);
+    } catch (error) {
+      this.handleDatabaseError(error, 'fetch transaction by EndToEndId', {
+        details: `EndToEndId ${endToEndId} for tenant ${tenantId} from table ${tableName}`,
       });
     }
   }
@@ -374,12 +481,15 @@ export class DatabaseOperationsService implements OnModuleInit {
     }
   }
 
-  async saveToQuarantine(payload: any, endpoint: string, differences: string[], tenantId: string, correlationId?: string): Promise<void> {
+  async saveToQuarantine(
+    payload: any,
+    endpoint: string,
+    differences: string[],
+    tenantId: string,
+    creDtTm: string,
+    correlationId?: string,
+  ): Promise<void> {
     try {
-      if (!this.DbManager) {
-        throw new InternalServerErrorException('Database manager not initialized - database operation cannot proceed');
-      }
-
       const quarantineRecord = {
         id: randomUUID(),
         correlation_id: correlationId ?? null,
@@ -391,13 +501,18 @@ export class DatabaseOperationsService implements OnModuleInit {
           code: 'VALIDATION_ERROR',
           message: 'Payload validation failed',
           differences,
-          timestamp: new Date().toISOString(),
+          timestamp: creDtTm,
         }),
         raw_payload: JSON.stringify(payload),
         status: QuarantineStatus.FAILED,
       };
 
+      if (!this.DbManager) {
+        throw new InternalServerErrorException('Database manager not initialized - database operation cannot proceed');
+      }
+
       await this.DbManager.saveToQuarantine(quarantineRecord);
+
       this.loggerService.log(`Saved failed record to quarantine with ID: ${quarantineRecord.id}`, this.log_context);
     } catch (error) {
       const errorMessage = String(error);
@@ -412,17 +527,14 @@ export class DatabaseOperationsService implements OnModuleInit {
     }
   }
 
-  async addDataModelTable(tableName: string, primaryKey: string, data: any): Promise<void> {
+  async addDataModelTable(tableName: string, primaryKey: string, data: any, tenantId: string, creDtTm: string): Promise<void> {
     // Validate table name to prevent SQL injection
     const safeTableName = this.getSafeIdentifier(tableName);
     try {
-      const insertIntoDynamicTable = `
-      INSERT INTO ${safeTableName} (
-       _key,
-        data)
-       VALUES ($1, $2)
-      on conflict (_key) do update set data = EXCLUDED.data`;
-      await this.databaseService.query(insertIntoDynamicTable, [primaryKey, data]);
+      if (!this.DbManager) {
+        throw new InternalServerErrorException('Database manager not initialized - database operation cannot proceed');
+      }
+      await this.DbManager.saveInDataModelTable(safeTableName, primaryKey, data, tenantId, creDtTm);
 
       this.loggerService.log(`Inserted data into the data model table: ${safeTableName}`, this.log_context);
     } catch (error) {

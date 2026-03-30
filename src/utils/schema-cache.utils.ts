@@ -6,9 +6,9 @@ import type { SchemaData } from '../interfaces/iSchemaData';
  * @param cachedSchema The cached schema (string or object)
  * @param endpoint The endpoint for logging
  * @param loggerService Logger service instance
- * @returns Tuple of [schema, mapping, functions] or null if inactive/invalid
+ * @returns Tuple of [schema, mapping, functions, related_transaction] or null if inactive/invalid
  */
-export function parseCachedSchema(cachedSchema: any, endpoint: string, loggerService: LoggerService): [any, any, any] | null {
+export function parseCachedSchema(cachedSchema: any, endpoint: string, loggerService: LoggerService): [any, any, any, any] | null {
   // Only parse if cachedSchema is a string
   if (typeof cachedSchema === 'string') {
     try {
@@ -20,7 +20,7 @@ export function parseCachedSchema(cachedSchema: any, endpoint: string, loggerSer
         return null;
       }
 
-      return [parsedSchema.schema, parsedSchema.mapping, parsedSchema.functions] as [any, any, any];
+      return [parsedSchema.schema, parsedSchema.mapping, parsedSchema.functions, parsedSchema.related_transaction] as [any, any, any, any];
     } catch (error) {
       loggerService.error(`Failed to parse cached schema for endpoint ${endpoint}: ${String(error)}`);
       return null;
@@ -32,7 +32,7 @@ export function parseCachedSchema(cachedSchema: any, endpoint: string, loggerSer
       loggerService.log(`Cached schema for endpoint: ${endpoint} is not active`);
       return null;
     }
-    return [schemaObj.schema, schemaObj.mapping, schemaObj.functions] as [any, any, any];
+    return [schemaObj.schema, schemaObj.mapping, schemaObj.functions, schemaObj.related_transaction] as [any, any, any, any];
   }
 
   return null;
@@ -48,6 +48,7 @@ export function prepareSchemaForCache(record: any): SchemaData {
     schema: record.schema,
     mapping: record.mapping,
     functions: record.functions,
+    related_transaction: record.related_transaction,
     publishing_status: record.publishing_status,
   };
 }

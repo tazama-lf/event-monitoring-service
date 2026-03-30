@@ -12,7 +12,7 @@ export function buildTazamaPayload(payload: any, transactionType: string, dataCa
   return {
     transaction: payload,
     TxTp: transactionType,
-    dataCache,
+    DataCache: dataCache,
   };
 }
 

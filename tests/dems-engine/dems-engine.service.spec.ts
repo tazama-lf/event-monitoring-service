@@ -25,8 +25,10 @@ describe('DemsEngineService', () => {
     properties: {
       name: { type: 'string' },
       age: { type: 'number' },
+      FIToFIPmtSts: { type: 'object', additionalProperties: true },
     },
     required: ['name'],
+    additionalProperties: true,
   };
 
   const mockMapping = [
@@ -71,6 +73,7 @@ describe('DemsEngineService', () => {
       saveTransactionHistory: jest.fn(),
       saveTransactionRelationship: jest.fn(),
       saveToQuarantine: jest.fn(),
+      getPacs008ByEndToEndId: jest.fn(),
     } as any;
 
     mockConfigService = {
@@ -123,27 +126,37 @@ describe('DemsEngineService', () => {
     it('should handle cache parsing error and fallback to database', async () => {
       (mockRedisService.getJson as jest.Mock).mockResolvedValue('invalid-json-string');
       mockDatabaseService.query.mockResolvedValue(
-        createMockQueryResult([{ schema: mockSchema, mapping: mockMapping, functions: mockFunctions, publishing_status: 'active' }]),
+        createMockQueryResult([
+          { schema: mockSchema, mapping: mockMapping, functions: mockFunctions, related_transaction: '', publishing_status: 'active' },
+        ]),
       );
 
       const result = await service.findSchemaAndMapping('/test');
 
       expect(mockLoggerService.error).toHaveBeenCalledWith(expect.stringContaining('Failed to parse cached schema'));
-      expect(result).toEqual([mockSchema, mockMapping, mockFunctions]);
+      expect(result).toEqual([mockSchema, mockMapping, mockFunctions, '']);
     });
 
     it('should query database on cache miss', async () => {
       (mockRedisService.getJson as jest.Mock).mockResolvedValue(null);
       mockDatabaseService.query.mockResolvedValue(
-        createMockQueryResult([{ schema: mockSchema, mapping: mockMapping, functions: mockFunctions, publishing_status: 'active' }]),
+        createMockQueryResult([
+          { schema: mockSchema, mapping: mockMapping, functions: mockFunctions, related_transaction: '', publishing_status: 'active' },
+        ]),
       );
 
       const result = await service.findSchemaAndMapping('/test');
 
-      expect(result).toEqual([mockSchema, mockMapping, mockFunctions]);
+      expect(result).toEqual([mockSchema, mockMapping, mockFunctions, '']);
       expect(mockRedisService.setJson).toHaveBeenCalledWith(
         '/test',
-        JSON.stringify({ schema: mockSchema, mapping: mockMapping, functions: mockFunctions, publishing_status: 'active' }),
+        JSON.stringify({
+          schema: mockSchema,
+          mapping: mockMapping,
+          functions: mockFunctions,
+          related_transaction: '',
+          publishing_status: 'active',
+        }),
         3600,
       );
     });
@@ -169,12 +182,22 @@ describe('DemsEngineService', () => {
   describe('handleMessage', () => {
     beforeEach(() => {
       mockDatabaseService.query.mockResolvedValue(
-        createMockQueryResult([{ schema: mockSchema, mapping: mockMapping, functions: mockFunctions, publishing_status: 'active' }]),
+        createMockQueryResult([
+          {
+            schema: mockSchema,
+            mapping: mockMapping,
+            functions: mockFunctions,
+            relatedTransaction: null,
+            related_transaction: '',
+            publishing_status: 'active',
+          },
+        ]),
       );
       (mockRedisService.getJson as jest.Mock).mockResolvedValue(null);
       mockDatabaseOperationsService.saveTransactionHistory.mockResolvedValue(undefined);
       mockDatabaseOperationsService.saveTransactionRelationship.mockResolvedValue(undefined);
       mockDatabaseOperationsService.saveToQuarantine.mockResolvedValue(undefined);
+      mockDatabaseOperationsService.getPacs008ByEndToEndId.mockResolvedValue(undefined);
       mockNatsService.notifyEventDirector.mockResolvedValue(undefined);
     });
 
@@ -187,12 +210,21 @@ describe('DemsEngineService', () => {
     });
 
     it('should process valid JSON payload', async () => {
-      const result = await service.handleMessage({ name: 'John', age: 30 }, '/test', 'tenant1', false);
+      const testPayload = {
+        name: 'John',
+        age: 30,
+        FIToFIPmtSts: {
+          TxInfAndSts: {
+            OrgnlEndToEndId: 'test-end-to-end-id',
+          },
+        },
+      };
+      const result = await service.handleMessage(testPayload, '/test', 'tenant1', false);
 
       expect(result).toHaveProperty('success', true);
       expect(result).toHaveProperty('configuredSchema');
       expect(result).toHaveProperty('tazamaPayload');
-      expect(result).toHaveProperty('dataCache');
+      expect(result).toHaveProperty('DataCache');
     });
 
     it('should return error for invalid payload', async () => {
@@ -328,7 +360,7 @@ describe('DemsEngineService', () => {
 
       // Should still succeed even with missing fields
       expect(result).toHaveProperty('success', true);
-      expect(result).toHaveProperty('dataCache');
+      expect(result).toHaveProperty('DataCache');
     });
 
     it('should handle database errors', async () => {
@@ -600,7 +632,7 @@ describe('DemsEngineService', () => {
     const mockTazamaPayload = {
       transaction: { name: 'John', age: 30 },
       TxTp: 'pacs.002',
-      dataCache: { userName: 'John' },
+      DataCache: { userName: 'John' },
     };
 
     beforeEach(() => {
@@ -611,7 +643,7 @@ describe('DemsEngineService', () => {
     it('should successfully save transaction and notify', async () => {
       await service.saveTransactionDataAndNotify(mockTazamaPayload, 'pacs.002', 'test123');
 
-      expect(mockDatabaseOperationsService.saveTransactionHistory).toHaveBeenCalledWith(mockTazamaPayload, 'pacs.002_test123');
+      expect(mockDatabaseOperationsService.saveTransactionHistory).toHaveBeenCalledWith(mockTazamaPayload, 'pacs.002_test123', undefined);
       expect(mockNatsService.notifyEventDirector).toHaveBeenCalledWith(mockTazamaPayload);
       expect(mockLoggerService.log).toHaveBeenCalledWith(expect.stringContaining('Successfully saved transaction history'));
     });
@@ -656,7 +688,7 @@ describe('DemsEngineService', () => {
   });
 
   describe('saveTransactionDataAndNotify', () => {
-    const testPayload = { transaction: { test: 'data' }, TxTp: 'test.type', dataCache: {} };
+    const testPayload = { transaction: { test: 'data' }, TxTp: 'test.type', DataCache: {} };
 
     it('should save and notify successfully', async () => {
       mockDatabaseOperationsService.saveTransactionHistory.mockResolvedValue(undefined);

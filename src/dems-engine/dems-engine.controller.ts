@@ -9,6 +9,8 @@ import { User } from '../auth/user.decorator';
 import { AuthenticatedUser } from '../auth/auth.types';
 import { MessageHandlerResponse } from '../interfaces/iMessagerHandlerResponse';
 import { isXmlContentType } from '../utils/xml2js.utils';
+import { ErrorResponse } from '../interfaces/iErrorResponse';
+import { ProcessingResult } from '../interfaces/iProcessingResult';
 
 @Controller('/dems-engine')
 @UseGuards(TazamaAuthGuard)
@@ -52,7 +54,12 @@ export class DemsEngineController {
 
     const isPayloadXml = isXmlContentType(req);
 
-    const result = await this.demsEngineService.handleMessage(payload, transformedEndpoint, user.token.tenantId, isPayloadXml);
+    const result: ErrorResponse | ProcessingResult = await this.demsEngineService.handleMessage(
+      payload,
+      transformedEndpoint,
+      user.token.tenantId,
+      isPayloadXml,
+    );
 
     if (!('success' in result)) {
       this.logger.log(`Problem is: ${result.message}`, this.LOG_CONTEXT);
@@ -65,7 +72,12 @@ export class DemsEngineController {
     }
 
     try {
-      await this.demsEngineService.saveTransactionDataAndNotify(result.tazamaPayload, result.transactionType, result.endToEndId);
+      await this.demsEngineService.saveTransactionDataAndNotify(
+        result.tazamaPayload,
+        result.transactionType,
+        result.endToEndId,
+        result.trackedFields,
+      );
     } catch (error) {
       this.logger.error(`Failed to save transaction data or notify: ${String(error)}`);
       throw new BadRequestException({
@@ -76,6 +88,8 @@ export class DemsEngineController {
 
     this.logger.log('Dynamic Mapping in Controller: ', result.dynamicMapping);
 
+    // console.log('Configured Schema in Controller: ', result);
+
     return {
       message: 'Everything is OK!',
       isMatch: true,
@@ -83,6 +97,7 @@ export class DemsEngineController {
       dynamicMapping: result.dynamicMapping,
       schema: result.configuredSchema,
       payload: result.tazamaPayload,
+      trackedFields: result.trackedFields,
     };
   }
 }

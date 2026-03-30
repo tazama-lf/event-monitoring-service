@@ -32,6 +32,7 @@ export function handlePostProcessing(
   mapping: any,
   dataCache: any,
   transactionRelationship: TransactionDetails,
+  relatedTransactionBoolean: boolean,
 ): string {
   let endToEndId = '';
 
@@ -54,6 +55,10 @@ export function handlePostProcessing(
   }
 
   if (type === 'redis') {
+    if (relatedTransactionBoolean) {
+      return '';
+    }
+
     dataCacheValue += mapping.suffix ?? '';
 
     const finalValue = convertToMappingType(dataCacheValue, mapping);

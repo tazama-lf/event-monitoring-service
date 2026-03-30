@@ -1,4 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
+
 ARG BUILD_IMAGE=node:20-bullseye
 ARG RUN_IMAGE=gcr.io/distroless/nodejs20-debian11:nonroot
 
@@ -11,11 +12,9 @@ COPY ./src ./src
 COPY ./package*.json ./
 COPY ./tsconfig.json ./
 COPY .npmrc ./
-COPY public-key.pem ./
+ARG GH_TOKEN
 
-RUN --mount=type=secret,id=gh_token \
-    GH_TOKEN=$(cat /run/secrets/gh_token) \
-    npm ci --ignore-scripts
+RUN npm ci --ignore-scripts
 RUN npm run build
 
 FROM ${BUILD_IMAGE} AS dep-resolver
@@ -24,29 +23,27 @@ LABEL stage=pre-prod
 
 COPY package*.json ./
 COPY .npmrc ./
-RUN --mount=type=secret,id=gh_token \
-    GH_TOKEN=$(cat /run/secrets/gh_token) \
-    npm ci --omit=dev --ignore-scripts
+ARG GH_TOKEN
+RUN npm ci --omit=dev --ignore-scripts
 
 FROM ${RUN_IMAGE} AS run-env
 USER nonroot
 
 WORKDIR /home/app
 COPY --from=dep-resolver /node_modules ./node_modules
-COPY --from=builder /home/app/dist ./dist
+COPY --from=builder /home/app/dist ./build
 COPY package.json ./
-COPY public-key.pem ./
 
 # Turn down the verbosity to default level.
 ENV NPM_CONFIG_LOGLEVEL warn
 
-# Service Based variables
+# Service-Based variables (replace with secure methods at runtime)
 ENV FUNCTION_NAME=event-monitoring-service
 ENV NODE_ENV=production
 ENV MAX_CPU=
 ENV APP_PORT=3002
 
-# Database Configuration
+# Database Configuration (replace with secure methods at runtime)
 ENV CONFIGURATION_DATABASE_URL=
 ENV DB_HOST=
 ENV DB_PORT=
@@ -56,7 +53,7 @@ ENV DB_NAME=
 ENV DB_MIN_CONNECTIONS=8
 ENV DB_MAX_CONNECTIONS=500
 
-# Redis Configuration
+# Redis Configuration (replace with secure methods at runtime)
 ENV REDIS_HOST=
 ENV REDIS_PORT=6379
 ENV REDIS_PASSWORD=
@@ -98,4 +95,4 @@ ENV STDOUT=true
 ENV ELASTIC=true
 
 # Execute application
-CMD ["dist/main.js"]
+CMD ["build/main.js"]

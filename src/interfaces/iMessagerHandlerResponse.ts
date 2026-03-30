@@ -1,4 +1,5 @@
 import type { TransactionDetails } from '@tazama-lf/frms-coe-lib/lib/interfaces';
+import type { ProcessingResult } from './iProcessingResult';
 
 export interface MessageHandlerResponse {
   message: string;
@@ -7,4 +8,5 @@ export interface MessageHandlerResponse {
   dynamicMapping?: unknown;
   schema: unknown;
   payload: unknown;
+  trackedFields: ProcessingResult['trackedFields'];
 }
