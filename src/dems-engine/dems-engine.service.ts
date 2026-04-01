@@ -69,7 +69,7 @@ export class DemsEngineService {
     // not found in cache, query the database
     this.loggerService.log(`Cache miss for endpoint: ${endpoint}. Querying database...`);
     const result = await this.databaseService.query(
-      "SELECT schema, mapping, functions, related_transaction, publishing_status FROM tcs_config WHERE endpoint_path = $1 and publishing_status = 'active'",
+      'SELECT schema, mapping, functions, related_transaction, publishing_status FROM tcs_config WHERE endpoint_path = $1 and publishing_status = \'active\'',
       [endpoint],
     );
     const [record] = result.rows;
@@ -102,6 +102,9 @@ export class DemsEngineService {
   ): Promise<{ isValid: boolean; differences?: string[] }> {
     let isValid;
     try {
+      // console.log('configuredSchema in validatePayload is : ', JSON.stringify(configuredSchema, null, 2));
+      // console.log('---------------')
+      // console.log('payload in validatePayload is : ', JSON.stringify(payload, null, 2));
       isValid = this.ajv.validate(configuredSchema, payload);
     } catch (error) {
       this.loggerService.error(`AJV validation error: ${String(error)}`);
@@ -462,9 +465,11 @@ export class DemsEngineService {
           explicitArray: false, // Don't wrap single values in arrays
           ignoreAttrs: false, // Include attributes
           mergeAttrs: true, // Merge attributes with element content
-          explicitRoot: true, // Don't include root wrapper
+          explicitRoot: true, // Include root wrapper
           explicitChildren: true,
           normalize: true,
+          charkey: '#text', // Use #text instead of default _ for text content
+          attrkey: '@', // Use @ prefix for attributes
           valueProcessors: [createSchemaAwareNumberProcessor(stringFields)], // Use custom processor
         };
 
@@ -474,7 +479,19 @@ export class DemsEngineService {
             if (err) {
               reject(err);
             } else {
-              resolve(result);
+              // Add XML declaration if schema expects it
+              if (configuredSchema?.properties?.['?xml']) {
+                const xmlWithDeclaration = {
+                  '?xml': {
+                    version: '1.0',
+                    encoding: 'UTF-8'
+                  },
+                  ...result
+                };
+                resolve(xmlWithDeclaration);
+              } else {
+                resolve(result);
+              }
             }
           });
         });
