@@ -102,9 +102,6 @@ export class DemsEngineService {
   ): Promise<{ isValid: boolean; differences?: string[] }> {
     let isValid;
     try {
-      // console.log('configuredSchema in validatePayload is : ', JSON.stringify(configuredSchema, null, 2));
-      // console.log('---------------')
-      // console.log('payload in validatePayload is : ', JSON.stringify(payload, null, 2));
       isValid = this.ajv.validate(configuredSchema, payload);
     } catch (error) {
       this.loggerService.error(`AJV validation error: ${String(error)}`);
@@ -170,10 +167,7 @@ export class DemsEngineService {
     };
 
     const dynamicMapping: any = {};
-    if (relatedTransactionBoolean) {
-      // console.log('relatedTransactionBoolean is : ', relatedTransactionBoolean);
-    }
-
+  
     // Track specific fields for database storage
     const trackedFields: TrackedFields = {
       CreDtTm: '',
@@ -516,14 +510,10 @@ export class DemsEngineService {
       // this is required as per event-director payload structure
       const enhancedRequest = { ...payload, TenantId: tenantId, TxTp: transactionType };
 
-      // we need payload of relatedTransaction for both dataCache and transactionRelationship, so doing transformation once and reusing it in both places
-      // console.log('relatedTransaction is : ', relatedTransaction);
-
+      
       const relatedResult = relatedTransaction ? await this.findSchemaAndMapping(relatedTransaction) : null;
       const [, relatedMapping, ,] = relatedResult ?? [];
-      // console.log('relatedMapping is : ', relatedMapping);
-      // console.log('enhancedRequest before related transaction mapping is : ', relatedMapping);
-
+      
       // in case of pacs002, the first processMapping will give the DataCache
       // second processMapping will give the transactionRelation and all others
       // so we will have to tell the second processMapping, somehow, that we have already built the dataCache and it needs to only build the transactionRelationship and other details. we can do this by passing a flag or by checking if the dataCache is empty or not. for now, we will check if the dataCache is empty or not.
