@@ -643,7 +643,7 @@ describe('DemsEngineService', () => {
     it('should successfully save transaction and notify', async () => {
       await service.saveTransactionDataAndNotify(mockTazamaPayload, 'pacs.002', 'test123');
 
-      expect(mockDatabaseOperationsService.saveTransactionHistory).toHaveBeenCalledWith(mockTazamaPayload, 'pacs.002_test123', undefined);
+      expect(mockDatabaseOperationsService.saveTransactionHistory).toHaveBeenCalledWith(mockTazamaPayload, 'pacs.002_test123', 'pacs.002', undefined);
       expect(mockNatsService.notifyEventDirector).toHaveBeenCalledWith(mockTazamaPayload);
       expect(mockLoggerService.log).toHaveBeenCalledWith(expect.stringContaining('Successfully saved transaction history'));
     });

@@ -404,7 +404,7 @@ export class DemsEngineService {
   ): Promise<void> {
     // using Promise.allSettled, instead of promise.all, to execute operations and capture individual results
     const results = await Promise.allSettled([
-      this.databaseOperationsService.saveTransactionHistory(tazamaPayload, `${transactionType}_${endToEndId}`, trackedFields),
+      this.databaseOperationsService.saveTransactionHistory(tazamaPayload, `${transactionType}_${endToEndId}`, transactionType, trackedFields),
       this.natsService.notifyEventDirector(tazamaPayload),
     ]);
 

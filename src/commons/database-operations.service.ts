@@ -308,7 +308,7 @@ export class DatabaseOperationsService implements OnModuleInit {
    * @param key - Transaction key for logging purposes
    * @param trackedFields - Optional tracked fields from mapping processing
    */
-  async saveTransactionHistory(transaction: TazamaPayload, key: string, trackedFields?: TrackedFields): Promise<void> {
+  async saveTransactionHistory(transaction: TazamaPayload, key: string, transactionType: string, trackedFields?: TrackedFields): Promise<void> {
     this.loggerService.log(
       `Saving transaction history with key: ${key} and tracked fields: ${JSON.stringify(trackedFields)}`,
       this.log_context,
@@ -319,7 +319,7 @@ export class DatabaseOperationsService implements OnModuleInit {
         throw new InternalServerErrorException('Database manager not initialized - database operation cannot proceed');
       }
 
-      switch (transaction.TxTp) {
+      switch (transactionType) {
         case 'pain.001.001.11': {
           await this.DbManager.saveTransactionHistoryPain001(transaction.transaction as Pain001);
           break;
@@ -337,13 +337,13 @@ export class DatabaseOperationsService implements OnModuleInit {
           break;
         }
         default: {
-          await this.DbManager.saveDynamicTransactionHistory(transaction.TxTp, transaction.transaction, trackedFields); // need to discuss type issue
+          await this.DbManager.saveDynamicTransactionHistory(transactionType, transaction.transaction, trackedFields); // need to discuss type issue
         }
       }
       this.loggerService.log(`Saved transaction history with key: ${key}`, this.log_context);
     } catch (error) {
       this.handleDatabaseError(error, 'save transaction history', {
-        details: `key ${key}, type ${transaction.TxTp}`,
+        details: `key ${key}, type ${transactionType}`,
       });
     }
   }
