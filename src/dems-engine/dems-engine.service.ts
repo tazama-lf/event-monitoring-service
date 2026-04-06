@@ -69,7 +69,7 @@ export class DemsEngineService {
     // not found in cache, query the database
     this.loggerService.log(`Cache miss for endpoint: ${endpoint}. Querying database...`);
     const result = await this.databaseService.query(
-      "SELECT schema, mapping, functions, related_transaction, publishing_status FROM tcs_config WHERE endpoint_path = $1 and publishing_status = 'active'",
+      'SELECT schema, mapping, functions, related_transaction, publishing_status FROM tcs_config WHERE endpoint_path = $1 and publishing_status = \'active\'',
       [endpoint],
     );
     const [record] = result.rows;
@@ -167,10 +167,7 @@ export class DemsEngineService {
     };
 
     const dynamicMapping: any = {};
-    if (relatedTransactionBoolean) {
-      // console.log('relatedTransactionBoolean is : ', relatedTransactionBoolean);
-    }
-
+  
     // Track specific fields for database storage
     const trackedFields: TrackedFields = {
       CreDtTm: '',
@@ -462,9 +459,11 @@ export class DemsEngineService {
           explicitArray: false, // Don't wrap single values in arrays
           ignoreAttrs: false, // Include attributes
           mergeAttrs: true, // Merge attributes with element content
-          explicitRoot: true, // Don't include root wrapper
+          explicitRoot: true, // Include root wrapper
           explicitChildren: true,
           normalize: true,
+          charkey: '#text', // Use #text instead of default _ for text content
+          attrkey: '@', // Use @ prefix for attributes
           valueProcessors: [createSchemaAwareNumberProcessor(stringFields)], // Use custom processor
         };
 
@@ -474,7 +473,19 @@ export class DemsEngineService {
             if (err) {
               reject(err);
             } else {
-              resolve(result);
+              // Add XML declaration if schema expects it
+              if (configuredSchema?.properties?.['?xml']) {
+                const xmlWithDeclaration = {
+                  '?xml': {
+                    version: '1.0',
+                    encoding: 'UTF-8'
+                  },
+                  ...result
+                };
+                resolve(xmlWithDeclaration);
+              } else {
+                resolve(result);
+              }
             }
           });
         });
@@ -499,14 +510,10 @@ export class DemsEngineService {
       // this is required as per event-director payload structure
       const enhancedRequest = { ...payload, TenantId: tenantId, TxTp: transactionType };
 
-      // we need payload of relatedTransaction for both dataCache and transactionRelationship, so doing transformation once and reusing it in both places
-      // console.log('relatedTransaction is : ', relatedTransaction);
-
+      
       const relatedResult = relatedTransaction ? await this.findSchemaAndMapping(relatedTransaction) : null;
       const [, relatedMapping, ,] = relatedResult ?? [];
-      // console.log('relatedMapping is : ', relatedMapping);
-      // console.log('enhancedRequest before related transaction mapping is : ', relatedMapping);
-
+      
       // in case of pacs002, the first processMapping will give the DataCache
       // second processMapping will give the transactionRelation and all others
       // so we will have to tell the second processMapping, somehow, that we have already built the dataCache and it needs to only build the transactionRelationship and other details. we can do this by passing a flag or by checking if the dataCache is empty or not. for now, we will check if the dataCache is empty or not.
