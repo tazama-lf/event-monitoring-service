@@ -570,9 +570,9 @@ export class DemsEngineService {
       this.loggerService.log(`Building Tazama payload for transaction type: ${transactionType}, tenant: ${tenantId}`, this.LOG_CONTEXT);
       let tazamaPayload;
       if (relatedMapping) {
-        tazamaPayload = buildTazamaPayload(enhancedRequest, transactionType, enhancedRequest.DataCache);
+        tazamaPayload = buildTazamaPayload(enhancedRequest);
       } else {
-        tazamaPayload = buildTazamaPayload(enhancedRequest, transactionType, dataCache);
+        tazamaPayload = buildTazamaPayload(enhancedRequest);
       }
       this.loggerService.log('Successfully built Tazama payload for ED. all ok');
 

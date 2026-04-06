@@ -4,15 +4,11 @@ import type { TazamaPayload } from '../interfaces/iTazamaPayload';
 /**
  * Builds the Tazama payload object
  * @param payload The original payload
- * @param transactionType The extracted transaction type
- * @param dataCache The processed data cache
  * @returns The formatted Tazama payload
  */
-export function buildTazamaPayload(payload: any, transactionType: string, dataCache: any): TazamaPayload {
+export function buildTazamaPayload(payload: any): TazamaPayload {
   return {
     transaction: payload,
-    TxTp: transactionType,
-    DataCache: dataCache,
   };
 }
 
