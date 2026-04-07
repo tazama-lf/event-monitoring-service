@@ -569,9 +569,10 @@ export class DemsEngineService {
       }
 
       this.loggerService.log(`Building Tazama payload for transaction type: ${transactionType}, tenant: ${tenantId}`, this.LOG_CONTEXT);
+      const [msgId] = processSourceMapping(['transactionDetails.MsgId'], configuredMapping, enhancedRequest);
       const transactionForNats = isPacs002Transaction(enhancedRequest)
         ? enhancedRequest
-        : { Payload: { ...payload }, TenantId: tenantId, TxTp: transactionType, MsgId: payload.MsgId };
+        : { Payload: { ...payload }, TenantId: tenantId, TxTp: transactionType, MsgId: msgId };
       const tazamaPayload = buildTazamaPayload(transactionForNats, transactionType, relatedMapping ? enhancedRequest.DataCache : dataCache);
       this.loggerService.log('Successfully built Tazama payload for ED. all ok');
 
