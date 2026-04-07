@@ -266,7 +266,6 @@ export class DemsEngineService {
       trackedFields,
     };
   }
-
   /**
    * Executes configured functions based on the mapping configuration
    * @param payload The payload to extract data from
@@ -494,8 +493,7 @@ export class DemsEngineService {
       if (!validationResult.isValid) {
         const MIN_DIFFERENCES_INDEX = 0;
         const errorMessage = validationResult.differences?.[MIN_DIFFERENCES_INDEX]?.includes('AJV validation error')
-          ? 'Error during schema validation'
-          : 'Payload structure does not match the schema';
+          ? 'Error during schema validation' : 'Payload structure does not match the schema';
         this.loggerService.warn(`Building error response: ${errorMessage}`, this.LOG_CONTEXT);
         return buildErrorResponse(errorMessage, validationResult.differences ?? [], configuredSchema);
       }
@@ -505,13 +503,8 @@ export class DemsEngineService {
       // this is required as per event-director payload structure
       const enhancedRequest = { ...payload, TenantId: tenantId, TxTp: transactionType };
 
-      // we need payload of relatedTransaction for both dataCache and transactionRelationship, so doing transformation once and reusing it in both places
-      // console.log('relatedTransaction is : ', relatedTransaction);
-
       const relatedResult = relatedTransaction ? await this.findSchemaAndMapping(relatedTransaction) : null;
       const [, relatedMapping, ,] = relatedResult ?? [];
-      // console.log('relatedMapping is : ', relatedMapping);
-      // console.log('enhancedRequest before related transaction mapping is : ', relatedMapping);
 
       // in case of pacs002, the first processMapping will give the DataCache
       // second processMapping will give the transactionRelation and all others
@@ -560,12 +553,14 @@ export class DemsEngineService {
         this.loggerService.warn('Building error response: function execution failed', this.LOG_CONTEXT);
         return buildErrorResponse('function execution failed', [String(error)]);
       }
-
       this.loggerService.log(`Building Tazama payload for transaction type: ${transactionType}, tenant: ${tenantId}`, this.LOG_CONTEXT);
-      const [msgId] = processSourceMapping(['transactionDetails.MsgId'], configuredMapping, enhancedRequest);
-      const transactionForNats = isPacs002Transaction(enhancedRequest)
-        ? enhancedRequest
-        : { Payload: { ...payload }, TenantId: tenantId, TxTp: transactionType, MsgId: msgId };
+      let transactionForNats;
+      if (isPacs002Transaction(enhancedRequest)) {
+        transactionForNats = enhancedRequest
+      } else {
+        const [msgId] = processSourceMapping(['transactionDetails.MsgId'], configuredMapping, enhancedRequest);
+        transactionForNats = { Payload: { ...payload }, TenantId: tenantId, TxTp: transactionType, MsgId: msgId };
+      }
       const tazamaPayload = buildTazamaPayload(transactionForNats, transactionType, relatedMapping ? enhancedRequest.DataCache : dataCache);
       this.loggerService.log('Successfully built Tazama payload for ED. all ok');
 

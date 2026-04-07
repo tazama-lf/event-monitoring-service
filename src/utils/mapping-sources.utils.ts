@@ -34,13 +34,20 @@ export function processSourceMapping(sources: string[], configuredMapping: any[]
       return splitResultValue;
     }
 
+    if (!mapping) {
+      return '';
+    }
+
     if (mapping.constantValue) {
       return mapping.constantValue;
     }
 
     const extractedValues = mapping.source.map((s: string) => {
-      const value = getValueByPath(payload, s);
-      return value;
+      try {
+        return getValueByPath(payload, s);
+      } catch {
+        return '';
+      }
     });
 
     const combinedValue = extractedValues.join('');
