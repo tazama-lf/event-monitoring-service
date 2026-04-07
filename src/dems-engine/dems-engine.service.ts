@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { LoggerService, RedisService } from '@tazama-lf/frms-coe-lib';
+import { isPacs002Transaction, LoggerService, RedisService } from '@tazama-lf/frms-coe-lib';
 import Ajv from 'ajv';
 import addFormats from 'ajv-formats';
 import { extractTransactionType } from '../utils/extract_message_type';
@@ -47,7 +47,7 @@ export class DemsEngineService {
   ) {
     this.ajv = new Ajv({ allErrors: true, logger: false });
     addFormats(this.ajv);
-    this.timeToLive = this.configService.get<number>('cache.timeToLive', 3600);
+    this.timeToLive = this.configService.get('cache.timeToLive', 3600);
   }
 
   @ApmSpan('dems-find-schema-and-mapping')
@@ -342,7 +342,13 @@ export class DemsEngineService {
           this.loggerService.log(`the primary key value is : ${primaryKeyValue} and data value is : ${JSON.stringify(dataValue)}`);
 
           // async addDataModelTable(tableName: string, primaryKey: string, data: any)
-          await this.databaseOperationsService[functionToCall](tableName, primaryKeyValue, dataValue, transactionRelationship.TenantId, transactionRelationship.CreDtTm);
+          await this.databaseOperationsService[functionToCall](
+            tableName,
+            primaryKeyValue,
+            dataValue,
+            transactionRelationship.TenantId,
+            transactionRelationship.CreDtTm,
+          );
           continue;
         }
 
@@ -563,12 +569,10 @@ export class DemsEngineService {
       }
 
       this.loggerService.log(`Building Tazama payload for transaction type: ${transactionType}, tenant: ${tenantId}`, this.LOG_CONTEXT);
-      let tazamaPayload;
-      if (relatedMapping) {
-        tazamaPayload = buildTazamaPayload(enhancedRequest, transactionType, enhancedRequest.DataCache);
-      } else {
-        tazamaPayload = buildTazamaPayload(enhancedRequest, transactionType, dataCache);
-      }
+      const transactionForNats = isPacs002Transaction(enhancedRequest)
+        ? enhancedRequest
+        : { Payload: { ...payload }, TenantId: tenantId, TxTp: transactionType, MsgId: payload.MsgId };
+      const tazamaPayload = buildTazamaPayload(transactionForNats, transactionType, relatedMapping ? enhancedRequest.DataCache : dataCache);
       this.loggerService.log('Successfully built Tazama payload for ED. all ok');
 
       return {
