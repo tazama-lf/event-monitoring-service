@@ -569,7 +569,7 @@ export class DemsEngineService {
       if (isPacs002Transaction(enhancedRequest)) {
         transactionForNats = enhancedRequest
       } else {
-        const [msgId] = processSourceMapping(['transactionDetails.MsgId'], configuredMapping, enhancedRequest);
+        const msgId = transactionRelationship.MsgId
         transactionForNats = { Payload: { ...payload }, TenantId: tenantId, TxTp: transactionType, MsgId: msgId };
       }
       const tazamaPayload = buildTazamaPayload(transactionForNats, transactionType, relatedMapping ? enhancedRequest.DataCache : dataCache);

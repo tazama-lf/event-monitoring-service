@@ -35,7 +35,7 @@ export function processSourceMapping(sources: string[], configuredMapping: any[]
     }
 
     if (!mapping) {
-      return '';
+      throw new Error(`Mapping not found for destination: ${source}`);
     }
 
     if (mapping.constantValue) {
@@ -43,11 +43,11 @@ export function processSourceMapping(sources: string[], configuredMapping: any[]
     }
 
     const extractedValues = mapping.source.map((s: string) => {
-      try {
-        return getValueByPath(payload, s);
-      } catch {
-        return '';
+      const value = getValueByPath(payload, s);
+      if (value === null || value === undefined) {
+        throw new Error(`Source value not found at path: ${s}`);
       }
+      return value;
     });
 
     const combinedValue = extractedValues.join('');
