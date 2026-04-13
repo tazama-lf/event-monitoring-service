@@ -1,0 +1,260 @@
+# SPDX-License-Identifier: Apache-2.0
+
+# This GitHub Actions workflow syncs workflows from a central repository to other repositories when changes are pushed to dev.
+
+# Please do not attempt to edit this flow without the direct consent from the DevOps team. This file is managed centrally.
+
+name: Sync Workflows
+
+on:
+  push:
+    branches: [ "dev" ]  # Fires only when commits land on dev (i.e. a PR merges or a direct push). Fixes #36.
+  workflow_dispatch:
+
+concurrency:
+  group: sync-workflows-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  Sync_All_Repos_Common_Workflows:
+    if: github.actor != 'dependabot[bot]' && github.actor != 'dependabot-preview[bot]'
+    runs-on: ubuntu-latest  # Use the latest Ubuntu runner for the job
+    steps:
+      - name: Checkout Central Workflows Repo  # Step to checkout the repository containing the central workflows
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Set up Git  # Step to configure Git with necessary details
+        run: |
+          git config --global user.name 'Justus-at-Tazama'
+          git config --global user.email '123470803+Justus-at-Tazama@users.noreply.github.com'
+          git config --global credential.helper store
+          # Configure SSH commit signing so sync commits show as Verified on GitHub.
+          # SSH_SIGNING_KEY must be stored base64-encoded (single line, no wrapping) to avoid
+          # line-ending corruption. Set with: base64 -w 0 signing_key | gh secret set SSH_SIGNING_KEY
+          # The corresponding public key must be registered as a Signing Key on the GitHub account
+          # that GH_TOKEN belongs to: Settings → SSH and GPG keys → New signing key.
+          if [ -z "${{ secrets.SSH_SIGNING_KEY }}" ]; then
+            echo "::error::SSH_SIGNING_KEY secret is not set. Commits cannot be signed. Add the secret before running the sync." >&2
+            exit 1
+          fi
+          mkdir -p ~/.ssh
+          # Decode the base64 secret directly to the key file — no line-ending issues possible.
+          echo "${{ secrets.SSH_SIGNING_KEY }}" | base64 -d > ~/.ssh/signing_key
+          chmod 600 ~/.ssh/signing_key
+          # Validate the key is a usable Ed25519/RSA private key before enabling signing.
+          ssh-keygen -y -f ~/.ssh/signing_key > /dev/null || {
+            echo "::error::SSH_SIGNING_KEY is not a valid SSH private key or is passphrase-protected. Fix the secret before running the sync." >&2
+            exit 1
+          }
+          git config --global gpg.format ssh
+          git config --global user.signingkey ~/.ssh/signing_key
+          git config --global commit.gpgsign true
+
+      - name: Get actor details  # Step to get the triggering actor's details for the Signed-off-by line
+        id: pr_author
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # For pull_request events use the PR author login; for push/workflow_dispatch fall back to the triggering actor.
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            PR_AUTHOR_NAME=$(gh api "repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}" --jq '.user.login')
+            PR_AUTHOR_NAME_FULL=$(git log -1 --pretty=format:'%an')
+            PR_AUTHOR_EMAIL=$(git log -1 --pretty=format:'%ae')
+          else
+            PR_AUTHOR_NAME="${{ github.actor }}"
+            PR_AUTHOR_NAME_FULL="${{ github.actor }}"
+            PR_AUTHOR_EMAIL="${{ github.actor }}@users.noreply.github.com"
+          fi
+          echo "PR_AUTHOR_NAME=${PR_AUTHOR_NAME}" >> $GITHUB_ENV
+          echo "PR_AUTHOR_EMAIL=${PR_AUTHOR_EMAIL}" >> $GITHUB_ENV
+          echo "PR_AUTHOR_NAME_FULL=${PR_AUTHOR_NAME_FULL}" >> $GITHUB_ENV
+
+      - name: Sync Workflows to Other Repos  # Step to sync workflows to other repositories
+        env:
+          REPOS: |  # List of repositories to sync workflows to
+            relay-service
+            event-monitoring-service
+            auth-service
+            typology-processor
+            event-director
+            event-sidecar
+            lumberjack
+            nats-utilities
+            batch-ppa
+            admin-service
+            tms-service
+            transaction-aggregation-decisioning-processor
+            Full-Stack-Docker-Tazama
+            rule-executer
+            event-flow
+            frms-coe-lib
+            frms-coe-startup-lib
+            auth-lib
+            auth-lib-provider-keycloak
+            rule-901
+            rule-902
+            tcs-lib
+            relay-service-integration-nats
+            relay-service-integration-rest
+            relay-service-integration-kafka
+            relay-service-integration-rabbitmq
+            audit-lib
+          SPECIFIC_FILES: dockerhub-image-build.yml dockerhub-image-build-rc.yml  # Docker workflows: only for repos that build Docker images (i.e. not in SPECIFIC_REPOS)
+          SPECIFIC_REPOS: |  # Repos that do NOT build Docker images — receive all workflows except SPECIFIC_FILES
+            relay-service
+            batch-ppa
+            Full-Stack-Docker-Tazama
+            rule-executer
+            frms-coe-lib
+            frms-coe-startup-lib
+            auth-lib
+            auth-lib-provider-keycloak
+            rule-901
+            rule-902
+            tcs-lib
+            relay-service-integration-nats
+            relay-service-integration-rest
+            relay-service-integration-kafka
+            relay-service-integration-rabbitmq
+            audit-lib
+          PUBLISH_REPOS: |  # Library repos that publish npm packages — the only repos that receive publish.yml and version-check.yml
+            frms-coe-lib
+            frms-coe-startup-lib
+            auth-lib
+            auth-lib-provider-keycloak
+            rule-901
+            rule-902
+            tcs-lib
+            relay-service-integration-nats
+            relay-service-integration-rest
+            relay-service-integration-kafka
+            relay-service-integration-rabbitmq
+            audit-lib
+          RULE_REPOS: |  # Rule repos that receive caller stubs instead of full package-rule*.yml copies
+            rule-901
+            rule-902
+          PR_REVIEWERS: ${{ secrets.GH_USERNAME }}  # List of reviewers
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: |
+          SIGNED_OFF_BY="Signed-off-by: ${{ env.PR_AUTHOR_NAME_FULL }} <${{ env.PR_AUTHOR_EMAIL }}>"
+
+          # Build the temp-workflows bundle once, outside the repo loop
+          mkdir -p temp-workflows
+          cp -r .github/workflows/* temp-workflows/
+          rm temp-workflows/sync-workflows.yml  # Remove the sync-workflows.yml to avoid recursive syncing
+          rm -f temp-workflows/node.js.yml  # Remove per-repo CI workflow to avoid overwriting repo-specific benchmarks
+
+          # Helper: check membership in a newline-delimited list (YAML block scalar)
+          # Space-delimited single-line vars (SPECIFIC_FILES) use the [[ =~ ]] pattern directly.
+          in_list() { echo "$2" | grep -Fxq "$1"; }
+
+          for repo in $REPOS; do
+            # All target repos are in the tazama-lf org. (Closes #28)
+            ORG="tazama-lf"
+
+            git clone https://github.com/$ORG/$repo.git
+            cd $repo
+            git remote set-url origin https://x-access-token:${{ secrets.GH_TOKEN }}@github.com/$ORG/$repo.git
+
+            # Ensure dev branch exists in target repo — create from default branch if absent.
+            if ! git ls-remote --heads origin dev | grep -q dev; then
+              DEFAULT_BRANCH=$(git remote show origin | sed -n '/HEAD branch/s/.*: //p')
+              echo "Branch 'dev' not found in $repo; creating from '${DEFAULT_BRANCH}'"
+              git checkout -b dev "origin/${DEFAULT_BRANCH}"
+              git push origin dev
+            else
+              git checkout dev
+            fi
+
+            # Always delete and recreate sync-workflows-update to avoid accumulating stale changes.
+            # RESERVED: sync-workflows-update is managed by this workflow — do not use it for regular development contributions.
+            if git ls-remote --heads origin sync-workflows-update | grep -q sync-workflows-update; then
+              git push origin --delete sync-workflows-update || true
+            fi
+            git checkout -b sync-workflows-update
+
+            cd ..
+            mkdir -p $repo/.github/workflows  # Create the workflows directory if it does not exist
+
+            # Unified copy: apply per-file rules before copying
+            for file in temp-workflows/*; do
+              filename=$(basename "$file")
+              # Docker workflows: skip for repos that don't build Docker images
+              if in_list "$repo" "$SPECIFIC_REPOS" && [[ " ${SPECIFIC_FILES} " =~ " ${filename} " ]]; then
+                continue
+              fi
+              # publish.yml, version-check.yml, and release-train.yml: only copy to designated library repos
+              if [[ "${filename}" == "publish.yml" || "${filename}" == "version-check.yml" || "${filename}" == "release-train.yml" ]] && ! in_list "$repo" "$PUBLISH_REPOS"; then
+                continue
+              fi
+              # package-rule*.yml canonical definitions: never copy to rule repos — stubs are stamped below
+              if in_list "$repo" "$RULE_REPOS" && [[ "${filename}" == package-rule*.yml ]]; then
+                continue
+              fi
+              # scorecard.yml: only copy to service repos — skip library/npm repos and rule repos
+              if [[ "${filename}" == "scorecard.yml" ]] && in_list "$repo" "$PUBLISH_REPOS"; then
+                continue
+              fi
+              cp -r "$file" "$repo/.github/workflows/"
+            done
+
+            # Stamp caller stubs for rule repos (replaces the full per-repo copies)
+            if in_list "$repo" "$RULE_REPOS"; then
+              RULE_NUM="${repo#rule-}"  # strip "rule-" prefix → "901", "902"
+              # RC caller stub
+              printf '%s\n' \
+                '# SPDX-License-Identifier: Apache-2.0' \
+                '# This file is managed centrally — do not edit manually.' \
+                '# To change build behaviour, update the reusable workflow in tazama-lf/workflows.' \
+                'on:' \
+                '  push:' \
+                '    branches: [dev]' \
+                '  repository_dispatch:' \
+                '    types: [rule-executer-update]' \
+                '  workflow_dispatch:' \
+                'jobs:' \
+                '  build:' \
+                "    uses: tazama-lf/workflows/.github/workflows/package-rule-rc.yml@dev" \
+                '    with:' \
+                "      rule_number: \"${RULE_NUM}\"" \
+                '      rule_org: "tazama-lf"' \
+                '    secrets: inherit' \
+                > "$repo/.github/workflows/package-rule-rc.yml"
+              # Stable caller stub
+              printf '%s\n' \
+                '# SPDX-License-Identifier: Apache-2.0' \
+                '# This file is managed centrally — do not edit manually.' \
+                '# To change build behaviour, update the reusable workflow in tazama-lf/workflows.' \
+                'on:' \
+                '  push:' \
+                '    branches: [main]' \
+                '  workflow_dispatch:' \
+                'jobs:' \
+                '  build:' \
+                "    uses: tazama-lf/workflows/.github/workflows/package-rule.yml@main" \
+                '    with:' \
+                "      rule_number: \"${RULE_NUM}\"" \
+                '      rule_org: "tazama-lf"' \
+                '    secrets: inherit' \
+                > "$repo/.github/workflows/package-rule.yml"
+              echo "Stamped caller stubs for rule-${RULE_NUM} (tazama-lf)"
+            fi
+            cd "$repo"
+            git add .github/workflows/
+            git commit -m "ci: sync workflows from central-workflows" -m "${SIGNED_OFF_BY}" || echo "No changes to commit"
+            git push origin sync-workflows-update || git push origin sync-workflows-update --force
+
+            # Create the PR with reviewers
+            IFS=',' read -ra REVIEWERS <<< "${PR_REVIEWERS}"
+            REVIEWERS_ARGS=""
+            for reviewer in "${REVIEWERS[@]}"; do
+              REVIEWERS_ARGS+="--reviewer $reviewer "
+            done
+
+            PR_BODY="This PR syncs workflows from the central-workflows repository."$'\n\n'"${SIGNED_OFF_BY}"
+            gh pr create --title "ci: sync workflows from central-workflows" --body "$PR_BODY" --base dev --head sync-workflows-update $REVIEWERS_ARGS || echo "PR already exists, updating existing PR"
+
+            cd ..
+          done
