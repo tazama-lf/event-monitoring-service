@@ -18,7 +18,7 @@ export async function bootstrap(): Promise<void> {
   const configService = app.get(ConfigService);
 
   // Configure CORS origins from environment variable
-  const corsOriginsConfig = configService.get<string>('CORS_ORIGINS') ?? process.env.CORS_ORIGINS;
+  const corsOriginsConfig = configService.get('CORS_ORIGINS') ?? process.env.CORS_ORIGINS;
   if (!corsOriginsConfig) {
     throw new Error('CORS_ORIGINS environment variable is not set');
   }
@@ -26,11 +26,12 @@ export async function bootstrap(): Promise<void> {
   let corsOrigins: string[];
   try {
     // parsing as JSON array first, then fall back to comma-separated
-    corsOrigins = corsOriginsConfig.startsWith('[') 
+    corsOrigins = corsOriginsConfig.startsWith('[')
       ? JSON.parse(corsOriginsConfig)
-      : corsOriginsConfig.split(',').map(origin => origin.trim());
+      : corsOriginsConfig.split(',').map((origin) => origin.trim());
   } catch (error) {
-    throw new Error(`Failed to parse CORS_ORIGINS: ${error}`);
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`Failed to parse CORS_ORIGINS: ${message}`, { cause: error });
   }
 
   app.enableCors({
@@ -62,8 +63,8 @@ export async function bootstrap(): Promise<void> {
     }),
   );
 
-  const port = configService.get<number>('port', 3002);
-  const environment = configService.get<string>('nodeEnv', 'dev');
+  const port = configService.get('port', 3002);
+  const environment = configService.get('nodeEnv', 'dev');
   const processId = process.pid;
   try {
     await app.listen(port);

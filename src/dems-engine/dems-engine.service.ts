@@ -9,7 +9,8 @@ import { getValueByPath } from '../utils/has_nested_property';
 import { DatabaseOperationsService } from '../commons';
 import { DatabaseService } from '../database/database.service';
 import { ApmSpan } from '../apm/apm.decorators';
-import { parseString, ParserOptions } from 'xml2js';
+import { ParserOptions } from 'xml2js';
+import { parseXmlPayload } from '../utils/xml-parse.utils';
 import { returnArrayFieldsFromSchema, replaceObjectsWithArrays, createSchemaAwareNumberProcessor } from '../utils/xml2js.utils';
 import { processSourceMapping } from '../utils/mapping-sources.utils';
 import { handleConstantValue } from '../utils/constant-value.utils';
@@ -47,7 +48,7 @@ export class DemsEngineService {
   ) {
     this.ajv = new Ajv({ allErrors: true, logger: false });
     addFormats(this.ajv);
-    this.timeToLive = this.configService.get<number>('cache.timeToLive', 3600);
+    this.timeToLive = this.configService.get('cache.timeToLive', 3600);
   }
 
   @ApmSpan('dems-find-schema-and-mapping')
@@ -69,7 +70,7 @@ export class DemsEngineService {
     // not found in cache, query the database
     this.loggerService.log(`Cache miss for endpoint: ${endpoint}. Querying database...`);
     const result = await this.databaseService.query(
-      'SELECT schema, mapping, functions, related_transaction, publishing_status FROM tcs_config WHERE endpoint_path = $1 and publishing_status = \'active\'',
+      "SELECT schema, mapping, functions, related_transaction, publishing_status FROM tcs_config WHERE endpoint_path = $1 and publishing_status = 'active'",
       [endpoint],
     );
     const [record] = result.rows;
@@ -167,7 +168,7 @@ export class DemsEngineService {
     };
 
     const dynamicMapping: any = {};
-  
+
     // Track specific fields for database storage
     const trackedFields: TrackedFields = {
       CreDtTm: '',
@@ -342,7 +343,13 @@ export class DemsEngineService {
           this.loggerService.log(`the primary key value is : ${primaryKeyValue} and data value is : ${JSON.stringify(dataValue)}`);
 
           // async addDataModelTable(tableName: string, primaryKey: string, data: any)
-          await this.databaseOperationsService[functionToCall](tableName, primaryKeyValue, dataValue, transactionRelationship.TenantId, transactionRelationship.CreDtTm);
+          await this.databaseOperationsService[functionToCall](
+            tableName,
+            primaryKeyValue,
+            dataValue,
+            transactionRelationship.TenantId,
+            transactionRelationship.CreDtTm,
+          );
           continue;
         }
 
@@ -467,28 +474,8 @@ export class DemsEngineService {
           valueProcessors: [createSchemaAwareNumberProcessor(stringFields)], // Use custom processor
         };
 
-        // eslint-disable-next-line promise/avoid-new -- we need to wrap xml2js parseString in a promise
-        transformedPayload = await new Promise((resolve, reject) => {
-          parseString(payload, options, (err, result) => {
-            if (err) {
-              reject(err);
-            } else {
-              // Add XML declaration if schema expects it
-              if (configuredSchema?.properties?.['?xml']) {
-                const xmlWithDeclaration = {
-                  '?xml': {
-                    version: '1.0',
-                    encoding: 'UTF-8'
-                  },
-                  ...result
-                };
-                resolve(xmlWithDeclaration);
-              } else {
-                resolve(result);
-              }
-            }
-          });
-        });
+        // Use the utility function for XML parsing
+        transformedPayload = await parseXmlPayload(payload, configuredSchema, options);
 
         // Convert the transformed payload to ensure array fields are properly formatted
         // Note: We don't need string conversion here anymore since the parser handles it
@@ -510,10 +497,9 @@ export class DemsEngineService {
       // this is required as per event-director payload structure
       const enhancedRequest = { ...payload, TenantId: tenantId, TxTp: transactionType };
 
-      
       const relatedResult = relatedTransaction ? await this.findSchemaAndMapping(relatedTransaction) : null;
       const [, relatedMapping, ,] = relatedResult ?? [];
-      
+
       // in case of pacs002, the first processMapping will give the DataCache
       // second processMapping will give the transactionRelation and all others
       // so we will have to tell the second processMapping, somehow, that we have already built the dataCache and it needs to only build the transactionRelationship and other details. we can do this by passing a flag or by checking if the dataCache is empty or not. for now, we will check if the dataCache is empty or not.

@@ -17,7 +17,7 @@ export class ApmService implements OnModuleInit {
       transactionIgnoreUrls: ['/health', '/metrics'],
       captureBody: 'all',
       captureHeaders: true,
-      environment: this.configService.get<string>('NODE_ENV', 'development'),
+      environment: this.configService.get('NODE_ENV', 'development'),
     });
   }
 

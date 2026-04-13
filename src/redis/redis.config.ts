@@ -11,7 +11,7 @@ export const createRedisConfig = (configService: ConfigService): RedisConfig => 
   }
 
   return {
-    db: configService.get<number>('redis.db', 0),
+    db: configService.get('redis.db', 0),
     servers: [
       {
         host,

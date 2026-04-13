@@ -47,7 +47,7 @@ export class AppClusterService {
     const configService = tempApp.get(ConfigService);
     const loggerService = tempApp.get(LoggerService);
 
-    const maxCpu = configService.get<number>('maxCpu', os.cpus().length);
+    const maxCpu = configService.get('maxCpu', os.cpus().length);
     const numCPUs = Math.min(maxCpu, os.cpus().length);
 
     await tempApp.close();
