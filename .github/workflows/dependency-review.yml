@@ -18,6 +18,8 @@ permissions:
 
 jobs:
   dependency-review:
+    # Only run if dependency graph is enabled or explicitly opted in
+    if: ${{ vars.DEPENDENCY_REVIEW_ENABLED == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - name: 'Checkout Repository'
