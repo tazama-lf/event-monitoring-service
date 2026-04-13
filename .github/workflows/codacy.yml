@@ -56,9 +56,9 @@ jobs:
           # Force 0 exit code to allow SARIF file generation
           # This will handover control about PR rejection to the GitHub side
           max-allowed-issues: 2147483647
-          # Limit to essential analyzers to avoid multiple SARIF runs with same category
+          # Run only ESLint to ensure single SARIF run and avoid category conflicts
           # This prevents GitHub Code Scanning rejection of multi-run SARIF uploads
-          tools: eslint,remark-lint
+          tool: eslint
 
       # Upload the SARIF file generated in the previous step
       - name: Upload SARIF results file
