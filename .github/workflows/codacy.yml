@@ -43,6 +43,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
       - name: Run Codacy Analysis CLI
+        id: codacy
         uses: codacy/codacy-analysis-cli-action@562ee3e92b8e92df8b67e0a5ff8aa8e261919c08 # v4.4.7
         with:
           # Check https://github.com/codacy/codacy-analysis-cli#project-token to get your project token from your Codacy repository
@@ -60,8 +61,16 @@ jobs:
           # This prevents GitHub Code Scanning rejection of multi-run SARIF uploads
           tool: eslint
 
+      - name: Verify SARIF was generated
+        run: |
+          if [ ! -s results.sarif ]; then
+            echo "results.sarif was not generated (or is empty). Codacy analysis failed earlier."
+            exit 1
+          fi
+
       # Upload the SARIF file generated in the previous step
       - name: Upload SARIF results file
+        if: ${{ always() && hashFiles('results.sarif') != '' }}
         uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: results.sarif
