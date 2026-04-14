@@ -62,15 +62,27 @@ jobs:
           tool: eslint
 
       - name: Verify SARIF was generated
+        id: verify
         run: |
-          if [ ! -s results.sarif ]; then
-            echo "results.sarif was not generated (or is empty). Codacy analysis failed earlier."
+          if [ ! -f results.sarif ]; then
+            echo "results.sarif was not generated. Codacy analysis failed earlier."
             exit 1
+          fi
+          if [ ! -s results.sarif ]; then
+            echo "results.sarif exists but is empty. This may indicate no issues were found."
+            echo "File size: $(stat -c%s results.sarif) bytes"
+            echo "File contents:"
+            cat results.sarif
+            echo "Skipping upload since SARIF is empty."
+            echo "skip_upload=true" >> $GITHUB_OUTPUT
+          else
+            echo "SARIF file generated successfully. Size: $(stat -c%s results.sarif) bytes"
+            echo "skip_upload=false" >> $GITHUB_OUTPUT
           fi
 
       # Upload the SARIF file generated in the previous step
       - name: Upload SARIF results file
-        if: ${{ always() && hashFiles('results.sarif') != '' }}
+        if: ${{ always() && steps.verify.outputs.skip_upload != 'true' && hashFiles('results.sarif') != '' }}
         uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: results.sarif
