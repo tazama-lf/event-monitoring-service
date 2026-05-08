@@ -164,7 +164,27 @@ sequenceDiagram
 
 ## Testing
 
-Run the test suite to validate functionality:
+### Test Environment Setup
+
+> **Required before running tests for the first time.**
+
+The test suite loads environment variables from a `.env.test` file via `dotenv`. This file is **gitignored** and must be created locally before running tests. Without it, all test suites will fail at module load time with:
+
+> `Environment variable STARTUP_TYPE is not defined.`
+
+Create `.env.test` from the provided sample and set at minimum `STARTUP_TYPE=nats`:
+
+```sh
+cp .env.test.sample .env.test
+```
+
+Review the values in `.env.test` and adjust any that differ from your local environment (database credentials, Redis password, NATS URL, etc.). The sample ships with sensible defaults for local development.
+
+> **Note:** Do not commit `.env.test` — it is intentionally gitignored as it may contain local secrets.
+
+### Running Tests
+
+Once `.env.test` is in place, run the test suite to validate functionality:
 
 ```sh
 npm run test
