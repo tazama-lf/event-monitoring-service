@@ -107,6 +107,9 @@
       "./jest.setup.js"
     ]
   },
+  "overrides": {
+    "fast-xml-parser": "5.8.0"
+  },
   "lint-staged": {
     "*.{ts,js}": [
       "eslint --fix",
