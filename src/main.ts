@@ -18,7 +18,8 @@ export async function bootstrap(): Promise<void> {
   const configService = app.get(ConfigService);
 
   // Configure CORS origins from environment variable
-  const corsOriginsConfig = configService.get<string>('CORS_ORIGINS') ?? process.env.CORS_ORIGINS;
+  const rawCorsConfig = configService.get<string>('CORS_ORIGINS') ?? process.env.CORS_ORIGINS;
+  const corsOriginsConfig = rawCorsConfig?.trim();
   if (!corsOriginsConfig) {
     throw new Error('CORS_ORIGINS environment variable is not set');
   }
@@ -26,11 +27,24 @@ export async function bootstrap(): Promise<void> {
   let corsOrigins: string[];
   try {
     // parsing as JSON array first, then fall back to comma-separated
-    corsOrigins = corsOriginsConfig.startsWith('[')
-      ? JSON.parse(corsOriginsConfig)
-      : corsOriginsConfig.split(',').map((origin) => origin.trim());
+    if (corsOriginsConfig.startsWith('[')) {
+      const parsed: unknown = JSON.parse(corsOriginsConfig);
+      if (!Array.isArray(parsed)) {
+        throw new Error('CORS_ORIGINS JSON value must be an array');
+      }
+      corsOrigins = parsed.map((item) => String(item).trim()).filter((origin) => origin.length > 0);
+    } else {
+      corsOrigins = corsOriginsConfig
+        .split(',')
+        .map((origin) => origin.trim())
+        .filter((origin) => origin.length > 0);
+    }
   } catch (error) {
     throw new Error(`Failed to parse CORS_ORIGINS: ${error instanceof Error ? error.message : String(error)}`, { cause: error });
+  }
+
+  if (corsOrigins.length === 0) {
+    throw new Error('CORS_ORIGINS must contain at least one valid origin');
   }
 
   app.enableCors({

@@ -5,23 +5,39 @@ import { NotifyEventDirectorError } from '../errors/transaction-operation.errors
 type MessageHandler = (reqObj: unknown) => Promise<void>;
 
 interface StartupServiceLike {
-  init: (handler: (message: unknown) => Promise<void>, logger: LoggerService, consumerStreams: string[]) => Promise<unknown>;
-  handleResponse: (payload: object) => Promise<void>;
+  init: (
+    handler: (message: unknown) => Promise<void>,
+    logger: LoggerService,
+    consumerStreams: string[],
+    parProducerStreamName?: string,
+  ) => Promise<unknown>;
+  handleResponse: (payload: object, subject?: string[]) => Promise<void>;
 }
 
 @Injectable()
 export class NatsService {
   private natsService: StartupServiceLike | null = null;
+  private natsServiceInit?: Promise<StartupServiceLike>;
   private readonly LOG_CONTEXT = NatsService.name;
 
   constructor(private readonly logger: LoggerService) {}
 
   private async getNatsService(): Promise<StartupServiceLike> {
-    if (!this.natsService) {
-      const { StartupFactory } = await import('@tazama-lf/frms-coe-startup-lib');
-      this.natsService = new StartupFactory();
+    if (this.natsService) {
+      return this.natsService;
     }
-    return this.natsService;
+    this.natsServiceInit ??= (async () => {
+      const { StartupFactory } = await import('@tazama-lf/frms-coe-startup-lib');
+      const inst = new StartupFactory();
+      this.natsService = inst;
+      return inst;
+    })();
+    try {
+      return await this.natsServiceInit;
+    } catch (error) {
+      this.natsServiceInit = undefined;
+      throw error;
+    }
   }
 
   async registerConsumer(consumerStreams: string[], messageHandler: MessageHandler): Promise<void> {
