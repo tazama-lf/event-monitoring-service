@@ -42,6 +42,22 @@ npm run start:dev
 
 The service will be available at `http://localhost:3002`
 
+> **dotenv behaviour — important for local development**
+>
+> The `package.json` scripts differ in how they load `.env`:
+>
+> | Script                     | dotenv pre-load                                 |
+> | -------------------------- | ----------------------------------------------- |
+> | `npm start` (`nest start`) | **No** — `.env` is **not** loaded automatically |
+> | `npm run start:dev`        | **Yes** — uses `-r dotenv/config`               |
+> | `npm run start:debug`      | **Yes** — uses `-r dotenv/config`               |
+>
+> Use `npm run start:dev` for local development so that the `.env` file you
+> copied from `.env.sample` is picked up automatically. If you use `npm start`
+> (e.g. in a container or CI), make sure all required environment variables are
+> set explicitly in the process environment — the `.env` file will **not** be
+> read.
+
 #### Project Variables
 
 | Variable    | Purpose                 | Example       |

@@ -279,5 +279,5 @@ export async function transformXmlPayload(payload: any, configuredSchema: any, l
       }
     });
   });
-  return replaceObjectsWithArrays(transformedPayload, arrayFields, [], loggerService);
+  return replaceObjectsWithArrays(transformedPayload, arrayFields, stringFields, loggerService);
 }
