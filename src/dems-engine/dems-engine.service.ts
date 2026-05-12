@@ -9,8 +9,7 @@ import { getValueByPath } from '../utils/has_nested_property';
 import { DatabaseOperationsService } from '../commons';
 import { DatabaseService } from '../database/database.service';
 import { ApmSpan } from '../apm/apm.decorators';
-import { parseString, ParserOptions } from 'xml2js';
-import { returnArrayFieldsFromSchema, replaceObjectsWithArrays, createSchemaAwareNumberProcessor } from '../utils/xml2js.utils';
+import { transformXmlPayload } from '../utils/xml2js.utils';
 import { processSourceMapping } from '../utils/mapping-sources.utils';
 import { handleConstantValue } from '../utils/constant-value.utils';
 import { handleDynamicMapping } from '../utils/dynamic-mapping.utils';
@@ -69,7 +68,7 @@ export class DemsEngineService {
     // not found in cache, query the database
     this.loggerService.log(`Cache miss for endpoint: ${endpoint}. Querying database...`);
     const result = await this.databaseService.query(
-      'SELECT schema, mapping, functions, related_transaction, publishing_status FROM tcs_config WHERE endpoint_path = $1 and publishing_status = \'active\'',
+      "SELECT schema, mapping, functions, related_transaction, publishing_status FROM tcs_config WHERE endpoint_path = $1 and publishing_status = 'active'",
       [endpoint],
     );
     const [record] = result.rows;
@@ -167,7 +166,7 @@ export class DemsEngineService {
     };
 
     const dynamicMapping: any = {};
-  
+
     // Track specific fields for database storage
     const trackedFields: TrackedFields = {
       CreDtTm: '',
@@ -442,8 +441,6 @@ export class DemsEngineService {
 
   @ApmSpan('dems-handle-message')
   async handleMessage(payload: any, endpoint: string, tenantId: string, isPayloadXml: boolean): Promise<ErrorResponse | ProcessingResult> {
-    let transformedPayload: any; //contains the XML --> JSON converted payload
-
     try {
       // refer to /docs/helpers for example schema and mapping configuration
       const result = await this.findSchemaAndMapping(endpoint);
@@ -458,53 +455,15 @@ export class DemsEngineService {
       this.loggerService.log(`Related transaction: ${JSON.stringify(relatedTransaction)}`, this.LOG_CONTEXT);
 
       if (isPayloadXml) {
-        const { stringFields, arrayFields } = returnArrayFieldsFromSchema(configuredSchema);
-
-        const options: ParserOptions = {
-          explicitArray: false, // Don't wrap single values in arrays
-          ignoreAttrs: false, // Include attributes
-          mergeAttrs: true, // Merge attributes with element content
-          explicitRoot: true, // Include root wrapper
-          explicitChildren: true,
-          normalize: true,
-          charkey: '#text', // Use #text instead of default _ for text content
-          attrkey: '@', // Use @ prefix for attributes
-          valueProcessors: [createSchemaAwareNumberProcessor(stringFields)], // Use custom processor
-        };
-
-        // eslint-disable-next-line promise/avoid-new -- we need to wrap xml2js parseString in a promise
-        transformedPayload = await new Promise((resolve, reject) => {
-          parseString(payload, options, (err, result) => {
-            if (err) {
-              reject(err);
-            } else {
-              // Add XML declaration if schema expects it
-              if (configuredSchema?.properties?.['?xml']) {
-                const xmlWithDeclaration = {
-                  '?xml': {
-                    version: '1.0',
-                    encoding: 'UTF-8'
-                  },
-                  ...result
-                };
-                resolve(xmlWithDeclaration);
-              } else {
-                resolve(result);
-              }
-            }
-          });
-        });
-
-        // Convert the transformed payload to ensure array fields are properly formatted
-        // Note: We don't need string conversion here anymore since the parser handles it
-        payload = replaceObjectsWithArrays(transformedPayload, arrayFields, [], this.loggerService);
+        payload = await transformXmlPayload(payload, configuredSchema, this.loggerService);
       }
 
       const validationResult = await this.validatePayload(payload, configuredSchema, endpoint, tenantId);
       if (!validationResult.isValid) {
         const MIN_DIFFERENCES_INDEX = 0;
         const errorMessage = validationResult.differences?.[MIN_DIFFERENCES_INDEX]?.includes('AJV validation error')
-          ? 'Error during schema validation' : 'Payload structure does not match the schema';
+          ? 'Error during schema validation'
+          : 'Payload structure does not match the schema';
         this.loggerService.warn(`Building error response: ${errorMessage}`, this.LOG_CONTEXT);
         return buildErrorResponse(errorMessage, validationResult.differences ?? [], configuredSchema);
       }
@@ -516,7 +475,7 @@ export class DemsEngineService {
 
       const relatedResult = relatedTransaction ? await this.findSchemaAndMapping(relatedTransaction) : null;
       const [, relatedMapping, ,] = relatedResult ?? [];
-      
+
       // in case of pacs002, the first processMapping will give the DataCache
       // second processMapping will give the transactionRelation and all others
       // so we will have to tell the second processMapping, somehow, that we have already built the dataCache and it needs to only build the transactionRelationship and other details. we can do this by passing a flag or by checking if the dataCache is empty or not. for now, we will check if the dataCache is empty or not.
@@ -567,9 +526,9 @@ export class DemsEngineService {
       this.loggerService.log(`Building Tazama payload for transaction type: ${transactionType}, tenant: ${tenantId}`, this.LOG_CONTEXT);
       let transactionForNats;
       if (isPacs002Transaction(enhancedRequest)) {
-        transactionForNats = enhancedRequest
+        transactionForNats = enhancedRequest;
       } else {
-        const msgId = transactionRelationship.MsgId
+        const msgId = transactionRelationship.MsgId;
         transactionForNats = { Payload: { ...payload }, TenantId: tenantId, TxTp: transactionType, MsgId: msgId };
       }
       const tazamaPayload = buildTazamaPayload(transactionForNats, transactionType, relatedMapping ? enhancedRequest.DataCache : dataCache);
