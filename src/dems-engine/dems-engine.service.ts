@@ -68,7 +68,7 @@ export class DemsEngineService {
     // not found in cache, query the database
     this.loggerService.log(`Cache miss for endpoint: ${endpoint}. Querying database...`);
     const result = await this.databaseService.query(
-      "SELECT schema, mapping, functions, related_transaction, publishing_status FROM tcs_config WHERE endpoint_path = $1 and publishing_status = 'active'",
+      'SELECT schema, mapping, functions, related_transaction, publishing_status FROM tcs_config WHERE endpoint_path = $1 and publishing_status = \'active\'',
       [endpoint],
     );
     const [record] = result.rows;
