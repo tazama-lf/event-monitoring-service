@@ -26,11 +26,11 @@ export async function bootstrap(): Promise<void> {
   let corsOrigins: string[];
   try {
     // parsing as JSON array first, then fall back to comma-separated
-    corsOrigins = corsOriginsConfig.startsWith('[') 
+    corsOrigins = corsOriginsConfig.startsWith('[')
       ? JSON.parse(corsOriginsConfig)
-      : corsOriginsConfig.split(',').map(origin => origin.trim());
+      : corsOriginsConfig.split(',').map((origin) => origin.trim());
   } catch (error) {
-    throw new Error(`Failed to parse CORS_ORIGINS: ${error}`);
+    throw new Error(`Failed to parse CORS_ORIGINS: ${error instanceof Error ? error.message : String(error)}`, { cause: error });
   }
 
   app.enableCors({
