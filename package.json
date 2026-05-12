@@ -18,6 +18,7 @@
     "start:prod": "node dist/main",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
     "lint:check": "eslint \"{src,apps,libs,test}/**/*.ts\"",
+    "lint:eslint": "eslint",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
