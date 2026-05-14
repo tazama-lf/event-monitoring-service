@@ -1,5 +1,6 @@
 import type { LoggerService } from '@tazama-lf/frms-coe-lib';
 import type { Request } from 'express';
+import { parseString, type ParserOptions } from 'xml2js';
 import type { ReturnArrayFieldsFromSchema } from '../interfaces/iXml2js.interfaces';
 
 /**
@@ -251,4 +252,32 @@ export function isXmlContentType(req: Request, loggerService?: LoggerService): b
     }
     throw error;
   }
+}
+
+export async function transformXmlPayload(payload: any, configuredSchema: any, loggerService: LoggerService): Promise<any> {
+  const { stringFields, arrayFields } = returnArrayFieldsFromSchema(configuredSchema);
+  const options: ParserOptions = {
+    explicitArray: false,
+    ignoreAttrs: false,
+    mergeAttrs: true,
+    explicitRoot: true,
+    explicitChildren: true,
+    normalize: true,
+    charkey: '#text',
+    attrkey: '@',
+    valueProcessors: [createSchemaAwareNumberProcessor(stringFields)],
+  };
+  // eslint-disable-next-line promise/avoid-new -- we need to wrap xml2js parseString in a promise
+  const transformedPayload = await new Promise<any>((resolve, reject) => {
+    parseString(payload, options, (err, result) => {
+      if (err) {
+        reject(err);
+      } else if (configuredSchema?.properties?.['?xml']) {
+        resolve({ '?xml': { version: '1.0', encoding: 'UTF-8' }, ...result });
+      } else {
+        resolve(result);
+      }
+    });
+  });
+  return replaceObjectsWithArrays(transformedPayload, arrayFields, stringFields, loggerService);
 }

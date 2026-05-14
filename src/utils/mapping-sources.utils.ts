@@ -34,12 +34,19 @@ export function processSourceMapping(sources: string[], configuredMapping: any[]
       return splitResultValue;
     }
 
+    if (!mapping) {
+      throw new Error(`Mapping not found for destination: ${source}`);
+    }
+
     if (mapping.constantValue) {
       return mapping.constantValue;
     }
 
     const extractedValues = mapping.source.map((s: string) => {
       const value = getValueByPath(payload, s);
+      if (value === null || value === undefined) {
+        throw new Error(`Source value not found at path: ${s}`);
+      }
       return value;
     });
 

@@ -76,7 +76,7 @@ export class ConfigNotifyService implements OnModuleInit {
         this.loggerService.warn(`Config not found for ID: ${message.transactionID}`, this.LOG_CONTEXT);
       }
     } catch (error) {
-      this.loggerService.error('Error processing message', error as Error, this.LOG_CONTEXT);
+      this.loggerService.error('Error processing message', error, this.LOG_CONTEXT);
     }
   }
 

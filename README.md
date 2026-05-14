@@ -42,6 +42,22 @@ npm run start:dev
 
 The service will be available at `http://localhost:3002`
 
+> **dotenv behaviour — important for local development**
+>
+> The `package.json` scripts differ in how they load `.env`:
+>
+> | Script                     | dotenv pre-load                                 |
+> | -------------------------- | ----------------------------------------------- |
+> | `npm start` (`nest start`) | **No** — `.env` is **not** loaded automatically |
+> | `npm run start:dev`        | **Yes** — uses `-r dotenv/config`               |
+> | `npm run start:debug`      | **Yes** — uses `-r dotenv/config`               |
+>
+> Use `npm run start:dev` for local development so that the `.env` file you
+> copied from `.env.sample` is picked up automatically. If you use `npm start`
+> (e.g. in a container or CI), make sure all required environment variables are
+> set explicitly in the process environment — the `.env` file will **not** be
+> read.
+
 #### Project Variables
 
 | Variable    | Purpose                 | Example       |
@@ -164,7 +180,27 @@ sequenceDiagram
 
 ## Testing
 
-Run the test suite to validate functionality:
+### Test Environment Setup
+
+> **Required before running tests for the first time.**
+
+The test suite loads environment variables from a `.env.test` file via `dotenv`. This file is **gitignored** and must be created locally before running tests. Without it, all test suites will fail at module load time with:
+
+> `Environment variable STARTUP_TYPE is not defined.`
+
+Create `.env.test` from the provided sample and set at minimum `STARTUP_TYPE=nats`:
+
+```sh
+cp .env.test.sample .env.test
+```
+
+Review the values in `.env.test` and adjust any that differ from your local environment (database credentials, Redis password, NATS URL, etc.). The sample ships with sensible defaults for local development.
+
+> **Note:** Do not commit `.env.test` — it is intentionally gitignored as it may contain local secrets.
+
+### Running Tests
+
+Once `.env.test` is in place, run the test suite to validate functionality:
 
 ```sh
 npm run test

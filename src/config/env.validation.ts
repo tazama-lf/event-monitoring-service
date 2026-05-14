@@ -138,7 +138,7 @@ export function validateEnvironment(config: Record<string, unknown>): AppConfigu
     port: appPort,
     configurationDatabaseUrl: config.CONFIGURATION_DATABASE_URL as string,
     database: {
-      host: (config.DB_HOST as string) || ('localhost' as string),
+      host: (config.DB_HOST as string) || 'localhost',
       port: dbPort,
       user: (config.DB_USER as string) || 'postgres',
       password: (config.DB_PASSWORD as string) || 'CHANGEME',

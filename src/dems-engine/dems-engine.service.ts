@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { LoggerService, RedisService } from '@tazama-lf/frms-coe-lib';
+import { isPacs002Transaction, LoggerService, RedisService } from '@tazama-lf/frms-coe-lib';
 import Ajv from 'ajv';
 import addFormats from 'ajv-formats';
 import { extractTransactionType } from '../utils/extract_message_type';
@@ -9,8 +9,7 @@ import { getValueByPath } from '../utils/has_nested_property';
 import { DatabaseOperationsService } from '../commons';
 import { DatabaseService } from '../database/database.service';
 import { ApmSpan } from '../apm/apm.decorators';
-import { parseString, ParserOptions } from 'xml2js';
-import { returnArrayFieldsFromSchema, replaceObjectsWithArrays, createSchemaAwareNumberProcessor } from '../utils/xml2js.utils';
+import { transformXmlPayload } from '../utils/xml2js.utils';
 import { processSourceMapping } from '../utils/mapping-sources.utils';
 import { handleConstantValue } from '../utils/constant-value.utils';
 import { handleDynamicMapping } from '../utils/dynamic-mapping.utils';
@@ -47,7 +46,7 @@ export class DemsEngineService {
   ) {
     this.ajv = new Ajv({ allErrors: true, logger: false });
     addFormats(this.ajv);
-    this.timeToLive = this.configService.get<number>('cache.timeToLive', 3600);
+    this.timeToLive = this.configService.get('cache.timeToLive', 3600);
   }
 
   @ApmSpan('dems-find-schema-and-mapping')
@@ -167,7 +166,7 @@ export class DemsEngineService {
     };
 
     const dynamicMapping: any = {};
-  
+
     // Track specific fields for database storage
     const trackedFields: TrackedFields = {
       CreDtTm: '',
@@ -263,7 +262,6 @@ export class DemsEngineService {
       trackedFields,
     };
   }
-
   /**
    * Executes configured functions based on the mapping configuration
    * @param payload The payload to extract data from
@@ -342,7 +340,13 @@ export class DemsEngineService {
           this.loggerService.log(`the primary key value is : ${primaryKeyValue} and data value is : ${JSON.stringify(dataValue)}`);
 
           // async addDataModelTable(tableName: string, primaryKey: string, data: any)
-          await this.databaseOperationsService[functionToCall](tableName, primaryKeyValue, dataValue, transactionRelationship.TenantId, transactionRelationship.CreDtTm);
+          await this.databaseOperationsService[functionToCall](
+            tableName,
+            primaryKeyValue,
+            dataValue,
+            transactionRelationship.TenantId,
+            transactionRelationship.CreDtTm,
+          );
           continue;
         }
 
@@ -437,8 +441,6 @@ export class DemsEngineService {
 
   @ApmSpan('dems-handle-message')
   async handleMessage(payload: any, endpoint: string, tenantId: string, isPayloadXml: boolean): Promise<ErrorResponse | ProcessingResult> {
-    let transformedPayload: any; //contains the XML --> JSON converted payload
-
     try {
       // refer to /docs/helpers for example schema and mapping configuration
       const result = await this.findSchemaAndMapping(endpoint);
@@ -453,46 +455,7 @@ export class DemsEngineService {
       this.loggerService.log(`Related transaction: ${JSON.stringify(relatedTransaction)}`, this.LOG_CONTEXT);
 
       if (isPayloadXml) {
-        const { stringFields, arrayFields } = returnArrayFieldsFromSchema(configuredSchema);
-
-        const options: ParserOptions = {
-          explicitArray: false, // Don't wrap single values in arrays
-          ignoreAttrs: false, // Include attributes
-          mergeAttrs: true, // Merge attributes with element content
-          explicitRoot: true, // Include root wrapper
-          explicitChildren: true,
-          normalize: true,
-          charkey: '#text', // Use #text instead of default _ for text content
-          attrkey: '@', // Use @ prefix for attributes
-          valueProcessors: [createSchemaAwareNumberProcessor(stringFields)], // Use custom processor
-        };
-
-        // eslint-disable-next-line promise/avoid-new -- we need to wrap xml2js parseString in a promise
-        transformedPayload = await new Promise((resolve, reject) => {
-          parseString(payload, options, (err, result) => {
-            if (err) {
-              reject(err);
-            } else {
-              // Add XML declaration if schema expects it
-              if (configuredSchema?.properties?.['?xml']) {
-                const xmlWithDeclaration = {
-                  '?xml': {
-                    version: '1.0',
-                    encoding: 'UTF-8'
-                  },
-                  ...result
-                };
-                resolve(xmlWithDeclaration);
-              } else {
-                resolve(result);
-              }
-            }
-          });
-        });
-
-        // Convert the transformed payload to ensure array fields are properly formatted
-        // Note: We don't need string conversion here anymore since the parser handles it
-        payload = replaceObjectsWithArrays(transformedPayload, arrayFields, [], this.loggerService);
+        payload = await transformXmlPayload(payload, configuredSchema, this.loggerService);
       }
 
       const validationResult = await this.validatePayload(payload, configuredSchema, endpoint, tenantId);
@@ -510,10 +473,9 @@ export class DemsEngineService {
       // this is required as per event-director payload structure
       const enhancedRequest = { ...payload, TenantId: tenantId, TxTp: transactionType };
 
-      
       const relatedResult = relatedTransaction ? await this.findSchemaAndMapping(relatedTransaction) : null;
       const [, relatedMapping, ,] = relatedResult ?? [];
-      
+
       // in case of pacs002, the first processMapping will give the DataCache
       // second processMapping will give the transactionRelation and all others
       // so we will have to tell the second processMapping, somehow, that we have already built the dataCache and it needs to only build the transactionRelationship and other details. we can do this by passing a flag or by checking if the dataCache is empty or not. for now, we will check if the dataCache is empty or not.
@@ -561,14 +523,15 @@ export class DemsEngineService {
         this.loggerService.warn('Building error response: function execution failed', this.LOG_CONTEXT);
         return buildErrorResponse('function execution failed', [String(error)]);
       }
-
       this.loggerService.log(`Building Tazama payload for transaction type: ${transactionType}, tenant: ${tenantId}`, this.LOG_CONTEXT);
-      let tazamaPayload;
-      if (relatedMapping) {
-        tazamaPayload = buildTazamaPayload(enhancedRequest, transactionType, enhancedRequest.DataCache);
+      let transactionForNats;
+      if (isPacs002Transaction(enhancedRequest)) {
+        transactionForNats = enhancedRequest;
       } else {
-        tazamaPayload = buildTazamaPayload(enhancedRequest, transactionType, dataCache);
+        const msgId = transactionRelationship.MsgId;
+        transactionForNats = { Payload: { ...payload }, TenantId: tenantId, TxTp: transactionType, MsgId: msgId };
       }
+      const tazamaPayload = buildTazamaPayload(transactionForNats, transactionType, relatedMapping ? enhancedRequest.DataCache : dataCache);
       this.loggerService.log('Successfully built Tazama payload for ED. all ok');
 
       return {
