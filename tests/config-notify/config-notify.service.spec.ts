@@ -1,16 +1,36 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { LoggerService, RedisService } from '@tazama-lf/frms-coe-lib';
 import { ConfigNotifyService } from '../../src/config-notify/config-notify.service';
 import { DatabaseService } from '../../src/database/database.service';
-import { NatsService } from '../../src/nats/nats.service';
+import { PublishingStatus } from '../../src/enums/publishingStatus.enum';
+
+const CACHE_TTL = 86400;
+
+const makeDbRow = (overrides = {}) => ({
+  endpointPath: '/test/endpoint',
+  schema: { type: 'object' },
+  mapping: { field: 'value' },
+  functions: { fn: 'test' },
+  related_transaction: 'rel-tx-id',
+  publishing_status: 'active',
+  ...overrides,
+});
+
+const makeQueryResult = (rows: object[]) => ({
+  rows,
+  rowCount: rows.length,
+  command: 'SELECT',
+  oid: 0,
+  fields: [],
+});
 
 describe('ConfigNotifyService', () => {
   let service: ConfigNotifyService;
   let mockLogger: jest.Mocked<LoggerService>;
   let mockRedis: jest.Mocked<RedisService>;
   let mockDatabaseService: jest.Mocked<DatabaseService>;
-  let mockNatsService: jest.Mocked<NatsService>;
 
   beforeEach(async () => {
     mockLogger = {
@@ -27,10 +47,6 @@ describe('ConfigNotifyService', () => {
       query: jest.fn(),
     } as any;
 
-    mockNatsService = {
-      registerConsumer: jest.fn(),
-    } as any;
-
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         ConfigNotifyService,
@@ -39,176 +55,142 @@ describe('ConfigNotifyService', () => {
         {
           provide: ConfigService,
           useValue: {
-            get: jest.fn((key, defaultValue) => {
-              if (key === 'cache.timeToLive') return 86400;
-              if (key === 'nats.consumerStream') return 'config.notification';
-              if (key === 'PRODUCER_STREAM') return 'dems.notification.response';
+            get: jest.fn((key: string, defaultValue: unknown) => {
+              if (key === 'cache.timeToLive') return CACHE_TTL;
               return defaultValue;
             }),
           },
         },
         { provide: DatabaseService, useValue: mockDatabaseService },
-        { provide: NatsService, useValue: mockNatsService },
       ],
     }).compile();
 
     service = module.get<ConfigNotifyService>(ConfigNotifyService);
   });
 
+  afterEach(() => {
+    jest.clearAllMocks();
+  });
+
   it('should be defined', () => {
     expect(service).toBeDefined();
   });
 
+  // ---------------------------------------------------------------------------
   describe('onModuleInit', () => {
-    it('should register consumer and preload cache', async () => {
-      mockDatabaseService.query.mockResolvedValue({
-        rows: [{ endpointPath: '/test', schema: {}, mapping: {}, functions: {}, publishing_status: 'active' }],
-        rowCount: 1,
-        command: 'SELECT',
-        oid: 0,
-        fields: [],
-      });
+    it('should preload all active configs into cache on startup', async () => {
+      const rows = [makeDbRow({ endpointPath: '/a' }), makeDbRow({ endpointPath: '/b' })];
+      mockDatabaseService.query.mockResolvedValue(makeQueryResult(rows));
 
       await service.onModuleInit();
 
-      expect(mockNatsService.registerConsumer).toHaveBeenCalled();
-      expect(mockRedis.setJson).toHaveBeenCalled();
-      expect(mockLogger.log).toHaveBeenCalledWith('NATS consumer registered for config.notification', 'ConfigNotifyService');
+      expect(mockDatabaseService.query).toHaveBeenCalledTimes(1);
+      expect(mockRedis.setJson).toHaveBeenCalledTimes(2);
+      expect(mockLogger.log).toHaveBeenCalledWith('Cache preloaded: 2 configurations', 'ConfigNotifyService');
     });
 
-    it('should throw error on failure', async () => {
-      mockNatsService.registerConsumer.mockRejectedValue(new Error('Connection failed'));
+    it('should preload nothing when no active configs exist', async () => {
+      mockDatabaseService.query.mockResolvedValue(makeQueryResult([]));
 
-      await expect(service.onModuleInit()).rejects.toThrow('Connection failed');
-    });
-  });
+      await service.onModuleInit();
 
-  describe('handleNatsMessage', () => {
-    it('should update cache when config found', async () => {
-      const message = { transactionID: '123' };
-      mockDatabaseService.query.mockResolvedValue({
-        rows: [{ endpointPath: '/test', schema: {}, mapping: {}, functions: {}, publishing_status: 'active' }],
-        rowCount: 1,
-        command: 'SELECT',
-        oid: 0,
-        fields: [],
-      });
-
-      await (service as any).handleNatsMessage(message);
-
-      expect(mockRedis.setJson).toHaveBeenCalled();
-      expect(mockLogger.log).toHaveBeenCalledWith('Updated cache for key: /test --> publishing status: active', 'ConfigNotifyService');
+      expect(mockRedis.setJson).not.toHaveBeenCalled();
+      expect(mockLogger.log).toHaveBeenCalledWith('Cache preloaded: 0 configurations', 'ConfigNotifyService');
     });
 
-    it('should log warning when config not found', async () => {
-      const message = { transactionID: '456' };
-      mockDatabaseService.query.mockResolvedValue({
-        rows: [],
-        rowCount: 0,
-        command: 'SELECT',
-        oid: 0,
-        fields: [],
-      });
-
-      await (service as any).handleNatsMessage(message);
-
-      expect(mockLogger.warn).toHaveBeenCalledWith('Config not found for ID: 456', 'ConfigNotifyService');
-    });
-
-    it('should log error for invalid message', async () => {
-      await (service as any).handleNatsMessage(null);
-
-      expect(mockLogger.error).toHaveBeenCalledWith(
-        'Invalid NATS message: expected JSON with non-empty transactionID',
-        'ConfigNotifyService',
-      );
-    });
-
-    it('should log error for missing transactionID', async () => {
-      await (service as any).handleNatsMessage({});
-
-      expect(mockLogger.error).toHaveBeenCalledWith(
-        'Invalid NATS message: expected JSON with non-empty transactionID',
-        'ConfigNotifyService',
-      );
-    });
-
-    it('should log error on database error', async () => {
-      const message = { transactionID: '789' };
-      const dbError = new Error('DB error');
+    it('should log and rethrow when the DB query fails', async () => {
+      const dbError = new Error('DB connection lost');
       mockDatabaseService.query.mockRejectedValue(dbError);
 
-      await (service as any).handleNatsMessage(message);
-
-      expect(mockLogger.error).toHaveBeenCalledWith('Error processing message', dbError, 'ConfigNotifyService');
-    });
-
-    it('should handle string JSON payload', async () => {
-      const stringMessage = JSON.stringify({ transactionID: '999' });
-      mockDatabaseService.query.mockResolvedValue({
-        rows: [{ endpointPath: '/test', schema: {}, mapping: {}, functions: {}, publishing_status: 'active' }],
-        rowCount: 1,
-        command: 'SELECT',
-        oid: 0,
-        fields: [],
-      });
-
-      await (service as any).handleNatsMessage(stringMessage);
-
-      expect(mockRedis.setJson).toHaveBeenCalled();
-      expect(mockLogger.log).toHaveBeenCalledWith('Received NATS message for config id: 999', 'ConfigNotifyService');
-    });
-
-    it('should handle Buffer payload', async () => {
-      const bufferMessage = Buffer.from(JSON.stringify({ transactionID: '888' }), 'utf8');
-      mockDatabaseService.query.mockResolvedValue({
-        rows: [{ endpointPath: '/test', schema: {}, mapping: {}, functions: {}, publishing_status: 'active' }],
-        rowCount: 1,
-        command: 'SELECT',
-        oid: 0,
-        fields: [],
-      });
-
-      await (service as any).handleNatsMessage(bufferMessage);
-
-      expect(mockRedis.setJson).toHaveBeenCalled();
-      expect(mockLogger.log).toHaveBeenCalledWith('Received NATS message for config id: 888', 'ConfigNotifyService');
-    });
-
-    it('should reject invalid JSON string', async () => {
-      await (service as any).handleNatsMessage('invalid json');
-
-      expect(mockLogger.error).toHaveBeenCalledWith(
-        'Invalid NATS message: expected JSON with non-empty transactionID',
-        'ConfigNotifyService',
-      );
+      await expect(service.onModuleInit()).rejects.toThrow('DB connection lost');
+      expect(mockLogger.error).toHaveBeenCalledWith(`Failed to initialize ConfigNotifyService: ${String(dbError)}`, 'ConfigNotifyService');
     });
   });
 
-  describe('setCache', () => {
-    it('should store config in Redis', async () => {
-      const config = {
-        endpointPath: '/test',
-        schema: { type: 'object' },
-        mapping: { field: 'value' },
-        functions: { fn: 'test' },
-        related_transaction: '',
-        publishing_status: 'active',
-      };
+  // ---------------------------------------------------------------------------
+  describe('updateCache', () => {
+    it('should fetch config by id, override publishing_status, and write to cache', async () => {
+      const row = makeDbRow({ publishing_status: 'inactive' });
+      mockDatabaseService.query.mockResolvedValue(makeQueryResult([row]));
 
-      await service.setCache(config);
+      await service.updateCache(1, PublishingStatus.ACTIVE);
+
+      expect(mockDatabaseService.query).toHaveBeenCalledWith(expect.stringContaining('WHERE id = $1'), [1]);
+      // The publishing_status stored in Redis must reflect what was passed in, not what was in the DB
+      expect(mockRedis.setJson).toHaveBeenCalledWith(
+        row.endpointPath,
+        JSON.stringify({
+          schema: row.schema,
+          mapping: row.mapping,
+          functions: row.functions,
+          related_transaction: row.related_transaction,
+          publishing_status: PublishingStatus.ACTIVE,
+        }),
+        CACHE_TTL,
+      );
+    });
+
+    it('should set publishing_status to inactive when requested', async () => {
+      const row = makeDbRow({ publishing_status: 'active' });
+      mockDatabaseService.query.mockResolvedValue(makeQueryResult([row]));
+
+      await service.updateCache(5, PublishingStatus.INACTIVE);
+
+      const [, storedJson] = mockRedis.setJson.mock.calls[0];
+      expect(JSON.parse(storedJson as string).publishing_status).toBe(PublishingStatus.INACTIVE);
+    });
+
+    it('should log the update after writing to cache', async () => {
+      const row = makeDbRow();
+      mockDatabaseService.query.mockResolvedValue(makeQueryResult([row]));
+
+      await service.updateCache(1, PublishingStatus.ACTIVE);
+
+      expect(mockLogger.log).toHaveBeenCalledWith(
+        `Updated cache for key: ${row.endpointPath} --> publishing status: ${PublishingStatus.ACTIVE}`,
+        'ConfigNotifyService',
+      );
+    });
+
+    it('should throw NotFoundException when no config matches the given id', async () => {
+      mockDatabaseService.query.mockResolvedValue(makeQueryResult([]));
+
+      await expect(service.updateCache(99, PublishingStatus.ACTIVE)).rejects.toThrow(new NotFoundException('Config not found for ID: 99'));
+      expect(mockRedis.setJson).not.toHaveBeenCalled();
+    });
+
+    it('should propagate DB errors', async () => {
+      mockDatabaseService.query.mockRejectedValue(new Error('Query failed'));
+
+      await expect(service.updateCache(1, PublishingStatus.ACTIVE)).rejects.toThrow('Query failed');
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  describe('setCache', () => {
+    it('should serialise all config fields and store in Redis under the endpointPath key', async () => {
+      const config = makeDbRow();
+
+      await service.setCache(config as any);
 
       expect(mockRedis.setJson).toHaveBeenCalledWith(
-        '/test',
+        config.endpointPath,
         JSON.stringify({
-          schema: { type: 'object' },
-          mapping: { field: 'value' },
-          functions: { fn: 'test' },
-          related_transaction: '',
-          publishing_status: 'active',
+          schema: config.schema,
+          mapping: config.mapping,
+          functions: config.functions,
+          related_transaction: config.related_transaction,
+          publishing_status: config.publishing_status,
         }),
-        86400,
+        CACHE_TTL,
       );
+    });
+
+    it('should use the configured TTL from ConfigService', async () => {
+      await service.setCache(makeDbRow() as any);
+
+      const [, , ttl] = mockRedis.setJson.mock.calls[0];
+      expect(ttl).toBe(CACHE_TTL);
     });
   });
 });
