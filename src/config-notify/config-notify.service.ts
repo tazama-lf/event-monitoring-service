@@ -5,7 +5,6 @@ import { DatabaseService } from '../database/database.service';
 import { CacheData } from '../interfaces/iCacheData';
 import { PublishingStatus } from '../enums/publishingStatus.enum';
 import { NatsService } from '../nats/nats.service';
-import { NatsMessage } from '../interfaces/iNatsMessage';
 
 @Injectable()
 export class ConfigNotifyService implements OnModuleInit {
@@ -27,8 +26,7 @@ export class ConfigNotifyService implements OnModuleInit {
   private readonly LOG_CONTEXT = ConfigNotifyService.name;
 
   async onModuleInit(): Promise<void> {
-    // Register consumer without producer stream since we only consume messages
-    this.natsService.registerConsumer([this.consumerStream], this.handleNatsMessage.bind(this));
+    await this.natsService.registerConsumer([this.consumerStream], this.handleNatsMessage.bind(this));
 
     this.loggerService.log(`NATS consumer registered for ${this.consumerStream}`, this.LOG_CONTEXT);
     try {
@@ -78,7 +76,7 @@ export class ConfigNotifyService implements OnModuleInit {
     await this.redisService.setJson(key, JSON.stringify(data), this.cacheTtl);
   }
 
-  private handleNatsMessage(message: NatsMessage): void {
+  private handleNatsMessage(message: unknown): void {
     this.loggerService.log(`Received NATS message: ${JSON.stringify(message)}`, this.LOG_CONTEXT);
   }
 }
