@@ -5,6 +5,7 @@ import { LoggerService, RedisService } from '@tazama-lf/frms-coe-lib';
 import { ConfigNotifyService } from '../../src/config-notify/config-notify.service';
 import { DatabaseService } from '../../src/database/database.service';
 import { PublishingStatus } from '../../src/enums/publishingStatus.enum';
+import { NatsService } from '../../src/nats/nats.service';
 
 const CACHE_TTL = 86400;
 
@@ -31,7 +32,7 @@ describe('ConfigNotifyService', () => {
   let mockLogger: jest.Mocked<LoggerService>;
   let mockRedis: jest.Mocked<RedisService>;
   let mockDatabaseService: jest.Mocked<DatabaseService>;
-
+  let mockNatsService: jest.Mocked<NatsService>;
   beforeEach(async () => {
     mockLogger = {
       log: jest.fn(),
@@ -41,6 +42,10 @@ describe('ConfigNotifyService', () => {
 
     mockRedis = {
       setJson: jest.fn(),
+    } as any;
+
+    mockNatsService = {
+      registerConsumer: jest.fn(),
     } as any;
 
     mockDatabaseService = {
@@ -57,11 +62,14 @@ describe('ConfigNotifyService', () => {
           useValue: {
             get: jest.fn((key: string, defaultValue: unknown) => {
               if (key === 'cache.timeToLive') return CACHE_TTL;
+              if (key === 'nats.consumerStream') return 'config.notification';
+              if (key === 'PRODUCER_STREAM') return 'dems.notification.response';
               return defaultValue;
             }),
           },
         },
         { provide: DatabaseService, useValue: mockDatabaseService },
+        { provide: NatsService, useValue: mockNatsService },
       ],
     }).compile();
 
