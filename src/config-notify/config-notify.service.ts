@@ -4,24 +4,33 @@ import { LoggerService, RedisService } from '@tazama-lf/frms-coe-lib';
 import { DatabaseService } from '../database/database.service';
 import { CacheData } from '../interfaces/iCacheData';
 import { PublishingStatus } from '../enums/publishingStatus.enum';
+import { NatsService } from '../nats/nats.service';
+import { NatsMessage } from '../interfaces/iNatsMessage';
 
 @Injectable()
 export class ConfigNotifyService implements OnModuleInit {
   private static readonly DEFAULT_CACHE_TTL = 3600;
   private readonly cacheTtl: number;
+  private readonly consumerStream: string;
 
   constructor(
     private readonly loggerService: LoggerService,
     private readonly redisService: RedisService,
     private readonly configService: ConfigService,
     private readonly databaseService: DatabaseService,
+    private readonly natsService: NatsService,
   ) {
     this.cacheTtl = this.configService.get<number>('cache.timeToLive', ConfigNotifyService.DEFAULT_CACHE_TTL);
+    this.consumerStream = this.configService.get<string>('nats.consumerStream', 'event-director');
   }
 
   private readonly LOG_CONTEXT = ConfigNotifyService.name;
 
   async onModuleInit(): Promise<void> {
+    // Register consumer without producer stream since we only consume messages
+    this.natsService.registerConsumer([this.consumerStream], this.handleNatsMessage.bind(this));
+
+    this.loggerService.log(`NATS consumer registered for ${this.consumerStream}`, this.LOG_CONTEXT);
     try {
       const result = await this.databaseService.query<CacheData>(
         'SELECT endpoint_path AS "endpointPath", schema, mapping, functions, related_transaction, publishing_status FROM tcs_config where publishing_status = \'active\' ',
@@ -67,5 +76,9 @@ export class ConfigNotifyService implements OnModuleInit {
       publishing_status: config.publishing_status,
     };
     await this.redisService.setJson(key, JSON.stringify(data), this.cacheTtl);
+  }
+
+  private handleNatsMessage(message: NatsMessage): void {
+    this.loggerService.log(`Received NATS message: ${JSON.stringify(message)}`, this.LOG_CONTEXT);
   }
 }
