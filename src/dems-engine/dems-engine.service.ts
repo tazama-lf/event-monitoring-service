@@ -473,7 +473,7 @@ export class DemsEngineService {
       // this is required as per event-director payload structure
       const enhancedRequest = { ...payload, TenantId: tenantId, TxTp: transactionType };
 
-      const relatedResult = relatedTransaction ? await this.findSchemaAndMapping(relatedTransaction) : null;
+      const relatedResult = relatedTransaction ? await this.findSchemaAndMapping(relatedTransaction, tenantId) : null;
       const [, relatedMapping, ,] = relatedResult ?? [];
 
       // in case of pacs002, the first processMapping will give the DataCache

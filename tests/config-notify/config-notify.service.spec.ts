@@ -10,6 +10,7 @@ import { NatsService } from '../../src/nats/nats.service';
 const CACHE_TTL = 86400;
 
 const makeDbRow = (overrides = {}) => ({
+  tenant_id: 'test-tenant',
   endpointPath: '/test/endpoint',
   schema: { type: 'object' },
   mapping: { field: 'value' },
@@ -126,7 +127,7 @@ describe('ConfigNotifyService', () => {
       expect(mockDatabaseService.query).toHaveBeenCalledWith(expect.stringContaining('WHERE id = $1'), [1]);
       // The publishing_status stored in Redis must reflect what was passed in, not what was in the DB
       expect(mockRedis.setJson).toHaveBeenCalledWith(
-        row.endpointPath,
+        `${row.tenant_id}:${row.endpointPath}`,
         JSON.stringify({
           schema: row.schema,
           mapping: row.mapping,
@@ -155,7 +156,7 @@ describe('ConfigNotifyService', () => {
       await service.updateCache(1, PublishingStatus.ACTIVE);
 
       expect(mockLogger.log).toHaveBeenCalledWith(
-        `Updated cache for key: ${row.endpointPath} --> publishing status: ${PublishingStatus.ACTIVE}`,
+        `Updated cache for key: ${row.tenant_id}:${row.endpointPath} --> publishing status: ${PublishingStatus.ACTIVE}`,
         'ConfigNotifyService',
       );
     });
@@ -182,7 +183,7 @@ describe('ConfigNotifyService', () => {
       await service.setCache(config as any);
 
       expect(mockRedis.setJson).toHaveBeenCalledWith(
-        config.endpointPath,
+        `${config.tenant_id}:${config.endpointPath}`,
         JSON.stringify({
           schema: config.schema,
           mapping: config.mapping,
