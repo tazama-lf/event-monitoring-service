@@ -50,7 +50,7 @@ export default defineConfig([
       '@typescript-eslint/restrict-template-expressions': 'error',
       '@typescript-eslint/strict-boolean-expressions': 'off',
       '@typescript-eslint/max-params': ['error', { max: 6 }],
-      '@stylistic/quotes': ['error', 'single'],
+      '@stylistic/quotes': ['error', 'single', {avoidEscape: true}],
       'complexity': ['warn', { max: 15 }],
       'max-depth': ['error', { max: 6 }],
       'no-console': 'error',
