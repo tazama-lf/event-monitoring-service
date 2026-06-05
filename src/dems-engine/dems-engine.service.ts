@@ -50,11 +50,11 @@ export class DemsEngineService {
   }
 
   @ApmSpan('dems-find-schema-and-mapping')
-  async findSchemaAndMapping(endpoint: string): Promise<FindSchemaAndMappingResult> {
+  async findSchemaAndMapping(endpoint: string, tenantId: string): Promise<FindSchemaAndMappingResult> {
     // latest change here is: it also fetches relatedTransaction now
     this.loggerService.log(`Looking up schema for endpoint: ${endpoint}`);
 
-    const cacheKey = endpoint;
+    const cacheKey = `${tenantId}:${endpoint}`;
     const cachedSchema = await this.redisService.getJson(cacheKey);
 
     if (cachedSchema) {
@@ -68,8 +68,8 @@ export class DemsEngineService {
     // not found in cache, query the database
     this.loggerService.log(`Cache miss for endpoint: ${endpoint}. Querying database...`);
     const result = await this.databaseService.query(
-      'SELECT schema, mapping, functions, related_transaction, publishing_status FROM tcs_config WHERE endpoint_path = $1 and publishing_status = \'active\'',
-      [endpoint],
+      "SELECT schema, mapping, functions, related_transaction, publishing_status FROM tcs_config WHERE endpoint_path = $1 and tenant_id = $2 and publishing_status = 'active'",
+      [endpoint, tenantId],
     );
     const [record] = result.rows;
     if (result.rows.length) {
@@ -443,7 +443,7 @@ export class DemsEngineService {
   async handleMessage(payload: any, endpoint: string, tenantId: string, isPayloadXml: boolean): Promise<ErrorResponse | ProcessingResult> {
     try {
       // refer to /docs/helpers for example schema and mapping configuration
-      const result = await this.findSchemaAndMapping(endpoint);
+      const result = await this.findSchemaAndMapping(endpoint, tenantId);
       if (!result) {
         this.loggerService.warn('Building error response: Schema not found for the specified endpoint', this.LOG_CONTEXT);
         return buildErrorResponse('Schema not found for the specified endpoint', ['No schema exists for this endpoint']);

@@ -31,7 +31,7 @@ export class ConfigNotifyService implements OnModuleInit {
     this.loggerService.log(`NATS consumer registered for ${this.consumerStream}`, this.LOG_CONTEXT);
     try {
       const result = await this.databaseService.query<CacheData>(
-        'SELECT endpoint_path AS "endpointPath", schema, mapping, functions, related_transaction, publishing_status FROM tcs_config where publishing_status = \'active\' ',
+        'SELECT endpoint_path AS "endpointPath", schema, mapping, functions, related_transaction, publishing_status, tenant_id FROM tcs_config where publishing_status = \'active\' ',
       );
       const configs = result.rows;
 
@@ -50,7 +50,7 @@ export class ConfigNotifyService implements OnModuleInit {
 
   public async updateCache(id: number, publishingStatus: PublishingStatus): Promise<void> {
     const result = await this.databaseService.query<CacheData>(
-      'SELECT endpoint_path AS "endpointPath", schema, mapping, functions, related_transaction, publishing_status FROM tcs_config WHERE id = $1',
+      'SELECT endpoint_path AS "endpointPath", schema, mapping, functions, related_transaction, publishing_status, tenant_id FROM tcs_config WHERE id = $1',
       [id],
     );
 
@@ -61,11 +61,14 @@ export class ConfigNotifyService implements OnModuleInit {
     const [config] = result.rows;
     config.publishing_status = publishingStatus;
     await this.setCache(config);
-    this.loggerService.log(`Updated cache for key: ${config.endpointPath} --> publishing status: ${publishingStatus}`, this.LOG_CONTEXT);
+    this.loggerService.log(
+      `Updated cache for key: ${config.tenant_id}:${config.endpointPath} --> publishing status: ${publishingStatus}`,
+      this.LOG_CONTEXT,
+    );
   }
 
   public async setCache(config: CacheData): Promise<void> {
-    const key = config.endpointPath;
+    const key = `${config.tenant_id}:${config.endpointPath}`;
     const data = {
       schema: config.schema,
       mapping: config.mapping,
