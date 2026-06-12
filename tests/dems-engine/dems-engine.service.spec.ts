@@ -104,11 +104,12 @@ describe('DemsEngineService', () => {
   });
 
   describe('findSchemaAndMapping', () => {
+    const mockTenantId = 'tenant1';
     it('should return cached schema on cache hit (object format)', async () => {
       const cachedData = { schema: mockSchema, mapping: mockMapping, functions: mockFunctions };
       (mockRedisService.getJson as jest.Mock).mockResolvedValue(cachedData);
 
-      const result = await service.findSchemaAndMapping('/test');
+      const result = await service.findSchemaAndMapping('/test', mockTenantId);
 
       expect(result).toEqual([mockSchema, mockMapping, mockFunctions]);
       expect(mockLoggerService.log).toHaveBeenCalledWith('Cache hit for endpoint: /test');
@@ -118,7 +119,8 @@ describe('DemsEngineService', () => {
       const cachedString = JSON.stringify({ schema: mockSchema, mapping: mockMapping, functions: mockFunctions });
       (mockRedisService.getJson as jest.Mock).mockResolvedValue(cachedString);
 
-      const result = await service.findSchemaAndMapping('/test');
+      const mockTenantId = 'tenant1';
+      const result = await service.findSchemaAndMapping('/test', mockTenantId);
 
       expect(result).toEqual([mockSchema, mockMapping, mockFunctions]);
     });
@@ -131,7 +133,7 @@ describe('DemsEngineService', () => {
         ]),
       );
 
-      const result = await service.findSchemaAndMapping('/test');
+      const result = await service.findSchemaAndMapping('/test', mockTenantId);
 
       expect(mockLoggerService.error).toHaveBeenCalledWith(expect.stringContaining('Failed to parse cached schema'));
       expect(result).toEqual([mockSchema, mockMapping, mockFunctions, '']);
@@ -145,11 +147,11 @@ describe('DemsEngineService', () => {
         ]),
       );
 
-      const result = await service.findSchemaAndMapping('/test');
+      const result = await service.findSchemaAndMapping('/test', mockTenantId);
 
       expect(result).toEqual([mockSchema, mockMapping, mockFunctions, '']);
       expect(mockRedisService.setJson).toHaveBeenCalledWith(
-        '/test',
+        `${mockTenantId}:/test`,
         JSON.stringify({
           schema: mockSchema,
           mapping: mockMapping,
@@ -165,7 +167,7 @@ describe('DemsEngineService', () => {
       (mockRedisService.getJson as jest.Mock).mockResolvedValue(null);
       mockDatabaseService.query.mockResolvedValue(createMockQueryResult([]));
 
-      const result = await service.findSchemaAndMapping('/test');
+      const result = await service.findSchemaAndMapping('/test', mockTenantId);
 
       expect(result).toBeNull();
       expect(mockLoggerService.log).toHaveBeenCalledWith('No schema found for endpoint: /test');
@@ -175,7 +177,7 @@ describe('DemsEngineService', () => {
       (mockRedisService.getJson as jest.Mock).mockResolvedValue(null);
       mockDatabaseService.query.mockRejectedValue(new Error('Database connection failed'));
 
-      await expect(service.findSchemaAndMapping('/test')).rejects.toThrow('Database connection failed');
+      await expect(service.findSchemaAndMapping('/test', mockTenantId)).rejects.toThrow('Database connection failed');
     });
   });
 

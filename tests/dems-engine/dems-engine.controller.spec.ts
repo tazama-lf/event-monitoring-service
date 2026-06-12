@@ -68,6 +68,7 @@ describe('DemsEngineController', () => {
       functions: { test: 'function' },
       related_transaction: '',
       publishing_status: 'active',
+      tenant_id: 'test-tenant',
     },
     publishing_status: 'active',
     trackedFields: {
