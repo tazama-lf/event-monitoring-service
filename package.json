@@ -106,6 +106,12 @@
       "src/dems-engine/dems-engine.service.ts"
     ],
     "coverageDirectory": "coverage",
+    "coverageThreshold": {
+      "global": {
+        "statements": 95,
+        "lines": 95
+      }
+    },
     "testEnvironment": "node",
     "setupFiles": [
       "./jest.setup.js"
