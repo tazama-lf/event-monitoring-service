@@ -61,6 +61,8 @@ export default defineConfig([
       'eslint-comments/no-duplicate-disable': 'off',
       'eslint-comments/no-unlimited-disable': 'off',
       'eslint-comments/no-unused-enable': 'off',
+      /* promise/avoid-new was removed in eslint-plugin-promise v7 but eslint-config-love still enables it; silence the "Definition for rule not found" error */
+      'promise/avoid-new': 'off',
     },
   },
 ]);
