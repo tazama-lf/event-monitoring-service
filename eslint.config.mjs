@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 import eslintPluginEslintComments from '@eslint-community/eslint-plugin-eslint-comments';
 import stylistic from '@stylistic/eslint-plugin';
-import tsEslint from '@typescript-eslint/eslint-plugin';
 import tsParser from '@typescript-eslint/parser';
 import eslintStandard from 'eslint-config-love';
 import eslintConfigPrettier from 'eslint-config-prettier/flat';
@@ -16,7 +15,6 @@ export default defineConfig([
       ...eslintStandard.plugins,
       ['@eslint-community/eslint-comments']: eslintPluginEslintComments,
       ['@stylistic']: stylistic,
-      ['@typescript-eslint']: tsEslint,
     },
     languageOptions: {
       ...eslintStandard.languageOptions,
