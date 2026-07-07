@@ -5,7 +5,11 @@ import { DemsEngineService } from '../../src/dems-engine/dems-engine.service';
 import { NatsService } from '../../src/nats/nats.service';
 import { DatabaseOperationsService } from '../../src/commons';
 import { DatabaseService } from '../../src/database/database.service';
-import { SaveTransactionHistoryError, NotifyEventDirectorError } from '../../src/errors/transaction-operation.errors';
+import {
+  SaveTransactionHistoryError,
+  NotifyEventDirectorError,
+  SaveTransactionRelationshipError,
+} from '../../src/errors/transaction-operation.errors';
 
 jest.mock('xml2js', () => ({
   parseString: jest.fn(),
@@ -706,6 +710,327 @@ describe('DemsEngineService', () => {
       mockDatabaseOperationsService.saveTransactionHistory.mockRejectedValue(new Error('Save failed'));
 
       await expect(service.saveTransactionDataAndNotify(testPayload, 'test.type', 'end-to-end-123')).rejects.toThrow('Save failed');
+    });
+
+    it('should handle generic TransactionOperationError subclass (not history/notify)', async () => {
+      const relErr = new SaveTransactionRelationshipError(new Error('rel db failed'));
+      mockDatabaseOperationsService.saveTransactionHistory.mockRejectedValue(relErr);
+      mockNatsService.notifyEventDirector.mockResolvedValue(undefined);
+
+      await expect(service.saveTransactionDataAndNotify(testPayload, 'test.type', 'end-to-end-123')).rejects.toThrow(/Operation failed:/);
+      expect(mockLoggerService.error).toHaveBeenCalledWith(
+        expect.stringContaining('Failed to save transaction relationship'),
+        expect.any(String),
+        'DemsEngineService',
+      );
+    });
+  });
+
+  describe('executeConfiguredFunctions branches (via handleMessage)', () => {
+    beforeEach(() => {
+      (mockRedisService.getJson as jest.Mock).mockResolvedValue(null);
+      mockDatabaseOperationsService.saveTransactionHistory.mockResolvedValue(undefined);
+      mockDatabaseOperationsService.saveTransactionRelationship.mockResolvedValue(undefined);
+      mockDatabaseOperationsService.saveToQuarantine.mockResolvedValue(undefined);
+      (mockDatabaseOperationsService as any).addAccount = jest.fn().mockResolvedValue(undefined);
+      (mockDatabaseOperationsService as any).addEntity = jest.fn().mockResolvedValue(undefined);
+      (mockDatabaseOperationsService as any).addAccountHolder = jest.fn().mockResolvedValue(undefined);
+      (mockDatabaseOperationsService as any).addDataModelTable = jest.fn().mockResolvedValue(undefined);
+      mockNatsService.notifyEventDirector.mockResolvedValue(undefined);
+    });
+
+    it('should return error response when configured function is not in allow-list', async () => {
+      mockDatabaseService.query.mockResolvedValue(
+        createMockQueryResult([
+          {
+            schema: mockSchema,
+            mapping: mockMapping,
+            functions: [{ functionName: 'dropAllTables', params: [] }],
+            related_transaction: '',
+            publishing_status: 'active',
+          },
+        ]),
+      );
+
+      const result = await service.handleMessage({ name: 'John' }, '/test', 'tenant1', false);
+
+      expect(result).toMatchObject({ isMatch: false, message: 'function execution failed' });
+      expect(result).toHaveProperty('differences');
+    });
+
+    it('should mark saveTransactionDetails and call saveTransactionRelationship', async () => {
+      mockDatabaseService.query.mockResolvedValue(
+        createMockQueryResult([
+          {
+            schema: mockSchema,
+            mapping: mockMapping,
+            functions: [{ functionName: 'saveTransactionDetails', params: [] }],
+            related_transaction: '',
+            publishing_status: 'active',
+          },
+        ]),
+      );
+
+      const result = await service.handleMessage({ name: 'John' }, '/test', 'tenant1', false);
+
+      expect(result).toHaveProperty('success', true);
+      expect(mockDatabaseOperationsService.saveTransactionRelationship).toHaveBeenCalled();
+    });
+
+    it('should return error when saveTransactionRelationship throws', async () => {
+      mockDatabaseService.query.mockResolvedValue(
+        createMockQueryResult([
+          {
+            schema: mockSchema,
+            mapping: mockMapping,
+            functions: [{ functionName: 'saveTransactionDetails', params: [] }],
+            related_transaction: '',
+            publishing_status: 'active',
+          },
+        ]),
+      );
+      mockDatabaseOperationsService.saveTransactionRelationship.mockRejectedValue(new Error('rel-save-fail'));
+
+      const result = await service.handleMessage({ name: 'John' }, '/test', 'tenant1', false);
+
+      expect(result).toMatchObject({ isMatch: false, message: 'function execution failed' });
+      expect(mockLoggerService.error).toHaveBeenCalledWith(
+        expect.stringContaining("Function 'saveTransactionDetails' failed"),
+        '',
+        'DemsEngineService',
+      );
+    });
+
+    it('should return error when addDataModelTable has fewer than 2 columns', async () => {
+      mockDatabaseService.query.mockResolvedValue(
+        createMockQueryResult([
+          {
+            schema: mockSchema,
+            mapping: mockMapping,
+            functions: [
+              {
+                functionName: 'addDataModelTable',
+                tableName: 'accounts',
+                columns: [{ datasource: 'payload', param: 'name' }],
+                params: [],
+              },
+            ],
+            related_transaction: '',
+            publishing_status: 'active',
+          },
+        ]),
+      );
+
+      const result = await service.handleMessage({ name: 'John' }, '/test', 'tenant1', false);
+
+      expect(result).toMatchObject({ isMatch: false, message: 'function execution failed' });
+    });
+
+    it('should return error when addDataModelTable has missing tableName', async () => {
+      mockDatabaseService.query.mockResolvedValue(
+        createMockQueryResult([
+          {
+            schema: mockSchema,
+            mapping: mockMapping,
+            functions: [
+              {
+                functionName: 'addDataModelTable',
+                columns: [
+                  { datasource: 'payload', param: 'name' },
+                  { datasource: 'payload', param: 'age' },
+                ],
+                params: [],
+              },
+            ],
+            related_transaction: '',
+            publishing_status: 'active',
+          },
+        ]),
+      );
+
+      const result = await service.handleMessage({ name: 'John', age: 30 }, '/test', 'tenant1', false);
+
+      expect(result).toMatchObject({ isMatch: false, message: 'function execution failed' });
+    });
+
+    it('should call addDataModelTable with payload datasource', async () => {
+      mockDatabaseService.query.mockResolvedValue(
+        createMockQueryResult([
+          {
+            schema: mockSchema,
+            mapping: mockMapping,
+            functions: [
+              {
+                functionName: 'addDataModelTable',
+                tableName: 'accounts',
+                columns: [
+                  { datasource: 'payload', param: 'name' },
+                  { datasource: 'payload', param: 'age' },
+                ],
+                params: [],
+              },
+            ],
+            related_transaction: '',
+            publishing_status: 'active',
+          },
+        ]),
+      );
+
+      const result = await service.handleMessage({ name: 'John', age: 30 }, '/test', 'tenant1', false);
+
+      expect(result).toHaveProperty('success', true);
+      expect((mockDatabaseOperationsService as any).addDataModelTable).toHaveBeenCalledWith(
+        'accounts',
+        'John',
+        30,
+        expect.any(String),
+        expect.any(String),
+      );
+    });
+
+    it('should call addDataModelTable with dataModel datasource', async () => {
+      const dynamicMapping = [
+        {
+          source: ['name'],
+          destination: 'dataModel.userName',
+          delimiter: '',
+        },
+        {
+          source: ['age'],
+          destination: 'dataModel.userAge',
+          delimiter: '',
+        },
+      ];
+      mockDatabaseService.query.mockResolvedValue(
+        createMockQueryResult([
+          {
+            schema: mockSchema,
+            mapping: dynamicMapping,
+            functions: [
+              {
+                functionName: 'addDataModelTable',
+                tableName: 'accounts',
+                columns: [
+                  { datasource: 'dataModel', param: 'dataModel.userName' },
+                  { datasource: 'dataModel', param: 'dataModel.userAge' },
+                ],
+                params: [],
+              },
+            ],
+            related_transaction: '',
+            publishing_status: 'active',
+          },
+        ]),
+      );
+
+      const result = await service.handleMessage({ name: 'John', age: 30 }, '/test', 'tenant1', false);
+
+      expect(result).toHaveProperty('success', true);
+      expect((mockDatabaseOperationsService as any).addDataModelTable).toHaveBeenCalled();
+    });
+
+    it('should return error when generic allowed function throws', async () => {
+      const mappingForFn = [{ constantValue: 'ACC-1', destination: 'accountId' }];
+      mockDatabaseService.query.mockResolvedValue(
+        createMockQueryResult([
+          {
+            schema: mockSchema,
+            mapping: mappingForFn,
+            functions: [{ functionName: 'addAccount', params: ['accountId'] }],
+            related_transaction: '',
+            publishing_status: 'active',
+          },
+        ]),
+      );
+      (mockDatabaseOperationsService as any).addAccount = jest.fn().mockRejectedValue(new Error('db-write-fail'));
+
+      const result = await service.handleMessage({ name: 'John' }, '/test', 'tenant1', false);
+
+      expect(result).toMatchObject({ isMatch: false, message: 'function execution failed' });
+      expect(mockLoggerService.error).toHaveBeenCalledWith(
+        expect.stringContaining("Function 'addAccount' failed"),
+        '',
+        'DemsEngineService',
+      );
+    });
+
+    it('should log when configuredMapping is null (no mapping configured)', async () => {
+      mockDatabaseService.query.mockResolvedValue(
+        createMockQueryResult([
+          {
+            schema: mockSchema,
+            mapping: null,
+            functions: mockFunctions,
+            related_transaction: '',
+            publishing_status: 'active',
+          },
+        ]),
+      );
+
+      const result = await service.handleMessage({ name: 'John' }, '/test', 'tenant1', false);
+
+      expect(result).toHaveProperty('success', true);
+      expect(mockLoggerService.log).toHaveBeenCalledWith(expect.stringContaining('No mapping configured for endpoint'));
+    });
+
+    it('should route dynamic mapping (non-redis/non-transactionDetails destination) to dynamicMapping', async () => {
+      const dynMapping = [
+        {
+          source: ['name'],
+          destination: 'dataModel.userName',
+          delimiter: '',
+        },
+      ];
+      mockDatabaseService.query.mockResolvedValue(
+        createMockQueryResult([
+          {
+            schema: mockSchema,
+            mapping: dynMapping,
+            functions: mockFunctions,
+            related_transaction: '',
+            publishing_status: 'active',
+          },
+        ]),
+      );
+
+      const result = await service.handleMessage({ name: 'John' }, '/test', 'tenant1', false);
+
+      expect(result).toHaveProperty('success', true);
+      if ('success' in result && result.success) {
+        expect(result.dynamicMapping).toBeDefined();
+      }
+    });
+
+    it('should keep pacs.002 payload as-is for NATS transaction', async () => {
+      const pacs002Schema = {
+        type: 'object',
+        additionalProperties: true,
+      };
+      mockDatabaseService.query.mockResolvedValue(
+        createMockQueryResult([
+          {
+            schema: pacs002Schema,
+            mapping: [],
+            functions: mockFunctions,
+            related_transaction: '',
+            publishing_status: 'active',
+          },
+        ]),
+      );
+
+      const pacs002Payload = {
+        FIToFIPmtSts: {
+          GrpHdr: { MsgId: 'M1' },
+          TxInfAndSts: { OrgnlEndToEndId: 'e2e' },
+        },
+      };
+
+      const result = await service.handleMessage(pacs002Payload, '/pacs.002.001.12', 'tenant1', false);
+
+      expect(result).toHaveProperty('success', true);
+      if ('success' in result && result.success) {
+        expect(result.transactionType).toBe('pacs.002.001.12');
+      }
     });
   });
 });
