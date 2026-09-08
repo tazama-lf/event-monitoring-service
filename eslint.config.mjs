@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 import eslintPluginEslintComments from '@eslint-community/eslint-plugin-eslint-comments';
 import stylistic from '@stylistic/eslint-plugin';
-import tsEslint from '@typescript-eslint/eslint-plugin';
 import tsParser from '@typescript-eslint/parser';
 import eslintStandard from 'eslint-config-love';
 import eslintConfigPrettier from 'eslint-config-prettier/flat';
@@ -16,7 +15,6 @@ export default defineConfig([
       ...eslintStandard.plugins,
       ['@eslint-community/eslint-comments']: eslintPluginEslintComments,
       ['@stylistic']: stylistic,
-      ['@typescript-eslint']: tsEslint,
     },
     languageOptions: {
       ...eslintStandard.languageOptions,
@@ -24,7 +22,8 @@ export default defineConfig([
       ecmaVersion: 2022,
       sourceType: 'module',
       parserOptions: {
-        project: ['./tsconfig.json'],
+        projectService: true,
+        tsconfigRootDir: import.meta.dirname,
       },
     },
     rules: {
@@ -62,6 +61,8 @@ export default defineConfig([
       'eslint-comments/no-duplicate-disable': 'off',
       'eslint-comments/no-unlimited-disable': 'off',
       'eslint-comments/no-unused-enable': 'off',
+      /* promise/avoid-new was removed in eslint-plugin-promise v7 but eslint-config-love still enables it; silence the "Definition for rule not found" error */
+      'promise/avoid-new': 'off',
     },
   },
 ]);
