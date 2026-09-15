@@ -52,6 +52,11 @@ describe('DemsEngineController', () => {
       TxTp: 'test.transaction',
       DataCache: { cached: 'data' },
     },
+    persistencePayload: {
+      transaction: { name: 'John' },
+      TxTp: 'test.transaction',
+      DataCache: { cached: 'data' },
+    },
     transactionRelationship: {
       source: 'test-source',
       destination: 'test-destination',
@@ -143,6 +148,14 @@ describe('DemsEngineController', () => {
         false,
       );
       expect(mockDemsEngineService.saveTransactionDataAndNotify).toHaveBeenCalled();
+      // The raw (unwrapped) persistence payload must be forwarded separately from the NATS payload.
+      expect(mockDemsEngineService.saveTransactionDataAndNotify).toHaveBeenCalledWith(
+        mockSuccessResult.tazamaPayload,
+        mockSuccessResult.transactionType,
+        mockSuccessResult.endToEndId,
+        mockSuccessResult.trackedFields,
+        mockSuccessResult.persistencePayload,
+      );
       expect(result.isMatch).toBe(true);
       expect(result.message).toBe('Everything is OK!');
     });

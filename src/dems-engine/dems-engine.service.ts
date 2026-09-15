@@ -34,6 +34,7 @@ type FindSchemaAndMappingResult = [any, any, any, any] | null;
 export class DemsEngineService {
   private readonly ajv: Ajv;
   private readonly timeToLive: number;
+  private readonly distributedCacheTimeToLive: number;
   private readonly LOG_CONTEXT = DemsEngineService.name;
 
   constructor(
@@ -47,6 +48,8 @@ export class DemsEngineService {
     this.ajv = new Ajv({ allErrors: true, logger: false });
     addFormats(this.ajv);
     this.timeToLive = this.configService.get('cache.timeToLive', 3600);
+    // TTL for the related-transaction DataCache cache, distinct from the config-schema cache above.
+    this.distributedCacheTimeToLive = this.configService.get('cache.distributedCacheTimeToLive', 3600);
   }
 
   @ApmSpan('dems-find-schema-and-mapping')
@@ -396,10 +399,14 @@ export class DemsEngineService {
     transactionType: string,
     endToEndId: string,
     trackedFields?: TrackedFields,
+    persistencePayload?: TazamaPayload,
   ): Promise<void> {
+    // The DB receives the raw (unwrapped) transaction; event-director receives the `{ Payload: ... }`
+    // envelope. Falls back to `tazamaPayload` when a persistence payload is not supplied.
+    const payloadToPersist = persistencePayload ?? tazamaPayload;
     // using Promise.allSettled, instead of promise.all, to execute operations and capture individual results
     const results = await Promise.allSettled([
-      this.databaseOperationsService.saveTransactionHistory(tazamaPayload, `${transactionType}_${endToEndId}`, trackedFields),
+      this.databaseOperationsService.saveTransactionHistory(payloadToPersist, `${transactionType}_${endToEndId}`, trackedFields),
       this.natsService.notifyEventDirector(tazamaPayload),
     ]);
 
@@ -490,6 +497,7 @@ export class DemsEngineService {
         logContext: this.LOG_CONTEXT,
         databaseOperationsService: this.databaseOperationsService,
         processMappings: this.processMappings.bind(this),
+        redisService: this.redisService,
       });
 
       const { relatedTransactionBoolean, enhancedRequest: updatedEnhancedRequest } = relatedTransactionResult;
@@ -509,6 +517,18 @@ export class DemsEngineService {
       this.loggerService.log(`dataCache: ${JSON.stringify(dataCache)}`, this.LOG_CONTEXT);
       this.loggerService.log(`trackedFields: ${JSON.stringify(trackedFields)}`, this.LOG_CONTEXT);
 
+      // Cache this message's own DataCache so a later related-transaction message can rebuild from
+      // Redis instead of querying the database and re-running the full mapping. Best-effort: a write
+      // failure just falls back to the existing database lookup on the next related message.
+      if (!relatedTransaction && endToEndId && Object.keys(dataCache).length > 0) {
+        const distributedCacheKey = `${tenantId}:${endToEndId}`;
+        try {
+          await this.redisService.setJson(distributedCacheKey, JSON.stringify(dataCache), this.distributedCacheTimeToLive);
+        } catch (error) {
+          this.loggerService.warn(`Failed to cache DataCache at key ${distributedCacheKey}: ${String(error)}`, this.LOG_CONTEXT);
+        }
+      }
+
       try {
         // refer to /docs/helpers for example functions configuration
         await this.executeConfiguredFunctions(
@@ -524,20 +544,29 @@ export class DemsEngineService {
         return buildErrorResponse('function execution failed', [String(error)]);
       }
       this.loggerService.log(`Building Tazama payload for transaction type: ${transactionType}, tenant: ${tenantId}`, this.LOG_CONTEXT);
+      // Persistence and notification use different shapes for non-pacs.002 messages: NATS keeps the
+      // `{ Payload: ... }` envelope, while raw_history stores the raw ISO message with a top-level
+      // TenantId (its generated columns read `document ->> 'TenantId'` from the document root).
       let transactionForNats;
+      let transactionForPersistence;
       if (isPacs002Transaction(enhancedRequest)) {
         transactionForNats = enhancedRequest;
+        transactionForPersistence = enhancedRequest;
       } else {
         const msgId = transactionRelationship.MsgId;
         transactionForNats = { Payload: { ...payload }, TenantId: tenantId, TxTp: transactionType, MsgId: msgId };
+        transactionForPersistence = enhancedRequest;
       }
-      const tazamaPayload = buildTazamaPayload(transactionForNats, transactionType, relatedMapping ? enhancedRequest.DataCache : dataCache);
+      const resolvedDataCache = relatedMapping ? enhancedRequest.DataCache : dataCache;
+      const tazamaPayload = buildTazamaPayload(transactionForNats, transactionType, resolvedDataCache);
+      const persistencePayload = buildTazamaPayload(transactionForPersistence, transactionType, resolvedDataCache);
       this.loggerService.log('Successfully built Tazama payload for ED. all ok');
 
       return {
         success: true,
         configuredSchema,
         tazamaPayload,
+        persistencePayload,
         transactionRelationship,
         DataCache: relatedTransactionBoolean ? enhancedRequest.DataCache : dataCache,
         transactionType,

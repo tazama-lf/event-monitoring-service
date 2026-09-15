@@ -77,6 +77,7 @@ export class DemsEngineController {
         result.transactionType,
         result.endToEndId,
         result.trackedFields,
+        result.persistencePayload,
       );
     } catch (error) {
       this.logger.error(`Failed to save transaction data or notify: ${String(error)}`);
