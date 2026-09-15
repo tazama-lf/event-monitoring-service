@@ -38,6 +38,7 @@ export interface AppConfiguration {
   };
   readonly cache: {
     readonly timeToLive: number;
+    readonly distributedCacheTimeToLive: number;
   };
   readonly auth: {
     readonly tazamaAuthUrl: string;
@@ -114,6 +115,10 @@ export function validateEnvironment(config: Record<string, unknown>): AppConfigu
   // Validate cache TTL if provided (using TTL instead of CACHE_TTL)
   const cacheTtl = parseIntEnv('TTL', config.TTL, { default: 3600, min: 1 });
 
+  // TTL for the related-transaction DataCache cache (issue #82), in seconds. Defaults to
+  // tms-service's distributedCacheTTL default of 3600 (1 hour) when unset.
+  const distributedCacheTtl = parseIntEnv('DISTRIBUTED_CACHE_TTL', config.DISTRIBUTED_CACHE_TTL, { default: 3600, min: 1 });
+
   // Validate Redis port
   const redisPort = parseIntEnv('REDIS_PORT', config.REDIS_PORT, { min: 1, max: 65535 });
 
@@ -165,6 +170,7 @@ export function validateEnvironment(config: Record<string, unknown>): AppConfigu
     },
     cache: {
       timeToLive: cacheTtl,
+      distributedCacheTimeToLive: distributedCacheTtl,
     },
     auth: {
       tazamaAuthUrl: (config.TAZAMA_AUTH_URL as string) || '',

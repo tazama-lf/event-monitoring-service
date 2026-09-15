@@ -2,7 +2,7 @@ import { BadRequestException, Body, Controller, UseGuards, Param, Post, Req } fr
 import { Request } from 'express';
 import { DemsEngineService } from './dems-engine.service';
 import { LoggerService } from '@tazama-lf/frms-coe-lib';
-import { isValidEndpointFormat, transformEndpoint } from '../utils/transform_endpoint';
+import { isValidEndpointFormat, transformEndpoint, extractTenantIdFromEndpoint } from '../utils/transform_endpoint';
 import { TazamaAuthGuard } from '../auth/tazama-auth.guard';
 import { RequireDemsWriteRole } from '../auth/auth.decorator';
 import { User } from '../auth/user.decorator';
@@ -25,14 +25,22 @@ export class DemsEngineController {
   @Post('*endpoint')
   @RequireDemsWriteRole()
   async messageHandler(
-    @Param('endpoint') endpoint: string,
+    // The wildcard `*endpoint` capture is an ARRAY of path segments on this NestJS/Express version
+    // for BOTH slash-delimited and comma-delimited request paths (verified against a live HTTP
+    // request through the actual routing layer — see transform_endpoint.ts and
+    // dems-engine.endpoint-routing.spec.ts). `unknown` here (rather than `string`) reflects that;
+    // isValidEndpointFormat/transformEndpoint/extractTenantIdFromEndpoint normalize whichever shape
+    // the router hands us.
+    @Param('endpoint') endpoint: unknown,
     @Body() payload: any,
     @User() user: AuthenticatedUser,
     @Req() req: Request,
   ): Promise<MessageHandlerResponse> {
     if (!isValidEndpointFormat(endpoint)) {
       throw new BadRequestException({
-        message: 'Invalid endpoint format. Endpoint must be a non-empty string containing commas.',
+        message:
+          'Invalid endpoint format. Accepted formats: slash-delimited (e.g. /TAZAMA/v1/iso20022/pacs.008.001.10, ' +
+          'matching the endpoint_path shown in the UI) or comma-delimited (e.g. TAZAMA,v1,iso20022,pacs.008.001.10).',
       });
     }
     const transformedEndpoint = transformEndpoint(endpoint);
@@ -43,7 +51,7 @@ export class DemsEngineController {
     );
 
     // check the tenant_id from JWT token with the tenant_id in the URL
-    const tenantIdFromUrl = endpoint.split(',')[0];
+    const tenantIdFromUrl = extractTenantIdFromEndpoint(endpoint);
     if (user.token.tenantId !== tenantIdFromUrl) {
       this.logger.error(
         `Tenant ID mismatch: JWT tenantId ${user.token.tenantId} does not match URL tenantId ${tenantIdFromUrl}`,
@@ -77,6 +85,7 @@ export class DemsEngineController {
         result.transactionType,
         result.endToEndId,
         result.trackedFields,
+        result.persistencePayload,
       );
     } catch (error) {
       this.logger.error(`Failed to save transaction data or notify: ${String(error)}`);

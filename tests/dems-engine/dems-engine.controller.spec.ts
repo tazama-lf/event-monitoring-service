@@ -52,6 +52,11 @@ describe('DemsEngineController', () => {
       TxTp: 'test.transaction',
       DataCache: { cached: 'data' },
     },
+    persistencePayload: {
+      transaction: { name: 'John' },
+      TxTp: 'test.transaction',
+      DataCache: { cached: 'data' },
+    },
     transactionRelationship: {
       source: 'test-source',
       destination: 'test-destination',
@@ -143,6 +148,15 @@ describe('DemsEngineController', () => {
         false,
       );
       expect(mockDemsEngineService.saveTransactionDataAndNotify).toHaveBeenCalled();
+      // Issue #83: the raw (unwrapped) persistence payload must be forwarded to the service so the
+      // DB stores the raw ISO message rather than the NATS `{ Payload: ... }` envelope.
+      expect(mockDemsEngineService.saveTransactionDataAndNotify).toHaveBeenCalledWith(
+        mockSuccessResult.tazamaPayload,
+        mockSuccessResult.transactionType,
+        mockSuccessResult.endToEndId,
+        mockSuccessResult.trackedFields,
+        mockSuccessResult.persistencePayload,
+      );
       expect(result.isMatch).toBe(true);
       expect(result.message).toBe('Everything is OK!');
     });
@@ -171,10 +185,36 @@ describe('DemsEngineController', () => {
     });
 
     it('should throw BadRequestException for invalid endpoint format', async () => {
+      // Empty string, empty array, and non-array/non-string all normalize to no usable segments.
       await expect(controller.messageHandler('', validPayload, mockUser, mockRequest as Request)).rejects.toThrow(BadRequestException);
-      await expect(controller.messageHandler('no-commas', validPayload, mockUser, mockRequest as Request)).rejects.toThrow(
+      await expect(controller.messageHandler([], validPayload, mockUser, mockRequest as Request)).rejects.toThrow(BadRequestException);
+      await expect(controller.messageHandler(undefined, validPayload, mockUser, mockRequest as Request)).rejects.toThrow(
         BadRequestException,
       );
+    });
+
+    it('should accept a single-segment endpoint (issue #84: no delimiter required for one path segment)', async () => {
+      // 'no-commas' is a valid 1-segment path on its own — it only fails downstream on the tenant
+      // check here because it doesn't match mockUser's tenantId, not because the format is invalid.
+      await expect(controller.messageHandler('no-commas', validPayload, mockUser, mockRequest as Request)).rejects.toThrow(
+        'Tenant ID mismatch between JWT and endpoint URL',
+      );
+    });
+
+    it('should accept the slash-delimited array form the real router produces (issue #84)', async () => {
+      mockDemsEngineService.handleMessage.mockResolvedValue(mockSuccessResult);
+      mockDemsEngineService.saveTransactionDataAndNotify.mockResolvedValue(undefined);
+
+      const slashFormEndpoint = ['test-tenant', 'endpoint', 'path'];
+      const result = await controller.messageHandler(slashFormEndpoint, validPayload, mockUser, mockRequest as Request);
+
+      expect(mockDemsEngineService.handleMessage).toHaveBeenCalledWith(
+        validPayload,
+        '/test-tenant/endpoint/path',
+        mockUser.token.tenantId,
+        false,
+      );
+      expect(result.isMatch).toBe(true);
     });
 
     it('should throw BadRequestException when validation fails', async () => {
