@@ -14,9 +14,12 @@ export const RequireClaims = (...claims: string[]): ReturnType<typeof SetMetadat
  */
 export const EventMonitoringClaims = Object.freeze({
   DEMS_WRITE: 'dems:write',
+  APPROVER: 'approver',
 } as const);
 
 /**
  * Convenience decorators for common Event Monitoring Service roles
  */
 export const RequireDemsWriteRole = (): ReturnType<typeof SetMetadata> => RequireClaims(EventMonitoringClaims.DEMS_WRITE);
+
+export const RequireActivationRole = (): ReturnType<typeof SetMetadata> => RequireClaims(EventMonitoringClaims.APPROVER);
