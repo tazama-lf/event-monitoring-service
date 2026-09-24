@@ -52,6 +52,12 @@ describe('DemsEngineController', () => {
       TxTp: 'test.transaction',
       DataCache: { cached: 'data' },
     },
+    persistencePayload: {
+      transaction: { name: 'John' },
+      TxTp: 'test.transaction',
+      DataCache: { cached: 'data' },
+    },
+    shouldCacheDataCache: true,
     transactionRelationship: {
       source: 'test-source',
       destination: 'test-destination',
@@ -92,6 +98,7 @@ describe('DemsEngineController', () => {
     mockDemsEngineService = {
       handleMessage: jest.fn(),
       saveTransactionDataAndNotify: jest.fn(),
+      cacheDataCache: jest.fn(),
     } as any;
 
     mockLoggerService = {
@@ -143,8 +150,53 @@ describe('DemsEngineController', () => {
         false,
       );
       expect(mockDemsEngineService.saveTransactionDataAndNotify).toHaveBeenCalled();
+      // The raw (unwrapped) persistence payload must be forwarded separately from the NATS payload.
+      expect(mockDemsEngineService.saveTransactionDataAndNotify).toHaveBeenCalledWith(
+        mockSuccessResult.tazamaPayload,
+        mockSuccessResult.transactionType,
+        mockSuccessResult.endToEndId,
+        mockSuccessResult.trackedFields,
+        mockSuccessResult.persistencePayload,
+      );
       expect(result.isMatch).toBe(true);
       expect(result.message).toBe('Everything is OK!');
+    });
+
+    it('should cache the DataCache only after the transaction is persisted and notified', async () => {
+      mockDemsEngineService.handleMessage.mockResolvedValue(mockSuccessResult);
+      mockDemsEngineService.saveTransactionDataAndNotify.mockResolvedValue(undefined);
+
+      await controller.messageHandler('test-tenant,endpoint', validPayload, mockUser, mockRequest as Request);
+
+      expect(mockDemsEngineService.cacheDataCache).toHaveBeenCalledWith(
+        mockUser.token.tenantId,
+        mockSuccessResult.endToEndId,
+        mockSuccessResult.DataCache,
+      );
+      // The cache write must come after persistence, never before.
+      const saveOrder = mockDemsEngineService.saveTransactionDataAndNotify.mock.invocationCallOrder[0];
+      const cacheOrder = mockDemsEngineService.cacheDataCache.mock.invocationCallOrder[0];
+      expect(cacheOrder).toBeGreaterThan(saveOrder);
+    });
+
+    it('should NOT cache the DataCache when persistence fails (no orphaned cache entry)', async () => {
+      mockDemsEngineService.handleMessage.mockResolvedValue(mockSuccessResult);
+      mockDemsEngineService.saveTransactionDataAndNotify.mockRejectedValue(new Error('db down'));
+
+      await expect(controller.messageHandler('test-tenant,endpoint', validPayload, mockUser, mockRequest as Request)).rejects.toThrow(
+        BadRequestException,
+      );
+
+      expect(mockDemsEngineService.cacheDataCache).not.toHaveBeenCalled();
+    });
+
+    it('should not cache a related-transaction (second leg) message', async () => {
+      mockDemsEngineService.handleMessage.mockResolvedValue({ ...mockSuccessResult, shouldCacheDataCache: false });
+      mockDemsEngineService.saveTransactionDataAndNotify.mockResolvedValue(undefined);
+
+      await controller.messageHandler('test-tenant,endpoint', validPayload, mockUser, mockRequest as Request);
+
+      expect(mockDemsEngineService.cacheDataCache).not.toHaveBeenCalled();
     });
 
     it('should handle XML content type', async () => {

@@ -77,6 +77,7 @@ export class DemsEngineController {
         result.transactionType,
         result.endToEndId,
         result.trackedFields,
+        result.persistencePayload,
       );
     } catch (error) {
       this.logger.error(`Failed to save transaction data or notify: ${String(error)}`);
@@ -84,6 +85,12 @@ export class DemsEngineController {
         message: 'Error saving transaction data or sending notification',
         differences: ['Transaction processing failed. Please contact support if the issue persists.'],
       });
+    }
+
+    // Only cache once the transaction is actually persisted and event-director has been notified, so
+    // a failed message never leaves a usable entry behind for a later related transaction.
+    if (result.shouldCacheDataCache) {
+      await this.demsEngineService.cacheDataCache(user.token.tenantId, result.endToEndId, result.DataCache);
     }
 
     this.logger.log('Dynamic Mapping in Controller: ', result.dynamicMapping);

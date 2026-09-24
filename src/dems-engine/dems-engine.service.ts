@@ -20,13 +20,14 @@ import { randomUUID } from 'node:crypto';
 import type { TransactionDetails } from '@tazama-lf/frms-coe-lib/lib/interfaces';
 import { ErrorResponse } from '../interfaces/iErrorResponse';
 import { ProcessingResult } from '../interfaces/iProcessingResult';
+import type { CacheData } from '../interfaces/iCacheData';
 import { TazamaPayload } from '../interfaces/iTazamaPayload';
 import { formatValidationErrors } from '../utils/validation.utils';
 import { buildTazamaPayload, buildErrorResponse } from '../utils/payload-builder.utils';
 import { parseCachedSchema, prepareSchemaForCache } from '../utils/schema-cache.utils';
 import { SaveTransactionHistoryError, NotifyEventDirectorError, TransactionOperationError } from '../errors/transaction-operation.errors';
 import type { TrackedFields } from '@tazama-lf/frms-coe-lib';
-import { processRelatedTransactionMapping } from '../utils/related-transaction.utils';
+import { processRelatedTransactionMapping, cacheDataCacheEntry } from '../utils/related-transaction.utils';
 
 type FindSchemaAndMappingResult = [any, any, any, any] | null;
 
@@ -34,6 +35,7 @@ type FindSchemaAndMappingResult = [any, any, any, any] | null;
 export class DemsEngineService {
   private readonly ajv: Ajv;
   private readonly timeToLive: number;
+  private readonly distributedCacheTimeToLive: number;
   private readonly LOG_CONTEXT = DemsEngineService.name;
 
   constructor(
@@ -47,6 +49,8 @@ export class DemsEngineService {
     this.ajv = new Ajv({ allErrors: true, logger: false });
     addFormats(this.ajv);
     this.timeToLive = this.configService.get('cache.timeToLive', 3600);
+    // TTL for the related-transaction DataCache cache, distinct from the config-schema cache above.
+    this.distributedCacheTimeToLive = this.configService.get('cache.distributedCacheTimeToLive', 3600);
   }
 
   @ApmSpan('dems-find-schema-and-mapping')
@@ -396,10 +400,14 @@ export class DemsEngineService {
     transactionType: string,
     endToEndId: string,
     trackedFields?: TrackedFields,
+    persistencePayload?: TazamaPayload,
   ): Promise<void> {
+    // The DB receives the raw (unwrapped) transaction; event-director receives the `{ Payload: ... }`
+    // envelope. Falls back to `tazamaPayload` when a persistence payload is not supplied.
+    const payloadToPersist = persistencePayload ?? tazamaPayload;
     // using Promise.allSettled, instead of promise.all, to execute operations and capture individual results
     const results = await Promise.allSettled([
-      this.databaseOperationsService.saveTransactionHistory(tazamaPayload, `${transactionType}_${endToEndId}`, trackedFields),
+      this.databaseOperationsService.saveTransactionHistory(payloadToPersist, `${transactionType}_${endToEndId}`, trackedFields),
       this.natsService.notifyEventDirector(tazamaPayload),
     ]);
 
@@ -437,6 +445,13 @@ export class DemsEngineService {
     }
 
     this.loggerService.log('Successfully saved transaction history and notified event-director');
+  }
+
+  /** Caches a first-leg DataCache. Call only after {@link saveTransactionDataAndNotify} resolves. */
+  @ApmSpan('dems-cache-datacache')
+  async cacheDataCache(tenantId: string, endToEndId: string, dataCache: CacheData): Promise<void> {
+    const { redisService, distributedCacheTimeToLive: ttl, loggerService, LOG_CONTEXT: logContext } = this;
+    await cacheDataCacheEntry({ tenantId, endToEndId, dataCache, redisService, ttl, loggerService, logContext });
   }
 
   @ApmSpan('dems-handle-message')
@@ -490,6 +505,7 @@ export class DemsEngineService {
         logContext: this.LOG_CONTEXT,
         databaseOperationsService: this.databaseOperationsService,
         processMappings: this.processMappings.bind(this),
+        redisService: this.redisService,
       });
 
       const { relatedTransactionBoolean, enhancedRequest: updatedEnhancedRequest } = relatedTransactionResult;
@@ -524,26 +540,38 @@ export class DemsEngineService {
         return buildErrorResponse('function execution failed', [String(error)]);
       }
       this.loggerService.log(`Building Tazama payload for transaction type: ${transactionType}, tenant: ${tenantId}`, this.LOG_CONTEXT);
+      // Persistence and notification use different shapes for non-pacs.002 messages: NATS keeps the
+      // `{ Payload: ... }` envelope, while raw_history stores the raw ISO message with a top-level
+      // TenantId (its generated columns read `document ->> 'TenantId'` from the document root).
       let transactionForNats;
+      let transactionForPersistence;
       if (isPacs002Transaction(enhancedRequest)) {
         transactionForNats = enhancedRequest;
+        transactionForPersistence = enhancedRequest;
       } else {
         const msgId = transactionRelationship.MsgId;
         transactionForNats = { Payload: { ...payload }, TenantId: tenantId, TxTp: transactionType, MsgId: msgId };
+        transactionForPersistence = enhancedRequest;
       }
-      const tazamaPayload = buildTazamaPayload(transactionForNats, transactionType, relatedMapping ? enhancedRequest.DataCache : dataCache);
+      const resolvedDataCache = relatedMapping ? enhancedRequest.DataCache : dataCache;
+      const tazamaPayload = buildTazamaPayload(transactionForNats, transactionType, resolvedDataCache);
+      const persistencePayload = buildTazamaPayload(transactionForPersistence, transactionType, resolvedDataCache);
       this.loggerService.log('Successfully built Tazama payload for ED. all ok');
 
       return {
         success: true,
         configuredSchema,
         tazamaPayload,
+        persistencePayload,
         transactionRelationship,
         DataCache: relatedTransactionBoolean ? enhancedRequest.DataCache : dataCache,
         transactionType,
         endToEndId,
         dynamicMapping: responseFromProcessMappings.dynamicMapping,
         trackedFields,
+        // Only a first leg (no related_transaction on its own endpoint) is worth caching for a later
+        // related message. Cached by the controller once persistence has actually succeeded.
+        shouldCacheDataCache: !relatedTransaction,
       };
     } catch (error) {
       this.loggerService.error(`Unexpected error in handleMessage: ${String(error)}`);
