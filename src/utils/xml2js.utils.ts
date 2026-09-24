@@ -267,7 +267,7 @@ export async function transformXmlPayload(payload: any, configuredSchema: any, l
     attrkey: '@',
     valueProcessors: [createSchemaAwareNumberProcessor(stringFields)],
   };
-  // eslint-disable-next-line promise/avoid-new -- we need to wrap xml2js parseString in a promise
+
   const transformedPayload = await new Promise<any>((resolve, reject) => {
     parseString(payload, options, (err, result) => {
       if (err) {

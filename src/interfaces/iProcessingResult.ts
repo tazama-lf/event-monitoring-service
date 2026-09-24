@@ -13,4 +13,5 @@ export interface ProcessingResult {
   transactionType: string;
   endToEndId: string;
   trackedFields: TrackedFields;
+  shouldCacheDataCache?: boolean;
 }

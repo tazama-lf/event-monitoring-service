@@ -20,13 +20,14 @@ import { randomUUID } from 'node:crypto';
 import type { TransactionDetails } from '@tazama-lf/frms-coe-lib/lib/interfaces';
 import { ErrorResponse } from '../interfaces/iErrorResponse';
 import { ProcessingResult } from '../interfaces/iProcessingResult';
+import type { CacheData } from '../interfaces/iCacheData';
 import { TazamaPayload } from '../interfaces/iTazamaPayload';
 import { formatValidationErrors } from '../utils/validation.utils';
 import { buildTazamaPayload, buildErrorResponse } from '../utils/payload-builder.utils';
 import { parseCachedSchema, prepareSchemaForCache } from '../utils/schema-cache.utils';
 import { SaveTransactionHistoryError, NotifyEventDirectorError, TransactionOperationError } from '../errors/transaction-operation.errors';
 import type { TrackedFields } from '@tazama-lf/frms-coe-lib';
-import { processRelatedTransactionMapping } from '../utils/related-transaction.utils';
+import { processRelatedTransactionMapping, cacheDataCacheEntry } from '../utils/related-transaction.utils';
 
 type FindSchemaAndMappingResult = [any, any, any, any] | null;
 
@@ -446,6 +447,13 @@ export class DemsEngineService {
     this.loggerService.log('Successfully saved transaction history and notified event-director');
   }
 
+  /** Caches a first-leg DataCache. Call only after {@link saveTransactionDataAndNotify} resolves. */
+  @ApmSpan('dems-cache-datacache')
+  async cacheDataCache(tenantId: string, endToEndId: string, dataCache: CacheData): Promise<void> {
+    const { redisService, distributedCacheTimeToLive: ttl, loggerService, LOG_CONTEXT: logContext } = this;
+    await cacheDataCacheEntry({ tenantId, endToEndId, dataCache, redisService, ttl, loggerService, logContext });
+  }
+
   @ApmSpan('dems-handle-message')
   async handleMessage(payload: any, endpoint: string, tenantId: string, isPayloadXml: boolean): Promise<ErrorResponse | ProcessingResult> {
     try {
@@ -517,18 +525,6 @@ export class DemsEngineService {
       this.loggerService.log(`dataCache: ${JSON.stringify(dataCache)}`, this.LOG_CONTEXT);
       this.loggerService.log(`trackedFields: ${JSON.stringify(trackedFields)}`, this.LOG_CONTEXT);
 
-      // Cache this message's own DataCache so a later related-transaction message can rebuild from
-      // Redis instead of querying the database and re-running the full mapping. Best-effort: a write
-      // failure just falls back to the existing database lookup on the next related message.
-      if (!relatedTransaction && endToEndId && Object.keys(dataCache).length > 0) {
-        const distributedCacheKey = `${tenantId}:${endToEndId}`;
-        try {
-          await this.redisService.setJson(distributedCacheKey, JSON.stringify(dataCache), this.distributedCacheTimeToLive);
-        } catch (error) {
-          this.loggerService.warn(`Failed to cache DataCache at key ${distributedCacheKey}: ${String(error)}`, this.LOG_CONTEXT);
-        }
-      }
-
       try {
         // refer to /docs/helpers for example functions configuration
         await this.executeConfiguredFunctions(
@@ -573,6 +569,9 @@ export class DemsEngineService {
         endToEndId,
         dynamicMapping: responseFromProcessMappings.dynamicMapping,
         trackedFields,
+        // Only a first leg (no related_transaction on its own endpoint) is worth caching for a later
+        // related message. Cached by the controller once persistence has actually succeeded.
+        shouldCacheDataCache: !relatedTransaction,
       };
     } catch (error) {
       this.loggerService.error(`Unexpected error in handleMessage: ${String(error)}`);
