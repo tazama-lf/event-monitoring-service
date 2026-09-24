@@ -2,6 +2,24 @@ import type { LoggerService, RedisService } from '@tazama-lf/frms-coe-lib';
 import { getValueByPath } from './has_nested_property';
 import type { DatabaseOperationsService } from '../commons';
 
+/**
+ * Namespace for DataCache entries so they cannot collide with the schema cache, which keys
+ * `{tenantId}:{endpointPath}` in the same Redis keyspace.
+ */
+const DATA_CACHE_KEY_PREFIX = 'data-cache';
+
+/** Builds the namespaced DataCache key. Read and write must both go through this. */
+const buildDataCacheKey = (tenantId: string, endToEndId: string): string => `${DATA_CACHE_KEY_PREFIX}:${tenantId}:${endToEndId}`;
+
+/**
+ * True only for a plain object — the shape a DataCache must have. Redis can hand back an array or a
+ * primitive (e.g. a value written by another service, or a stale entry in a different format);
+ * spreading either into DataCache would drop the real fields or add character-indexed keys, so
+ * anything else is treated as a miss and falls back to the database.
+ */
+const isPlainRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+
 interface Mapping {
   source: string[] | string;
   delimiter?: string;
@@ -58,14 +76,23 @@ export async function processRelatedTransactionMapping(params: ProcessRelatedTra
     relatedTransactionBoolean = true;
 
     // Check Redis first for a cached DataCache before falling back to the database lookup + remap.
-    const distributedCacheKey = `${tenantId}:${relatedEndToEndId}`;
+    const distributedCacheKey = buildDataCacheKey(tenantId, relatedEndToEndId);
     let cachedDataCache: any = null;
     if (redisService) {
       try {
         const cachedJson = await redisService.getJson(distributedCacheKey);
         if (cachedJson) {
-          cachedDataCache = typeof cachedJson === 'string' ? JSON.parse(cachedJson) : cachedJson;
-          loggerService.log(`DataCache cache hit for related transaction at key: ${distributedCacheKey}`, logContext);
+          const decoded: unknown = typeof cachedJson === 'string' ? JSON.parse(cachedJson) : cachedJson;
+          if (isPlainRecord(decoded)) {
+            cachedDataCache = decoded;
+            loggerService.log(`DataCache cache hit for related transaction at key: ${distributedCacheKey}`, logContext);
+          } else {
+            // An array or primitive is not a usable DataCache — treat it as a miss.
+            loggerService.warn(
+              `Ignoring non-object cached DataCache at key ${distributedCacheKey}; falling back to the database`,
+              logContext,
+            );
+          }
         }
       } catch (error) {
         // Corrupt/unparseable cache entry — treat exactly like a miss, fall back to the database.
@@ -127,7 +154,7 @@ export async function cacheDataCacheEntry(params: CacheDataCacheEntryParams): Pr
 
   if (!endToEndId || !dataCache || Object.keys(dataCache).length === 0) return;
 
-  const distributedCacheKey = `${tenantId}:${endToEndId}`;
+  const distributedCacheKey = buildDataCacheKey(tenantId, endToEndId);
   try {
     await redisService.setJson(distributedCacheKey, JSON.stringify(dataCache), ttl);
   } catch (error) {

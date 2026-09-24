@@ -290,7 +290,7 @@ describe('DemsEngineService', () => {
       await service.cacheDataCache('tenant1', 'E2E-CACHE-TEST', { userName: 'John' } as any);
 
       expect(mockRedisService.setJson).toHaveBeenCalledWith(
-        'tenant1:E2E-CACHE-TEST',
+        'data-cache:tenant1:E2E-CACHE-TEST',
         JSON.stringify({ userName: 'John' }),
         3600, // mockConfigService.get() is stubbed to always return 3600
       );

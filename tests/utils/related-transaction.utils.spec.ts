@@ -62,7 +62,7 @@ describe('processRelatedTransactionMapping', () => {
       redisService,
     });
 
-    expect(redisService.getJson).toHaveBeenCalledWith(`${tenantId}:${endToEndId}`);
+    expect(redisService.getJson).toHaveBeenCalledWith(`data-cache:${tenantId}:${endToEndId}`);
     expect(databaseOperationsService.getTransaction).not.toHaveBeenCalled();
     expect(processMappings).not.toHaveBeenCalled();
     expect(result.relatedTransactionBoolean).toBe(true);
@@ -90,7 +90,7 @@ describe('processRelatedTransactionMapping', () => {
       redisService,
     });
 
-    expect(redisService.getJson).toHaveBeenCalledWith(`${tenantId}:${endToEndId}`);
+    expect(redisService.getJson).toHaveBeenCalledWith(`data-cache:${tenantId}:${endToEndId}`);
     expect(databaseOperationsService.getTransaction).toHaveBeenCalledWith(endToEndId, tenantId, 'pacs008');
     expect(processMappings).toHaveBeenCalledWith(relatedPayload, relatedMapping, relatedTransaction, false);
     expect(result.relatedTransactionBoolean).toBe(true);
@@ -173,6 +173,38 @@ describe('processRelatedTransactionMapping', () => {
     expect(databaseOperationsService.getTransaction).toHaveBeenCalledWith(endToEndId, tenantId, 'pacs008');
     expect(result.relatedTransactionBoolean).toBe(true);
     expect(result.enhancedRequest.DataCache).toMatchObject(dbDataCache);
+  });
+
+  it.each([
+    ['an array', JSON.stringify([1, 2, 3])],
+    ['a bare string', JSON.stringify('some-string')],
+    ['a number', JSON.stringify(42)],
+  ])('when the cached value is %s: treats it as a miss and falls back to the database', async (_label, cached) => {
+    const loggerService = makeLoggerService();
+    const redisService = { getJson: jest.fn().mockResolvedValue(cached) } as any;
+    const relatedPayload = { FIToFICstmrCdtTrf: { CdtTrfTxInf: { PmtId: { EndToEndId: endToEndId } } } };
+    const databaseOperationsService = { getTransaction: jest.fn().mockResolvedValue(relatedPayload) } as any;
+    const dbDataCache = { dbtrId: 'John' };
+    const processMappings = jest.fn().mockResolvedValue({ dataCache: dbDataCache });
+
+    const result = await processRelatedTransactionMapping({
+      relatedMapping,
+      relatedTransaction,
+      configuredMapping,
+      enhancedRequest: makeEnhancedRequest(),
+      tenantId,
+      loggerService: loggerService as any,
+      logContext: 'test',
+      databaseOperationsService,
+      processMappings,
+      redisService,
+    });
+
+    // The database must still be consulted, and no character-indexed keys may leak into DataCache.
+    expect(databaseOperationsService.getTransaction).toHaveBeenCalledWith(endToEndId, tenantId, 'pacs008');
+    expect(result.enhancedRequest.DataCache).toMatchObject(dbDataCache);
+    expect(result.enhancedRequest.DataCache).not.toHaveProperty('0');
+    expect(loggerService.warn).toHaveBeenCalledWith(expect.stringContaining('non-object cached DataCache'), 'test');
   });
 
   it('merges cached/DB DataCache onto any pre-existing enhancedRequest.DataCache rather than replacing it', async () => {
