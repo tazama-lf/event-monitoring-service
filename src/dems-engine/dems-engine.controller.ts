@@ -87,6 +87,12 @@ export class DemsEngineController {
       });
     }
 
+    // Only cache once the transaction is actually persisted and event-director has been notified, so
+    // a failed message never leaves a usable entry behind for a later related transaction.
+    if (result.shouldCacheDataCache) {
+      await this.demsEngineService.cacheDataCache(user.token.tenantId, result.endToEndId, result.DataCache);
+    }
+
     this.logger.log('Dynamic Mapping in Controller: ', result.dynamicMapping);
 
     // console.log('Configured Schema in Controller: ', result);

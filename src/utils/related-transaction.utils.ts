@@ -100,3 +100,37 @@ export async function processRelatedTransactionMapping(params: ProcessRelatedTra
     enhancedRequest,
   };
 }
+
+interface CacheDataCacheEntryParams {
+  tenantId: string;
+  endToEndId: string;
+  dataCache: unknown;
+  redisService: RedisService;
+  ttl: number;
+  loggerService: LoggerService;
+  logContext: string;
+}
+
+/**
+ * Writes a first-leg message's DataCache to the distributed cache, keyed the same way
+ * {@link processRelatedTransactionMapping} reads it back.
+ *
+ * Must only be called once the transaction has been persisted AND event-director notified: writing
+ * earlier would leave a usable entry behind for a message whose database write or notification then
+ * failed, and a later related message would rebuild from data that was never actually persisted.
+ *
+ * Best-effort — a Redis failure is logged and swallowed, because the database lookup remains the
+ * source of truth.
+ */
+export async function cacheDataCacheEntry(params: CacheDataCacheEntryParams): Promise<void> {
+  const { tenantId, endToEndId, dataCache, redisService, ttl, loggerService, logContext } = params;
+
+  if (!endToEndId || !dataCache || Object.keys(dataCache).length === 0) return;
+
+  const distributedCacheKey = `${tenantId}:${endToEndId}`;
+  try {
+    await redisService.setJson(distributedCacheKey, JSON.stringify(dataCache), ttl);
+  } catch (error) {
+    loggerService.warn(`Failed to cache DataCache at key ${distributedCacheKey}: ${String(error)}`, logContext);
+  }
+}
