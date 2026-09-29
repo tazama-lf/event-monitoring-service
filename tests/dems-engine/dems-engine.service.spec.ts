@@ -238,6 +238,94 @@ describe('DemsEngineService', () => {
       expect(result).toHaveProperty('DataCache');
     });
 
+    it('should persist the raw message with a top-level TenantId while notifying with the Payload envelope', async () => {
+      const testPayload = {
+        name: 'John',
+        age: 30,
+        FIToFIPmtSts: {
+          TxInfAndSts: {
+            OrgnlEndToEndId: 'test-end-to-end-id',
+          },
+        },
+      };
+
+      const result = await service.handleMessage(testPayload, '/test', 'tenant1', false);
+
+      expect(result).toHaveProperty('success', true);
+      if (!('success' in result)) throw new Error('expected a successful ProcessingResult');
+
+      // NATS notification keeps the `{ Payload: ... }` envelope.
+      expect(result.tazamaPayload.transaction).toHaveProperty('Payload');
+      expect(result.tazamaPayload.transaction.Payload).toMatchObject({ name: 'John', age: 30 });
+
+      // Persistence stores the raw ISO message plus a top-level TenantId, no Payload envelope.
+      expect(result.persistencePayload.transaction).not.toHaveProperty('Payload');
+      expect(result.persistencePayload.transaction).toMatchObject({ name: 'John', age: 30, TenantId: 'tenant1' });
+    });
+
+    it('should flag a first-leg message for caching rather than writing to Redis during handleMessage', async () => {
+      const mappingWithEndToEndId = [
+        { source: ['name'], destination: 'redis.userName' },
+        { source: ['e2eId'], destination: 'transactionDetails.EndToEndId' },
+      ];
+      mockDatabaseService.query.mockResolvedValue(
+        createMockQueryResult([
+          {
+            schema: { type: 'object', properties: { name: { type: 'string' }, e2eId: { type: 'string' } } },
+            mapping: mappingWithEndToEndId,
+            functions: mockFunctions,
+            related_transaction: '', // this endpoint is NOT itself a related-transaction lookup
+            publishing_status: 'active',
+          },
+        ]),
+      );
+
+      const testPayload = { name: 'John', e2eId: 'E2E-CACHE-TEST' };
+      const result = await service.handleMessage(testPayload, '/test', 'tenant1', false);
+
+      expect(result).toHaveProperty('success', true);
+      expect(result).toHaveProperty('shouldCacheDataCache', true);
+      // The DataCache must NOT be written yet — persistence has not run at this point. Only the
+      // unrelated config-schema cache write (key `tenant1:/test`) is allowed here.
+      const dataCacheCalls = (mockRedisService.setJson as jest.Mock).mock.calls.filter(([key]) => key !== 'tenant1:/test');
+      expect(dataCacheCalls).toHaveLength(0);
+    });
+
+    it('should write the DataCache to Redis when cacheDataCache is called after persistence', async () => {
+      await service.cacheDataCache('tenant1', 'E2E-CACHE-TEST', { userName: 'John' } as any);
+
+      expect(mockRedisService.setJson).toHaveBeenCalledWith(
+        'data-cache:tenant1:E2E-CACHE-TEST',
+        JSON.stringify({ userName: 'John' }),
+        3600, // mockConfigService.get() is stubbed to always return 3600
+      );
+    });
+
+    it('should not write a cache entry when there is no usable endToEndId or DataCache', async () => {
+      await service.cacheDataCache('tenant1', '', { userName: 'John' } as any);
+      await service.cacheDataCache('tenant1', 'E2E-1', {} as any);
+
+      expect(mockRedisService.setJson).not.toHaveBeenCalled();
+    });
+
+    it('should NOT write a DataCache cache entry when endToEndId is empty (nothing usable to key the cache on)', async () => {
+      // mockMapping has no transactionDetails.EndToEndId entry, so endToEndId stays ''.
+      await service.handleMessage({ name: 'John', age: 30 }, '/test', 'tenant1', false);
+
+      // setJson IS called once here for the unrelated config-schema cache (key `tenant1:/test`,
+      // written by findSchemaAndMapping) — assert specifically that no call used an
+      // EndToEndId-shaped DataCache key (`tenant1:<endToEndId>`), rather than asserting zero calls.
+      const dataCacheCalls = (mockRedisService.setJson as jest.Mock).mock.calls.filter(([key]) => key !== 'tenant1:/test');
+      expect(dataCacheCalls).toHaveLength(0);
+    });
+
+    it('should not throw if the Redis cache write fails (best-effort caching)', async () => {
+      (mockRedisService.setJson as jest.Mock).mockRejectedValueOnce(new Error('Redis connection refused'));
+
+      await expect(service.cacheDataCache('tenant1', 'E2E-CACHE-FAIL', { userName: 'John' } as any)).resolves.toBeUndefined();
+      expect(mockLoggerService.warn).toHaveBeenCalledWith(expect.stringContaining('Failed to cache DataCache'), expect.anything());
+    });
+
     it('should return error for invalid payload', async () => {
       const result = await service.handleMessage({ age: 30 }, '/test', 'tenant1', false);
 

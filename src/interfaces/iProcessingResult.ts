@@ -6,10 +6,12 @@ export interface ProcessingResult {
   success: boolean;
   configuredSchema: any;
   tazamaPayload: TazamaPayload;
+  persistencePayload: TazamaPayload;
   dynamicMapping?: any;
   transactionRelationship: TransactionDetails;
   DataCache: CacheData;
   transactionType: string;
   endToEndId: string;
   trackedFields: TrackedFields;
+  shouldCacheDataCache?: boolean;
 }
